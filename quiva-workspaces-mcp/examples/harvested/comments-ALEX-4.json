@@ -18,19 +18,6 @@
   "comments": [
     {
       "author": "<<REDACTED:user-id>>",
-      "body": "test",
-      "created_at": "2026-07-14T19:27:52.218910343Z",
-      "id": "c_eU7CVCgmAU",
-      "modified": 1784057272,
-      "reactions": {},
-      "sequence": 1487,
-      "subject": "ms.workspaces.task-comment.ALEX-4.c_eU7CVCgmAU",
-      "type": "created",
-      "updated_at": "2026-07-14T19:27:52.218910343Z",
-      "url": "https://app.microstrate.io/en/hub/spaces/ALEX/tasks?task=ALEX-4#comment-c_eU7CVCgmAU"
-    },
-    {
-      "author": "<<REDACTED:user-id>>",
       "body": "comment 1!!!!",
       "created_at": "2026-07-14T19:03:16.501641275Z",
       "id": "c_x4h0WxpVkY",
@@ -54,6 +41,19 @@
       "type": "created",
       "updated_at": "2026-07-14T19:04:38.919791202Z",
       "url": "https://app.microstrate.io/en/hub/spaces/ALEX/tasks?task=ALEX-4#comment-c_vjzL1WEExW"
+    },
+    {
+      "author": "<<REDACTED:user-id>>",
+      "body": "test",
+      "created_at": "2026-07-14T19:27:52.218910343Z",
+      "id": "c_eU7CVCgmAU",
+      "modified": 1784057272,
+      "reactions": {},
+      "sequence": 1487,
+      "subject": "ms.workspaces.task-comment.ALEX-4.c_eU7CVCgmAU",
+      "type": "created",
+      "updated_at": "2026-07-14T19:27:52.218910343Z",
+      "url": "https://app.microstrate.io/en/hub/spaces/ALEX/tasks?task=ALEX-4#comment-c_eU7CVCgmAU"
     }
   ]
 }

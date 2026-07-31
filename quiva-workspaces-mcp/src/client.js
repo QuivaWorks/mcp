@@ -14,7 +14,103 @@
 // here (my-tasks, watch/mute, export) are hard 401 without a JWT. Prefer a
 // bearer token or email/password so attribution and reactions work.
 
+import { createHash } from 'node:crypto';
+
 const DEFAULT_API_URL = 'https://api.microstrate.io';
+
+// The object store that backs space FILES lives at a DIFFERENT URL root from
+// /workspaces/*, and it is absent from the gateway route registry
+// (specs/openapi/quiva-endpoints.json), so it cannot be discovered from there —
+// it was found by reading what the UI calls
+// (microstrate/src/services/api/storage/storage.api.ts downloadFileBinary /
+// uploadObjFileBinary). Read and write share one root and differ only by method:
+//
+//   GET  {base}/api/default-storage/object/{bucket}/{key}  -> the raw bytes
+//   POST {base}/api/default-storage/object/{bucket}/{key}  -> { name, size, digest, ... }
+//
+// Verified live 2026-07-31: an API key is sufficient for both, and the write
+// response carries a `digest` over the exact bytes stored (see digestMatches
+// below for its encoding), so a write can be integrity-checked without a second
+// round trip. Reading the file back is still the stronger check.
+//
+// Neither response is wrapped in the workspaces `{ status_code, body }` envelope,
+// and a read returns file content rather than JSON — so these bypass both
+// parseBody and unwrapEnvelope.
+const OBJECT_ROOT = '/api/default-storage/object';
+
+// Bucket holding every space's files. workspaces-service/data/const.go
+// WorkspacesObjectStoreBucketName.
+export const WORKSPACES_BUCKET = 'microstrate-workspaces';
+
+// The write response carries `digest: "SHA-256=<hash>"`. The hash uses the
+// BASE64URL alphabet (`-` and `_`, not `+` and `/`) with padding retained.
+//
+// This was very nearly wrong: the first digest compared during development
+// happened to contain neither `+` nor `/`, so a plain-base64 comparison matched
+// and read as proof that the encoding was standard base64. The second file
+// hashed to a value containing a `/` and the check failed. So both sides are
+// NORMALISED here — alphabet folded and padding stripped — rather than trusting
+// either encoding. A comparison that can pass for the wrong reason is not a check.
+export function sha256OfContent(content) {
+  const buf = Buffer.isBuffer(content) ? content : Buffer.from(String(content), 'utf8');
+  return createHash('sha256').update(buf).digest('base64');
+}
+
+function normaliseDigest(value) {
+  return String(value ?? '')
+    .replace(/^SHA-256=/, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+// Does `returned` (the store's digest string) describe exactly these bytes?
+export function digestMatches(content, returned) {
+  const expected = normaliseDigest(sha256OfContent(content));
+  return expected !== '' && normaliseDigest(returned) === expected;
+}
+
+// The digest string as the store would express it, for diagnostics.
+export function expectedDigestString(content) {
+  return 'SHA-256=' + sha256OfContent(content).replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+// A file-index entry's `name` can be EMPTY while its `subject` is correct —
+// observed live 2026-07-31 on all twelve folder markers in the VERTICAL space
+// after the #1291 marker rename rolled through, while markers created natively by
+// the new code kept their name. This is a known state, not a surprise: the engine
+// itself falls back to decoding the subject in exactly this case
+// (workspaces-service DeleteFolderHandler -> transform.ObjKeyUnsafe). So the
+// SUBJECT is the authoritative key and `name` is a convenience.
+//
+// Subject shape: `ms.workspace-files.<b64seg>.<b64seg>...`, one segment per path
+// segment, base64 RawStdEncoding (standard alphabet, NO padding). A segment that
+// does not decode is passed through verbatim — mirroring util.ObjKeyUnsafe.
+const FILE_SUBJECT_PREFIX = 'ms.workspace-files.';
+
+export function decodeFileKey(subject) {
+  if (typeof subject !== 'string' || subject === '') return '';
+  const body = subject.startsWith(FILE_SUBJECT_PREFIX) ? subject.slice(FILE_SUBJECT_PREFIX.length) : subject;
+  return body
+    .split('.')
+    .map((part) => {
+      try {
+        const decoded = Buffer.from(part, 'base64');
+        // Node's base64 decoder is lenient, so round-trip to decide whether the
+        // segment really was base64 — Go returns the raw part on a decode error.
+        if (decoded.toString('base64').replace(/=+$/, '') !== part) return part;
+        return decoded.toString('utf8');
+      } catch {
+        return part;
+      }
+    })
+    .join('.');
+}
+
+// The key of a file-index entry, preferring `name` and falling back to the subject.
+export function fileKeyOf(entry) {
+  return entry?.name && entry.name !== '' ? entry.name : decodeFileKey(entry?.subject);
+}
 
 export class QuivaClient {
   constructor(env = process.env) {
@@ -121,6 +217,59 @@ export class QuivaClient {
   }
   delete(path, query) {
     return this.request('DELETE', path, { query });
+  }
+
+  // --- Object store (space files) ------------------------------------------
+  // Keys are dotted paths: `spaces.<SPACE_ID>.<folder>...<name>.<ext>`. The key
+  // is percent-encoded because live keys DO contain spaces — the alex-test
+  // templates write `spaces.FAHUB.<Owner Name>.<file>.pdf`. encodeURIComponent
+  // leaves `.`, `-`, `_` and `~` alone, so a normal dotted key is unchanged.
+  objectUrl(bucket, key) {
+    return `${this.baseUrl}${OBJECT_ROOT}/${encodeURIComponent(bucket)}/${encodeURIComponent(key)}`;
+  }
+
+  // Read one object's bytes. Returns { key, bucket, bytes, encoding, content }:
+  // text for JSON/markdown/plain keys, base64 otherwise (a vertical
+  // document_templates folder holds .docx).
+  async readObject(bucket, key) {
+    const res = await fetch(this.objectUrl(bucket, key), { headers: await this.authHeaders() });
+    if (!res.ok) {
+      const data = await parseBody(res);
+      const err = new Error(`GET object ${key} failed (${res.status}): ${extractError(data)}`);
+      err.status = res.status;
+      err.body = data;
+      throw err;
+    }
+    const buf = Buffer.from(await res.arrayBuffer());
+    const textual = /\.(json|md|txt|csv|ya?ml|html?|svg)$/i.test(key);
+    return {
+      bucket,
+      key,
+      bytes: buf.length,
+      encoding: textual ? 'utf8' : 'base64',
+      content: textual ? buf.toString('utf8') : buf.toString('base64'),
+    };
+  }
+
+  // Write one object. `content` is a string (utf8) or a Buffer. Returns the
+  // storage entry, whose `digest` proves what landed.
+  async writeObject(bucket, key, content) {
+    const body = Buffer.isBuffer(content) ? content : Buffer.from(String(content), 'utf8');
+    const res = await fetch(this.objectUrl(bucket, key), {
+      method: 'POST',
+      body,
+      // The UI sends application/json regardless of the payload, and the store
+      // does not inspect it — it stores the bytes as given.
+      headers: { 'Content-Type': 'application/json', ...(await this.authHeaders()) },
+    });
+    const data = await parseBody(res);
+    if (!res.ok) {
+      const err = new Error(`POST object ${key} failed (${res.status}): ${extractError(data)}`);
+      err.status = res.status;
+      err.body = data;
+      throw err;
+    }
+    return data;
   }
 }
 

@@ -7,6 +7,8 @@
 //   'space' | 'task' | 'multi_task' | 'comment' | 'reaction' | 'task_action'
 // requireRequired defaults to true (create). Pass false for update payloads.
 
+import { VERTICAL_SPACE_ID, VERTICAL_CONFIG_TYPES, FOLDER_MARKERS } from './workspaces-docs.js';
+
 const SPACE_ID_REGEX = /^\w+$/; // letters, numbers, underscore only
 const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -16,7 +18,7 @@ const SPACE_READONLY = ['owner', 'created_at', 'updated_at', 'url'];
 const TASK_READONLY = ['created_at', 'updated_at', 'created_by', 'url', 'watchers', 'muted'];
 const COMMENT_READONLY = ['author', 'created_at', 'updated_at', 'url', 'reactions'];
 
-const VALID_KINDS = ['space', 'task', 'multi_task', 'comment', 'reaction', 'task_action'];
+const VALID_KINDS = ['space', 'task', 'multi_task', 'comment', 'reaction', 'task_action', 'folder', 'file'];
 
 // Every field the frontend writes on a time log. The backend does no defaulting
 // inside time_tracking (model.TimeTracking is stored as sent), so anything the
@@ -41,6 +43,8 @@ export function validate(kind, payload, { requireRequired = true } = {}) {
     case 'comment': validateComment(payload, requireRequired, errors, warnings); break;
     case 'reaction': validateReaction(payload, errors, warnings); break;
     case 'task_action': validateTaskAction(payload, requireRequired, errors, warnings); break;
+    case 'folder': validateFolder(payload, errors, warnings); break;
+    case 'file': validateFile(payload, errors, warnings); break;
   }
 
   return { valid: errors.length === 0, errors, warnings };
@@ -342,6 +346,226 @@ function warnRfc3339(obj, key, label, warnings) {
 function warnDateFormat(p, key, warnings) {
   if (typeof p[key] === 'string' && DATE_ONLY_REGEX.test(p[key])) {
     warnings.push(`${key} "${p[key]}" is date-only — the engine parses it as RFC3339 on read and a date-only value can fail to round-trip. Prefer a full timestamp like "${p[key]}T00:00:00Z".`);
+  }
+}
+
+// --- Folders and files -----------------------------------------------------
+//
+// Object keys are DOTTED paths (`spaces.<SPACE_ID>.<folder>...<name>.<ext>`), so
+// `.` is the hierarchy separator and a dot inside a name silently creates an
+// extra level. Everything below either encodes a rule the engine enforces, or
+// lints a failure the engine accepts SILENTLY — the second group is the reason
+// this validator exists.
+
+// A dotted path with an empty segment (leading/trailing dot, or "..") produces a
+// key the tree walker cannot place.
+function lintDottedPath(label, value, errors) {
+  if (String(value).split('.').some((s) => s === '')) {
+    errors.push(
+      `${label} ${JSON.stringify(value)} has an empty path segment — "." is the hierarchy separator, so it cannot start or end with a dot, or contain "..".`
+    );
+    return false;
+  }
+  return true;
+}
+
+// Warn when a VERTICAL category folder is not one of the six accounts-service
+// will route. A WARNING and not an error: the list is transcribed from
+// accounts-service/accounts/updateaccount.go and can grow upstream without us
+// noticing, and a non-deploying folder may well be deliberate.
+function lintVerticalCategory(category, warnings) {
+  if (category && !Object.prototype.hasOwnProperty.call(VERTICAL_CONFIG_TYPES, category)) {
+    warnings.push(
+      `"${category}" is not one of the six folder names accounts-service deploys from (${Object.keys(VERTICAL_CONFIG_TYPES).join(', ')}). ` +
+        'The category folder is the ROUTING KEY, and an unrecognised name is skipped SILENTLY — no error, no log entry, nothing deploys from it.'
+    );
+  }
+}
+
+function validateFolder(p, errors, warnings) {
+  const hasPair = p.space_id !== undefined || p.folder !== undefined;
+
+  // The engine only 400s when space_id, folder AND full_path are all present, or
+  // all three absent — so `{ space_id }` alone passes server-side validation and
+  // writes a malformed `spaces.<ID>..<marker>.json`. Catch both locally.
+  if (p.full_path !== undefined && p.full_path !== '' && hasPair) {
+    errors.push(
+      'send EITHER full_path OR space_id + folder, not both — the engine only rejects the case where all three are present, so a mixed payload silently uses full_path and ignores the rest.'
+    );
+  }
+
+  if (p.full_path !== undefined && p.full_path !== '') {
+    if (typeof p.full_path !== 'string') {
+      errors.push('full_path must be a string');
+    } else {
+      if (!p.full_path.startsWith('spaces.')) {
+        errors.push(`full_path ${JSON.stringify(p.full_path)} must start with "spaces.<SPACE_ID>." — every space file key is rooted there.`);
+      }
+      lintDottedPath('full_path', p.full_path, errors);
+    }
+  } else {
+    if (p.space_id === undefined || p.space_id === '') {
+      errors.push('space_id is required (or send full_path instead)');
+    } else if (typeof p.space_id !== 'string' || !SPACE_ID_REGEX.test(p.space_id)) {
+      errors.push(`space_id ${JSON.stringify(p.space_id)} is invalid — letters, numbers and underscore only (^\\w+$).`);
+    } else if (p.space_id !== p.space_id.toUpperCase()) {
+      warnings.push(`space_id "${p.space_id}" will be UPPERCASED server-side to "${p.space_id.toUpperCase()}" — the stored key uses the uppercase form.`);
+    }
+
+    // The gap above: without this the engine writes `spaces.<ID>..<marker>.json`.
+    if (p.folder === undefined || p.folder === '') {
+      errors.push(
+        'folder is required — the engine does NOT reject a payload carrying only space_id (it only errors when space_id, folder and full_path are ALL empty), and would write a malformed key `spaces.<ID>..__meta__.json`.'
+      );
+    } else if (typeof p.folder !== 'string' || p.folder.includes('.')) {
+      errors.push(`folder ${JSON.stringify(p.folder)} must be a single dot-free segment — a dot would create an extra level. Use subfolder for a parent path.`);
+    }
+
+    if (p.subfolder !== undefined && p.subfolder !== '') {
+      if (typeof p.subfolder !== 'string') {
+        errors.push('subfolder must be a string');
+      } else {
+        // subfolder is the PARENT prefix, not a child: the engine builds
+        // `spaces.<space_id>.<subfolder>.<folder>`. It may itself be dotted for
+        // deeper nesting.
+        lintDottedPath('subfolder', p.subfolder, errors);
+      }
+    }
+  }
+
+  // Marker names are managed by the engine — naming a folder after one produces
+  // a doubled marker like `...__meta__.__meta__.json`.
+  const bareMarkers = FOLDER_MARKERS.map((m) => m.replace(/\.json$/, ''));
+  if (typeof p.folder === 'string' && bareMarkers.includes(p.folder)) {
+    warnings.push(`folder "${p.folder}" collides with a folder-marker name (${FOLDER_MARKERS.join(', ')}) — the engine appends the marker itself, so this would store a doubled marker key.`);
+  }
+
+  // model.CreateFolderRequest.Metadata is map[string]string: a nested object or
+  // a number fails to unmarshal and the whole call 400s.
+  if (p.metadata !== undefined) {
+    if (!isObject(p.metadata)) {
+      errors.push('metadata must be an object');
+    } else {
+      const bad = Object.entries(p.metadata).filter(([, v]) => typeof v !== 'string');
+      if (bad.length) {
+        errors.push(`metadata values must all be STRINGS (the engine field is map[string]string) — non-string value(s) for: ${bad.map(([k]) => k).join(', ')}`);
+      }
+      for (const reserved of ['created_at', 'created_by']) {
+        if (p.metadata[reserved] !== undefined) {
+          warnings.push(`metadata.${reserved} is overwritten by the engine — yours is discarded.`);
+        }
+      }
+    }
+  }
+
+  // Vertical-specific layout lint.
+  const resolved = p.full_path && p.full_path !== ''
+    ? p.full_path
+    : `spaces.${p.space_id}${p.subfolder ? '.' + p.subfolder : ''}.${p.folder}`;
+  const segs = String(resolved).split('.');
+  if (segs[1] === VERTICAL_SPACE_ID) {
+    // spaces.VERTICAL.<vertical>            -> a vertical root (segs.length 3)
+    // spaces.VERTICAL.<vertical>.<category> -> a category folder (segs.length 4)
+    if (segs.length === 4) lintVerticalCategory(segs[3], warnings);
+    if (segs.length === 3 && segs[2] !== 'SHARED' && !/^[a-z0-9_]+$/.test(segs[2])) {
+      warnings.push(
+        `vertical id "${segs[2]}" is not lower_snake_case. Existing verticals are (financial_advisor, insurance_broker, uig), and accounts-service derives the flow COLLECTION name by splitting the id on "_" and title-casing each part — so anything else produces an odd collection name.`
+      );
+    }
+  }
+
+  warnReadonly(p, ['created_at', 'created_by', 'owner'], warnings);
+}
+
+function validateFile(p, errors, warnings) {
+  if (p.key === undefined || p.key === '') {
+    errors.push('key is required — the full dotted object key, e.g. "spaces.VERTICAL.my_vertical.spaces.myhub.json"');
+    return;
+  }
+  if (typeof p.key !== 'string') {
+    errors.push('key must be a string');
+    return;
+  }
+  if (!p.key.startsWith('spaces.')) {
+    errors.push(`key ${JSON.stringify(p.key)} must start with "spaces.<SPACE_ID>." — every space file key is rooted there.`);
+  }
+  lintDottedPath('key', p.key, errors);
+
+  if (p.content !== undefined && typeof p.content !== 'string') {
+    errors.push('content must be a string (JSON should be stringified before sending)');
+  }
+
+  const segs = p.key.split('.');
+  if (segs.length < 4) {
+    errors.push(`key ${JSON.stringify(p.key)} is too shallow — expected at least spaces.<SPACE_ID>.<name>.<ext>.`);
+  }
+
+  // Writing a marker by hand creates a folder the engine did not make, and
+  // create_folder would then 409 on it.
+  if (FOLDER_MARKERS.some((m) => p.key.endsWith('.' + m))) {
+    warnings.push(
+      `key ends in a folder marker (${FOLDER_MARKERS.join(' / ')}) — markers are written by create_folder, and hand-writing one creates a folder the engine did not register consistently. Use create_folder instead.`
+    );
+  }
+
+  if (segs[1] !== VERTICAL_SPACE_ID) return;
+
+  // --- VERTICAL template-library rules ---
+  const category = segs[3];
+  lintVerticalCategory(category, warnings);
+
+  const ext = segs[segs.length - 1].toLowerCase();
+  if (category === 'document_templates') {
+    if (ext === 'json') {
+      warnings.push('document_templates config is forwarded verbatim to microstrate.file-generator.post.template — confirm it is a template CONFIG body and not a raw source document.');
+    }
+  } else if (Object.prototype.hasOwnProperty.call(VERTICAL_CONFIG_TYPES, category) && ext !== 'json') {
+    warnings.push(`a "${category}" config is POSTed verbatim to ${VERTICAL_CONFIG_TYPES[category]}, which expects a JSON body — a ".${ext}" file would fail to unmarshal at deploy time.`);
+  }
+
+  // Content-shape lints, only when the content is parseable JSON.
+  if (typeof p.content !== 'string' || ext !== 'json') return;
+  let parsed;
+  try {
+    parsed = JSON.parse(p.content);
+  } catch (err) {
+    errors.push(`content is not valid JSON but the key ends in .json — deployment would fail to unmarshal it: ${err.message}`);
+    return;
+  }
+  if (!isObject(parsed)) return;
+
+  if (category === 'assistants' && parsed.config === undefined) {
+    errors.push(
+      'an assistants config must be WRAPPED as { "config": { ... } } — accounts-service unmarshals into a { config } struct, so a flat agent payload yields an EMPTY config and deploys a hollow assistant. (It also FORCES config.shared to "team", whatever you set.)'
+    );
+  }
+
+  if (category === 'spaces') {
+    if (parsed.id === undefined || parsed.id === '') {
+      errors.push('a spaces config needs an `id` — it is POSTed to microstrate.workspaces.post.space, which requires one.');
+    }
+    if (parsed.name === undefined || parsed.name === '') {
+      warnings.push('a spaces config with no `name` renders unnamed on the board.');
+    }
+    // The finding this lint exists for: record_configs WINS on read, and the
+    // legacy ids array is only consulted when it is absent. Keeping one of them
+    // in sync by hand is exactly how a config gets silently dropped.
+    const ids = Array.isArray(parsed.record_config_ids) ? parsed.record_config_ids : null;
+    const objs = Array.isArray(parsed.record_configs) ? parsed.record_configs.map((c) => c?.id) : null;
+    if (ids && objs) {
+      const missing = ids.filter((id) => !objs.includes(id));
+      const extra = objs.filter((id) => !ids.includes(id));
+      if (missing.length || extra.length) {
+        warnings.push(
+          `record_config_ids and record_configs DISAGREE (only in ids: ${missing.join(', ') || 'none'}; only in record_configs: ${extra.join(', ') || 'none'}). ` +
+            '`record_configs` WINS on read and `record_config_ids` is consulted only when it is absent (space-record-configs.utils.ts), so anything listed only in the ids array is silently ignored. Write both, identically.'
+        );
+      }
+    } else if (ids && !objs) {
+      warnings.push(
+        'this space uses only the LEGACY `record_config_ids`. It still reads correctly today (it is the fallback), but the UI persists `record_configs` and DELETES the ids array on save — so add `record_configs: [{ id }]` alongside it.'
+      );
+    }
   }
 }
 

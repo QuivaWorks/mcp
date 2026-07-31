@@ -3,7 +3,8 @@
 import assert from 'node:assert/strict';
 import { validate } from '../src/validate.js';
 import { harvestedPayloads, getExample } from '../src/examples.js';
-import { TIME_LOG_EXAMPLE, TIME_TRACKING_EXAMPLE, TASK_ACTION_EXAMPLE } from '../src/workspaces-docs.js';
+import { TIME_LOG_EXAMPLE, TIME_TRACKING_EXAMPLE, TASK_ACTION_EXAMPLE, VERTICAL_CONFIG_TYPES } from '../src/workspaces-docs.js';
+import { decodeFileKey, fileKeyOf, digestMatches, sha256OfContent } from '../src/client.js';
 
 let failures = 0;
 function check(name, fn) {
@@ -426,6 +427,277 @@ check('the authored example covers the new task surface and passes the validator
     'the example must record that logs[] replaces rather than appends'
   );
 });
+
+// --- folders ---------------------------------------------------------------
+
+check('valid vertical category folder passes', () => {
+  const r = validate('folder', { space_id: 'VERTICAL', subfolder: 'my_vertical', folder: 'spaces' });
+  assert.equal(r.valid, true, JSON.stringify(r.errors));
+  assert.equal(r.warnings.length, 0, JSON.stringify(r.warnings));
+});
+
+// The engine only 400s when space_id, folder AND full_path are all empty, so a
+// payload with just space_id passes server-side and writes `spaces.X..__meta__.json`.
+check('folder payload with only space_id is an error (the engine would not reject it)', () => {
+  const r = validate('folder', { space_id: 'VERTICAL' });
+  assert.equal(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes('folder is required')));
+});
+
+check('a dotted folder name is an error (dots are the hierarchy separator)', () => {
+  const r = validate('folder', { space_id: 'VERTICAL', folder: 'a.b' });
+  assert.equal(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes('single dot-free segment')));
+});
+
+check('full_path combined with space_id/folder is an error', () => {
+  const r = validate('folder', { space_id: 'VERTICAL', folder: 'spaces', full_path: 'spaces.VERTICAL.v.spaces' });
+  assert.equal(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes('EITHER full_path OR')));
+});
+
+check('non-string metadata values are an error (engine field is map[string]string)', () => {
+  const r = validate('folder', { space_id: 'X', folder: 'f', metadata: { count: 1 } });
+  assert.equal(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes('map[string]string')));
+});
+
+// A WARNING, not an error: the six names are transcribed from accounts-service
+// and can grow upstream, and a non-deploying folder may be deliberate.
+check('an unrecognised vertical category warns and names the silent skip', () => {
+  const r = validate('folder', { space_id: 'VERTICAL', subfolder: 'my_vertical', folder: 'record_config' });
+  assert.equal(r.valid, true, JSON.stringify(r.errors));
+  assert.ok(r.warnings.some((w) => w.includes('SILENTLY')));
+});
+
+check('a non-snake_case vertical id warns about the derived flow collection name', () => {
+  const r = validate('folder', { space_id: 'VERTICAL', folder: 'MyVertical' });
+  assert.equal(r.valid, true, JSON.stringify(r.errors));
+  assert.ok(r.warnings.some((w) => w.includes('collection')));
+});
+
+check('a folder named after the marker warns', () => {
+  const r = validate('folder', { space_id: 'X', folder: '__meta__' });
+  assert.ok(r.warnings.some((w) => w.includes('folder-marker')));
+});
+
+// --- files -----------------------------------------------------------------
+
+check('file needs a key', () => {
+  const r = validate('file', { content: '{}' });
+  assert.equal(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes('key is required')));
+});
+
+check('a key not rooted at spaces. is an error', () => {
+  const r = validate('file', { key: 'VERTICAL.v.spaces.hub.json', content: '{}' });
+  assert.equal(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes('must start with "spaces.')));
+});
+
+// deployVerticals unmarshals an assistant into a { config } struct, so a flat
+// payload deploys a hollow assistant with no error anywhere.
+check('an unwrapped assistants config is an error', () => {
+  const r = validate('file', {
+    key: 'spaces.VERTICAL.v1.assistants.a.json',
+    content: JSON.stringify({ name: 'A', llm_provider: 'claude', model: 'claude-haiku-4-5' }),
+  });
+  assert.equal(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes('"config"')));
+});
+
+check('a { config } wrapped assistants config passes', () => {
+  const r = validate('file', {
+    key: 'spaces.VERTICAL.v1.assistants.a.json',
+    content: JSON.stringify({ config: { name: 'A', llm_provider: 'claude', model: 'claude-haiku-4-5' } }),
+  });
+  assert.equal(r.valid, true, JSON.stringify(r.errors));
+});
+
+check('content that is not valid JSON under a .json key is an error', () => {
+  const r = validate('file', { key: 'spaces.VERTICAL.v1.flows.f.json', content: '{nope' });
+  assert.equal(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes('not valid JSON')));
+});
+
+check('a non-json config for a deployable category warns about unmarshalling', () => {
+  const r = validate('file', { key: 'spaces.VERTICAL.v1.flows.f.yaml', content: 'a: 1' });
+  assert.ok(r.warnings.some((w) => w.includes('unmarshal')));
+});
+
+// The lint that exists because record_configs WINS on read and the legacy ids
+// array is only a fallback — keeping one in sync by hand drops a config silently.
+check('record_config_ids disagreeing with record_configs warns', () => {
+  const r = validate('file', {
+    key: 'spaces.VERTICAL.v1.spaces.hub.json',
+    content: JSON.stringify({ id: 'HUB', name: 'Hub', record_config_ids: ['Client', 'Policy'], record_configs: [{ id: 'Client' }] }),
+  });
+  assert.equal(r.valid, true, JSON.stringify(r.errors));
+  assert.ok(r.warnings.some((w) => w.includes('DISAGREE') && w.includes('Policy')));
+});
+
+check('a space config using only the legacy record_config_ids warns', () => {
+  const r = validate('file', {
+    key: 'spaces.VERTICAL.v1.spaces.hub.json',
+    content: JSON.stringify({ id: 'HUB', name: 'Hub', record_config_ids: ['Client'] }),
+  });
+  assert.ok(r.warnings.some((w) => w.includes('LEGACY')));
+});
+
+check('a spaces config with no id is an error', () => {
+  const r = validate('file', { key: 'spaces.VERTICAL.v1.spaces.hub.json', content: JSON.stringify({ name: 'Hub' }) });
+  assert.equal(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes('needs an `id`')));
+});
+
+check('hand-writing a folder marker warns', () => {
+  const r = validate('file', { key: 'spaces.VERTICAL.v1.__meta__.json', content: '{}' });
+  assert.ok(r.warnings.some((w) => w.includes('folder marker')));
+});
+
+// --- subject decoding ------------------------------------------------------
+//
+// A file-index entry's `name` can be empty while its subject is correct, so the
+// subject is the authoritative key. This fixture is a REAL subject read off
+// staging on 2026-07-31 for the `uig` vertical's folder marker, whose `name` came
+// back as "". Matching on name alone is what made the first harvest report 9 of
+// 21 keys and would make a poll-until-indexed loop hang forever.
+check('decodeFileKey recovers a real key from a real subject', () => {
+  const subject = 'ms.workspace-files.c3BhY2Vz.VkVSVElDQUw.dWln.X19tZXRhX18.anNvbg';
+  assert.equal(decodeFileKey(subject), 'spaces.VERTICAL.uig.__meta__.json');
+});
+
+check('fileKeyOf prefers name and falls back to the subject', () => {
+  assert.equal(fileKeyOf({ name: 'spaces.X.a.json', subject: 'ms.workspace-files.zzzz' }), 'spaces.X.a.json');
+  assert.equal(
+    fileKeyOf({ name: '', subject: 'ms.workspace-files.c3BhY2Vz.VkVSVElDQUw.dWln.X19tZXRhX18.anNvbg' }),
+    'spaces.VERTICAL.uig.__meta__.json'
+  );
+});
+
+check('a segment that is not base64 is passed through verbatim (matches ObjKeyUnsafe)', () => {
+  // util.ObjKeyUnsafe keeps the raw part when base64 decoding fails.
+  assert.equal(decodeFileKey('ms.workspace-files.c3BhY2Vz.!!!not-base64!!!'), 'spaces.!!!not-base64!!!');
+});
+
+// --- object digest ---------------------------------------------------------
+//
+// The store's digest uses the BASE64URL alphabet. This nearly shipped wrong: the
+// first file tested hashed to a value containing no `+` or `/`, so comparing
+// against standard base64 matched and looked like proof the encoding was standard.
+// The second file hashed to a value with a `/` in it and the comparison failed.
+// The fixture below is the REAL digest staging returned for exactly these bytes.
+const DIGEST_FIXTURE = {
+  content: JSON.stringify(
+    {
+      id: 'ZZZ_MCP_PROBE_2',
+      name: 'MCP tool-path probe',
+      description: 'Written through the MCP write_file tool. Probe artefact, safe to delete.',
+      record_config_ids: ['Client'],
+      record_configs: [{ id: 'Client' }],
+      statuses: [{ id: 'to_do', name: 'To Do', color: '#6B7280', complete: false, order: 1 }],
+    },
+    null,
+    2
+  ),
+  // As returned by POST /api/default-storage/object/... on 2026-07-31.
+  serverDigest: 'SHA-256=E14cH3huoYptSMv_Vt0qbAYpk3HSZ8tlvDBRUBlKoao',
+};
+
+check('digestMatches accepts the base64URL digest the store actually returns', () => {
+  assert.equal(digestMatches(DIGEST_FIXTURE.content, DIGEST_FIXTURE.serverDigest), true);
+});
+
+check('the server digest really does differ from standard base64 (why normalising matters)', () => {
+  const standard = sha256OfContent(DIGEST_FIXTURE.content);
+  assert.ok(standard.includes('/'), 'this fixture must contain a `/` in standard base64 or it proves nothing');
+  assert.notEqual('SHA-256=' + standard, DIGEST_FIXTURE.serverDigest);
+});
+
+check('digestMatches also accepts a standard-base64 spelling of the same hash', () => {
+  assert.equal(digestMatches(DIGEST_FIXTURE.content, 'SHA-256=' + sha256OfContent(DIGEST_FIXTURE.content)), true);
+});
+
+check('digestMatches rejects a digest for different bytes', () => {
+  assert.equal(digestMatches(DIGEST_FIXTURE.content + ' ', DIGEST_FIXTURE.serverDigest), false);
+  assert.equal(digestMatches(DIGEST_FIXTURE.content, 'SHA-256=nonsense'), false);
+});
+
+// --- golden gate: the live VERTICAL template library -----------------------
+//
+// These are real keys on the platform, so the validator MUST accept every one.
+// A validator that rejects working config is a bug in the validator.
+const library = (() => {
+  try {
+    return getExample('vertical-template-library');
+  } catch {
+    return null;
+  }
+})();
+
+check('golden: the VERTICAL library example is bundled', () => {
+  assert.ok(library, 'run tools/harvest-examples.mjs — examples/harvested/vertical-template-library.json is missing');
+  assert.ok(library.all_keys?.length > 0, 'the example has no keys');
+});
+
+if (library) {
+  for (const key of library.all_keys) {
+    check(`golden: validator accepts the live key "${key.split('.').slice(2).join('.')}"`, () => {
+      const r = validate('file', { key });
+      assert.equal(r.valid, true, `${key}: ${JSON.stringify(r.errors)}`);
+    });
+  }
+
+  // Every category folder that is live must be one of the six we claim deploy.
+  // If upstream adds a seventh, this fails and says to re-read updateaccount.go
+  // rather than letting the transcribed list quietly go stale.
+  check('golden: every live category folder is a known deployable config type', () => {
+    const live = new Set();
+    for (const v of Object.values(library.verticals ?? {})) {
+      for (const c of Object.keys(v.categories ?? {})) live.add(c);
+    }
+    const unknown = [...live].filter((c) => !Object.prototype.hasOwnProperty.call(VERTICAL_CONFIG_TYPES, c));
+    assert.deepEqual(
+      unknown,
+      [],
+      `live category folder(s) ${unknown.join(', ')} are not in VERTICAL_CONFIG_TYPES — re-read accounts-service/accounts/updateaccount.go configTypeToEndpointSubject and update the list.`
+    );
+    assert.ok(live.size > 0, 'no category folders found in the corpus');
+  });
+
+  // The live space configs are the shape an authored vertical has to match.
+  check('golden: the live space configs pass the file validator with their content', () => {
+    const entries = Object.entries(library.space_configs ?? {});
+    assert.ok(entries.length > 0, 'no space configs harvested');
+    for (const [key, config] of entries) {
+      const r = validate('file', { key, content: JSON.stringify(config) });
+      assert.equal(r.valid, true, `${key}: ${JSON.stringify(r.errors)}`);
+    }
+  });
+
+  // The live configs set BOTH record-config keys, in agreement — which is why
+  // they trip no warning. That agreement is the thing to copy.
+  check('golden: the live space configs carry record_configs AND record_config_ids in agreement', () => {
+    const configs = Object.values(library.space_configs ?? {});
+    const withRecords = configs.filter((c) => c.record_config_ids || c.record_configs);
+    assert.ok(withRecords.length > 0, 'no live space config attaches a record config');
+    for (const c of withRecords) {
+      assert.ok(Array.isArray(c.record_configs), 'a live space config is missing the current `record_configs` shape');
+      assert.deepEqual(
+        c.record_configs.map((x) => x.id).sort(),
+        [...(c.record_config_ids ?? [])].sort(),
+        'a live space config has the two record-config keys out of agreement'
+      );
+    }
+  });
+
+  check('golden: SHARED carries the Client record config every vertical inherits', () => {
+    assert.ok(
+      library.all_keys.some((k) => k === 'spaces.VERTICAL.SHARED.record_configs.Client.json'),
+      'SHARED/record_configs/Client.json is missing — deployVerticals always appends SHARED, so this is what gives every account its Client config'
+    );
+  });
+}
 
 if (failures) {
   console.error(`\n${failures} check(s) failed`);

@@ -1,0 +1,192 @@
+{
+  "slug": "vertical-template-library",
+  "kind": "vertical template library (real folder tree)",
+  "source": {
+    "space_id": "VERTICAL",
+    "harvested_from": "https://api.microstrate.io"
+  },
+  "teaches": "The real layout of the VERTICAL space: which verticals exist, which category folders each has, and which marker filename each folder carries. This is the evidence behind the file/folder path rules and the six deployable category names — see get_workspaces_reference(\"verticals\").",
+  "file_count": 21,
+  "marker_styles_present": [
+    "__meta__.json"
+  ],
+  "marker_note": "One marker style present. If you expected two, folders may predate or postdate the 2026-07-31 rename.",
+  "verticals": {
+    "SHARED": {
+      "categories": {
+        "record_configs": {
+          "configs": [
+            "spaces.VERTICAL.SHARED.record_configs.Client.json"
+          ],
+          "folder_marker": "__meta__.json"
+        }
+      },
+      "marker_style": "__meta__.json"
+    },
+    "financial_advisor": {
+      "categories": {
+        "assistants": {
+          "configs": [
+            "spaces.VERTICAL.financial_advisor.assistants.assist.json"
+          ],
+          "folder_marker": "__meta__.json"
+        },
+        "document_templates": {
+          "configs": [
+            "spaces.VERTICAL.financial_advisor.document_templates.roa.docx",
+            "spaces.VERTICAL.financial_advisor.document_templates.soa.docx"
+          ],
+          "folder_marker": "__meta__.json"
+        },
+        "flows": {
+          "configs": [
+            "spaces.VERTICAL.financial_advisor.flows.client-folder-creation.json",
+            "spaces.VERTICAL.financial_advisor.flows.kyc.json"
+          ],
+          "folder_marker": "__meta__.json"
+        },
+        "meeting_templates": {
+          "configs": [],
+          "folder_marker": "__meta__.json"
+        },
+        "record_configs": {
+          "configs": [],
+          "folder_marker": "__meta__.json"
+        },
+        "spaces": {
+          "configs": [
+            "spaces.VERTICAL.financial_advisor.spaces.fahub.json"
+          ],
+          "folder_marker": "__meta__.json"
+        }
+      },
+      "marker_style": "__meta__.json"
+    },
+    "insurance_broker": {
+      "categories": {
+        "record_configs": {
+          "configs": [],
+          "folder_marker": "__meta__.json"
+        },
+        "spaces": {
+          "configs": [
+            "spaces.VERTICAL.insurance_broker.spaces.ibhub.json"
+          ],
+          "folder_marker": "__meta__.json"
+        }
+      },
+      "marker_style": "__meta__.json"
+    },
+    "uig": {
+      "categories": {},
+      "marker_style": "__meta__.json"
+    }
+  },
+  "space_configs": {
+    "spaces.VERTICAL.financial_advisor.spaces.fahub.json": {
+      "description": "House client folders, tasks and other resources related to your clients",
+      "id": "FAHUB",
+      "record_config_ids": [
+        "Client"
+      ],
+      "record_configs": [
+        {
+          "id": "Client"
+        }
+      ],
+      "name": "Advisor Hub",
+      "statuses": [
+        {
+          "color": "#6B7280",
+          "complete": false,
+          "id": "to_do",
+          "name": "To Do"
+        },
+        {
+          "color": "#3B82F6",
+          "complete": false,
+          "id": "in_progress",
+          "name": "In Progress"
+        },
+        {
+          "color": "#F59E0B",
+          "complete": false,
+          "id": "in_review",
+          "name": "In Review"
+        },
+        {
+          "color": "#10B981",
+          "complete": false,
+          "id": "completed",
+          "name": "Completed"
+        }
+      ]
+    },
+    "spaces.VERTICAL.insurance_broker.spaces.ibhub.json": {
+      "description": "House client folders, tasks and other resources related to your clients",
+      "id": "IBHUB",
+      "name": "Broker Hub",
+      "record_config_ids": [
+        "Client"
+      ],
+      "record_configs": [
+        {
+          "id": "Client"
+        }
+      ],
+      "statuses": [
+        {
+          "color": "#3b82f6",
+          "complete": false,
+          "id": "to_do",
+          "name": "To Do",
+          "order": 1
+        },
+        {
+          "color": "#f59e0b",
+          "complete": false,
+          "id": "in_progress",
+          "name": "In Progress",
+          "order": 2
+        },
+        {
+          "color": "#8b5cf6",
+          "complete": false,
+          "id": "in_review",
+          "name": "In Review",
+          "order": 3
+        },
+        {
+          "color": "#10b981",
+          "complete": false,
+          "id": "completed",
+          "name": "Completed",
+          "order": 4
+        }
+      ]
+    }
+  },
+  "all_keys": [
+    "spaces.VERTICAL.SHARED.__meta__.json",
+    "spaces.VERTICAL.SHARED.record_configs.Client.json",
+    "spaces.VERTICAL.SHARED.record_configs.__meta__.json",
+    "spaces.VERTICAL.financial_advisor.__meta__.json",
+    "spaces.VERTICAL.financial_advisor.assistants.__meta__.json",
+    "spaces.VERTICAL.financial_advisor.assistants.assist.json",
+    "spaces.VERTICAL.financial_advisor.document_templates.__meta__.json",
+    "spaces.VERTICAL.financial_advisor.document_templates.roa.docx",
+    "spaces.VERTICAL.financial_advisor.document_templates.soa.docx",
+    "spaces.VERTICAL.financial_advisor.flows.__meta__.json",
+    "spaces.VERTICAL.financial_advisor.flows.client-folder-creation.json",
+    "spaces.VERTICAL.financial_advisor.flows.kyc.json",
+    "spaces.VERTICAL.financial_advisor.meeting_templates.__meta__.json",
+    "spaces.VERTICAL.financial_advisor.record_configs.__meta__.json",
+    "spaces.VERTICAL.financial_advisor.spaces.__meta__.json",
+    "spaces.VERTICAL.financial_advisor.spaces.fahub.json",
+    "spaces.VERTICAL.insurance_broker.__meta__.json",
+    "spaces.VERTICAL.insurance_broker.record_configs.__meta__.json",
+    "spaces.VERTICAL.insurance_broker.spaces.__meta__.json",
+    "spaces.VERTICAL.insurance_broker.spaces.ibhub.json",
+    "spaces.VERTICAL.uig.__meta__.json"
+  ]
+}
