@@ -1,0 +1,143 @@
+{
+  "slug": "renewal-review-board",
+  "kind": "write-payloads",
+  "not_evidence": "HAND-WRITTEN. Every harvested example is a READ response and therefore carries server-set fields (owner, created_at, url, and on a task watchers/muted). This example exists because a create/update body is a DIFFERENT shape from a read: you must build it from scratch, never echo a GET back. It is not proof the platform accepts it — that is what test:e2e is for.",
+  "teaches": [
+    "create_space: id must be ^\\w+$ and is UPPERCASED server-side, so reference the space (and its task ids) by the uppercase form",
+    "statuses[] carry the board's presentation fields — color and complete are set on 45/45 live statuses, so omit them and the board renders a colourless column with no done state",
+    "default_status names the column new tasks land in; the status ids are what a task's `status` refers to",
+    "priorities[] need icon + icon_type + icon_color together (27/27 live priorities set all three) — priorityIconClass() reads icon_type unconditionally, so a priority without it breaks the priority dropdown",
+    "create_task: the id is SERVER-GENERATED as {SPACEID}-{n} — any id you send is ignored, and space_id must name a space that already exists",
+    "a task's status/priority must be ids from THAT space's statuses/priorities",
+    "create_comment then react_to_comment: reaction is a map { \"<emoji>\": true|false }, true adds and false removes",
+    "time_tracking is an estimate plus the full logs[] array — logs REPLACES rather than appends, so adding an entry is read-modify-write, and every TimeLog field (id, user, created_at) is client-supplied",
+    "a task action is a checklist item on its own subject, not a field on the task — it never appears in get_task, and today it cannot be read back at all"
+  ],
+  "space": {
+    "id": "mcp_verification_renewals",
+    "name": "Renewal Reviews (MCP verification)",
+    "description": "Authored by quiva-workspaces-mcp to verify board rendering end to end.",
+    "default_status": "awaiting_info",
+    "statuses": [
+      { "id": "awaiting_info", "name": "Awaiting Info", "color": "#9ca3af", "order": 10, "complete": false, "is_visible": true },
+      { "id": "in_review", "name": "In Review", "color": "#3b82f6", "order": 20, "complete": false, "is_visible": true },
+      { "id": "referred", "name": "Referred to Underwriter", "color": "#eab308", "order": 30, "complete": false, "is_visible": true },
+      { "id": "quoted", "name": "Quoted", "color": "#a855f7", "order": 40, "complete": false, "is_visible": true },
+      { "id": "bound", "name": "Bound", "color": "#22c55e", "order": 50, "complete": true, "is_visible": true }
+    ],
+    "priorities": [
+      { "id": "routine", "name": "Routine", "icon": "angle-down", "icon_type": "light", "icon_color": "#1E3A8A" },
+      { "id": "standard", "name": "Standard", "icon": "equals", "icon_type": "light", "icon_color": "#e8b800", "default": true },
+      { "id": "urgent", "name": "Urgent", "icon": "angles-up", "icon_type": "light", "icon_color": "#DC2626" }
+    ],
+    "tags": [
+      { "id": "large_risk", "name": "Large Risk", "color": "#DC2626" },
+      { "id": "new_business", "name": "New Business", "color": "#22c55e" }
+    ]
+  },
+  "task": {
+    "space_id": "MCP_VERIFICATION_RENEWALS",
+    "title": "Renewal review — Ridgeline Constructions (POL-2026-0087)",
+    "description": "Expiring 2027-08-01. Confirm sum insured and re-rate before issuing terms.",
+    "status": "in_review",
+    "priority": "urgent",
+    "due_date": "2026-08-15T00:00:00Z",
+    "tags": ["large_risk"],
+    "_people_note": "assignees[] and reporter are USER UUIDs resolved from list_users — placeholders here so a shipped example carries nobody's identity. tools/push-example.mjs substitutes real accounts before sending. Note there can be SEVERAL accounts for one person (staging has two accounts under one colleague's name, one role=admin and one role=client) — match on email, not on name.",
+    "assignees": ["00000000-0000-0000-0000-000000000000"],
+    "reporter": "00000000-0000-0000-0000-000000000001"
+  },
+  "assignees_typo_divergence": {
+    "what": "Some live tasks store `asignees` (ONE s) and no `assignees` — ALEX-7 and ALEX-12 on staging do.",
+    "why_it_matters": "list_tasks returns the raw stored document, so the assignee shows up there; GET /workspaces/task/{id} unmarshals into the typed struct, whose tag is `assignees`, so the same task looks unassigned. The two routes disagree for the same task.",
+    "the_correct_spelling": "`assignees`. model/api.go Task.Assignees and UpdateTaskRequest.Assignees both use json:\"assignees\", so a write with the correct spelling round-trips on BOTH routes — verified live 2026-07-30 after setting the assignee on this task: get_task and list_tasks agreed, and the `asignees` key was absent.",
+    "the_other_typo": "hub-service/agents/agents.go:412 also declares `json:\"asignees,omitempty\"`, backing resolveTaskKnowledge. It only reads and re-marshals, so it is not what produced the bad records — but it does mean an agent given a `task://` knowledge URI never receives assignees for a CORRECTLY stored task."
+  },
+  "comment": {
+    "body": "Broker confirmed the sum insured moves to 2.5M. Referring for underwriter sign-off."
+  },
+  "reaction": { "reaction": { "👀": true } },
+  "reaction_key_must_be_a_real_emoji": {
+    "was_wrong": "This example used { \"eyes\": true } — a shortcode NAME. That is wrong and it shipped to staging, where the comment showed a broken reaction until it was corrected.",
+    "why": "The reaction key is stored VERBATIM and rendered as-is. Nothing on the platform converts a shortcode name into a glyph.",
+    "verified_live": "2026-07-30 on comment c_EjFPH9ZyI5. Posting { \"eyes\": true } returned reactions { \"eyes\": { count: 1, users: [...] } } — the literal string. Posting { \"👀\": true } returned { \"👀\": { count: 1, users: [...] } }. Both stored happily; only the emoji one renders.",
+    "fix": "Pass the emoji character itself. validate_payload now ERRORS on a non-emoji key.",
+    "also_corrected": "The docs claimed a reaction needs a Bearer JWT or it is stored against an empty user id. Not so: this reaction was written with an API KEY alone and came back attributed to a real user id (the account the key resolves to)."
+  },
+  "time_tracking": {
+    "_user_note": "user.id/user.name below are PLACEHOLDERS. The snapshot is client-supplied — the backend never fills it from the token — so a real write must carry a real uuid from list_users paired with that user's actual name, or the UI attributes the entry to nobody. tools/push-example.mjs substitutes the authenticated account's own id and name before sending. Shipping a colleague's identity inside an example file is not the way to make it render.",
+    "estimate": { "time_in_seconds": 7200 },
+    "logs": [
+      {
+        "id": "time_log_7c1f0e2a-2b44-4a1e-9f0d-3d5a6b8c1120",
+        "time_spent": { "time_in_seconds": 3600 },
+        "started_at": "2026-07-29T09:00:00Z",
+        "description": "Reviewed the expiring schedule and pulled last year's rating",
+        "user": { "id": "00000000-0000-0000-0000-000000000000", "name": "Example User" },
+        "created_at": "2026-07-29T10:05:00Z"
+      },
+      {
+        "id": "time_log_1d9b4f56-6c0e-4f7a-b2a1-8e4c7d905311",
+        "time_spent": { "time_in_seconds": 1800 },
+        "started_at": "2026-07-29T13:00:00Z",
+        "description": "Called the broker to confirm the revised sum insured",
+        "user": { "id": "00000000-0000-0000-0000-000000000000", "name": "Example User" },
+        "created_at": "2026-07-29T13:35:00Z"
+      }
+    ]
+  },
+  "task_action": {
+    "id": "ta_confirm_sum_insured",
+    "description": "Confirm the revised sum insured with the insured before issuing terms",
+    "done": false,
+    "resources": [
+      {
+        "resource_id": "risk_programme",
+        "resource_type": "record-config",
+        "metadata": { "note": "capture the re-rate against this config" }
+      }
+    ]
+  },
+  "time_tracking_merge_semantics_verified_live": {
+    "verified": "2026-07-29 against MCP_VERIFICATION_RENEWALS-1 on staging, one PATCH per case, each confirmed by re-reading the task.",
+    "time_tracking omitted": "untouched",
+    "time_tracking present without logs": "existing logs PRESERVED — the nil slice marshals as \"logs\":null but is not destructive, which is the opposite of what the Go struct's missing omitempty suggests",
+    "logs: []": "every log CLEARED",
+    "logs: [one entry]": "the array is REPLACED wholesale — the two entries that were there were gone, so this is never an append",
+    "consequence": "adding a log is read-modify-write: get_task, take time_tracking.logs, append, send the complete array back",
+    "units": "always seconds. The UI parses \"2h 30m\" using 1w=5d and 1d=8h (task-time-tracking.utils.ts) and sends only the number; totals, remaining and progress are derived client-side and must never be sent."
+  },
+  "task_action_cannot_be_verified": {
+    "symptom": "PUT /workspaces/task/{task_id}/action returns 200 with the action, and GET on the same path returns 400 \"description is required\".",
+    "cause": "the gateway maps the GET at the WRITE resource microstrate.workspaces.put.task-action, so it invokes AddTaskActionHandler. ListTaskActionsHandler exists at workspaces-service/handler/task_actions.go:94 and is registered as get.task-actions in service/service.go, but no gateway route points at it.",
+    "consequence": "the write response is the request echoed back (response.SuccessWithBody(request, body)), not the stored aggregate — so with no read route NOTHING about a task action is verifiable, including whether a partial write merges or replaces. This is the one place in this MCP that cannot follow the read-back-after-every-write rule.",
+    "also": "no component in microstrate/src reads task actions, so an action written today is invisible in the UI as well.",
+    "fix": "repoint the GET mapping at microstrate.workspaces.get.task-actions.",
+    "verified": "2026-07-29 on staging: PUT 200, GET 400, DELETE 200, DELETE of an unknown id 404 \"resource not found\", PUT against a nonexistent task 404 \"task not found\"."
+  },
+  "default_status_behaviour_change": {
+    "what": "create_task with no `status` now inherits the space's default_status instead of storing \"\".",
+    "where": "workspaces-service/handler/tasks.go createTask — it now fetches the space (GetAggregate) rather than only checking existence (SubjectExists), so it can read DefaultStatus.",
+    "verified": "2026-07-29: POST {title, space_id:\"MCP_VERIFICATION_RENEWALS\"} returned status \"awaiting_info\", the space's default_status.",
+    "caveat": "only when space_id is set — a task with no space still gets \"\". A task created without a status used to sit outside every board column; it now lands in the default one."
+  },
+  "field_shapes_that_are_read_only": {
+    "space": ["owner", "created_at", "updated_at", "url", "record_configs", "records", "tasks", "files"],
+    "task": ["id", "created_at", "updated_at", "created_by", "url", "watchers", "muted", "reporter", "order"],
+    "comment": ["id", "author", "created_at", "updated_at", "url", "reactions", "subject", "sequence", "modified", "type"]
+  },
+  "gotchas_this_example_encodes": [
+    "due_date as a full timestamp, not date-only: the engine parses RFC3339 on read and a bare 2026-08-15 can fail to round-trip",
+    "the space id here is lowercase in the create body on purpose — it is stored as MCP_VERIFICATION_RENEWALS, and the task's space_id uses that uppercase form",
+    "no `id` on the task: create_task ignores it and assigns {SPACEID}-{n}"
+  ],
+  "how_to_verify_on_staging": [
+    "validate_payload(kind='space', payload=<space>) then create_space",
+    "create_task with the task payload, then create_comment on the returned task id, then react_to_comment",
+    "open https://app.microstrate.io/en/hub/spaces/MCP_VERIFICATION_RENEWALS/tasks and switch to the Board view",
+    "the five columns must appear in order with their colours, Bound must render as the completed column, and the task must sit in In Review with an Urgent priority icon",
+    "update_task with the time_tracking payload, then open the task detail modal: the estimate, the two logged entries and the derived progress bar all render (task-details-modal / task-time-tracking components)",
+    "set_task_action with the task_action payload — it returns 200 but you cannot read it back or see it in the UI, so treat it as unverified (see task_action_cannot_be_verified)",
+    "clean up with delete_task then delete_space (both return { message: 'success' }, not 204)"
+  ]
+}

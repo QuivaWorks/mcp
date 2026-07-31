@@ -1,0 +1,128 @@
+{
+  "slug": "space-MCDONALDS",
+  "kind": "space",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "id": "MCDONALDS",
+    "url": "https://app.microstrate.io/en/hub/spaces/MCDONALDS/tasks",
+    "harvested_from": "GET /workspaces/spaces"
+  },
+  "teaches": [
+    "6 custom board statuses (columns)",
+    "statuses carry the board's presentation fields (color, order, complete, is_visible) — the API does not require them, the board reads them",
+    "a status flagged `complete: true` (the done state)",
+    "default_status naming the column new tasks land in",
+    "6 custom task priorities with icon presentation (icon, icon_type, icon_color)",
+    "default_view: \"files\"",
+    "a logo",
+    "read-only fields a create/update body must NOT echo back: owner, created_at, updated_at, url"
+  ],
+  "config": {
+    "name": "Mac",
+    "id": "MCDONALDS",
+    "description": "**McDonald's Corporation** is an American multinational [fast food](https://en.wikipedia.org/wiki/Fast_food \"Fast food\") restaurant chain. As of 2024, it is the second-largest by number of locations in the world, behind the Chinese chain [Mixue Ice Cream & Tea](https://en.wikipedia.org/wiki/Mixue_Ice_Cream_%26_Tea \"Mixue Ice Cream & Tea\").[\\[9\\]](https://en.wikipedia.org/wiki/McDonald%27s#cite_note-10)",
+    "default_status": "backlog",
+    "statuses": [
+      {
+        "id": "backlog",
+        "name": "Backlog",
+        "color": "#9ca3af",
+        "order": 10,
+        "complete": false,
+        "is_visible": true
+      },
+      {
+        "id": "in_progress",
+        "name": "In Progress",
+        "color": "#3b82f6",
+        "order": 20,
+        "complete": false,
+        "is_visible": true
+      },
+      {
+        "id": "blocked",
+        "name": "Blocked",
+        "color": "#ef4444",
+        "order": 30,
+        "complete": false,
+        "is_visible": true
+      },
+      {
+        "id": "testing",
+        "name": "Testing",
+        "color": "#eab308",
+        "order": 40,
+        "complete": false,
+        "is_visible": true
+      },
+      {
+        "id": "review",
+        "name": "Review",
+        "color": "#a855f7",
+        "order": 50,
+        "complete": false,
+        "is_visible": true
+      },
+      {
+        "id": "completed",
+        "name": "Completed",
+        "color": "#22c55e",
+        "order": 60,
+        "complete": true,
+        "is_visible": true
+      }
+    ],
+    "owner": "<<REDACTED:user-id>>",
+    "created_at": "2026-06-08T11:17:42Z",
+    "updated_at": "2026-06-12T12:02:02Z",
+    "url": "https://app.microstrate.io/en/hub/spaces/MCDONALDS/tasks",
+    "logo": true,
+    "priorities": [
+      {
+        "id": "lowest",
+        "name": "Lowest",
+        "icon": "fa-angles-down",
+        "icon_type": "fa-light",
+        "icon_color": "#3B82F6"
+      },
+      {
+        "id": "low",
+        "name": "Low",
+        "icon": "fa-angle-down",
+        "icon_type": "fa-light",
+        "icon_color": "#1E3A8A"
+      },
+      {
+        "id": "medium",
+        "default": true,
+        "name": "Medium",
+        "icon": "fa-equals",
+        "icon_type": "fa-light",
+        "icon_color": "#e8b800"
+      },
+      {
+        "id": "high",
+        "name": "High",
+        "icon": "fa-angle-up",
+        "icon_type": "fa-light",
+        "icon_color": "#ff6600"
+      },
+      {
+        "id": "highest",
+        "name": "Highest",
+        "icon": "fa-angles-up",
+        "icon_type": "fa-light",
+        "icon_color": "#DC2626"
+      },
+      {
+        "id": "priority",
+        "default": false,
+        "name": "Most Highest",
+        "icon": "fa-brake-warning",
+        "icon_type": "fa-solid",
+        "icon_color": "#09dce3"
+      }
+    ],
+    "default_view": "files"
+  }
+}

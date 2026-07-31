@@ -1,0 +1,146 @@
+{
+  "slug": "escalation_request_v2",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "config_id": "escalation_request_v2",
+    "harvested": "live record config (configs only — no record data)"
+  },
+  "featured": false,
+  "teaches": [
+    "required fields",
+    "enums",
+    "schema types: array, object, string"
+  ],
+  "form_node_count": 0,
+  "config": {
+    "id": "escalation_request_v2",
+    "name": "Escalation Request",
+    "description": "A record configuration for managing escalation requests with priority levels and attachments",
+    "label": "Escalation Request",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "attachments": {
+          "ui": {
+            "inputType": "array",
+            "props": {
+              "label": "Attachments"
+            }
+          },
+          "description": "Files or documents attached to this request",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "name": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Request Name",
+              "placeholder": "Enter a descriptive name for this request"
+            }
+          },
+          "description": "The name or title of the escalation request",
+          "type": "string"
+        },
+        "priority": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Priority",
+              "options": [
+                {
+                  "text": "Low",
+                  "value": "low"
+                },
+                {
+                  "text": "Medium",
+                  "value": "medium"
+                },
+                {
+                  "text": "High",
+                  "value": "high"
+                }
+              ]
+            }
+          },
+          "description": "Priority level of the escalation request",
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "request": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Request Details",
+              "placeholder": "Describe the escalation request in detail"
+            }
+          },
+          "description": "Detailed description of the escalation request",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "request",
+        "priority"
+      ]
+    },
+    "views": {
+      "form": {
+        "type": "grid",
+        "props": {
+          "gridTemplateColumns": "1fr 1fr",
+          "gap": 16
+        },
+        "children": [
+          {
+            "type": "field",
+            "field": "name"
+          },
+          {
+            "type": "field",
+            "field": "priority"
+          },
+          {
+            "type": "field",
+            "field": "request"
+          },
+          {
+            "type": "field",
+            "field": "attachments"
+          }
+        ]
+      },
+      "table": {
+        "type": "table",
+        "columns": [
+          {
+            "field": "name",
+            "order": 1
+          },
+          {
+            "field": "priority",
+            "order": 2
+          },
+          {
+            "field": "request",
+            "order": 3
+          },
+          {
+            "field": "attachments",
+            "order": 4
+          }
+        ]
+      }
+    },
+    "created_at": "2026-06-02T12:40:23Z",
+    "updated_at": "2026-06-02T12:40:23Z"
+  }
+}

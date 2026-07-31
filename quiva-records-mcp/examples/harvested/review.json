@@ -1,0 +1,518 @@
+{
+  "slug": "review",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "config_id": "review",
+    "harvested": "live record config (configs only — no record data)"
+  },
+  "featured": false,
+  "teaches": [
+    "required fields",
+    "format: date",
+    "schema types: array, boolean, number, object, string"
+  ],
+  "form_node_count": 0,
+  "config": {
+    "id": "review",
+    "name": "Review",
+    "description": "Financial plan reviews and updates",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "advisor_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Advisor ID"
+            }
+          },
+          "type": "string"
+        },
+        "advisor_name": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Advisor Name"
+            }
+          },
+          "type": "string"
+        },
+        "circumstances_changes": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Circumstances Changes"
+            }
+          },
+          "type": "string"
+        },
+        "circumstances_updated": {
+          "ui": {
+            "inputType": "checkbox",
+            "props": {
+              "label": "Circumstances Updated"
+            }
+          },
+          "type": "boolean"
+        },
+        "client_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Client ID"
+            }
+          },
+          "type": "string"
+        },
+        "created_by": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Created By"
+            }
+          },
+          "type": "string"
+        },
+        "created_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Created Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "goals_progress": {
+          "ui": {
+            "inputType": "array",
+            "props": {
+              "helpText": {
+                "markdown": "Progress on client goals since last review"
+              },
+              "label": "Goals Progress"
+            }
+          },
+          "description": "Progress on client goals since last review",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "goal_id": {
+                "ui": {
+                  "inputType": "text",
+                  "props": {
+                    "helpText": {
+                      "markdown": "ID of the goal being reviewed"
+                    },
+                    "label": "Goal ID"
+                  }
+                },
+                "description": "ID of the goal being reviewed",
+                "type": "string"
+              },
+              "goal_name": {
+                "ui": {
+                  "inputType": "text",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Name of the goal"
+                    },
+                    "label": "Goal Name"
+                  }
+                },
+                "description": "Name of the goal",
+                "type": "string"
+              },
+              "notes": {
+                "ui": {
+                  "inputType": "textarea",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Notes about goal progress"
+                    },
+                    "label": "Notes"
+                  }
+                },
+                "description": "Notes about goal progress",
+                "type": "string"
+              },
+              "on_track": {
+                "ui": {
+                  "inputType": "checkbox",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Whether goal is on track"
+                    },
+                    "label": "On Track"
+                  }
+                },
+                "description": "Whether goal is on track",
+                "type": "boolean"
+              },
+              "progress_percentage": {
+                "ui": {
+                  "inputType": "number",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Percentage progress toward goal"
+                    },
+                    "label": "Progress Percentage",
+                    "max": 100,
+                    "min": 0
+                  }
+                },
+                "description": "Percentage progress toward goal",
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "goal_id",
+              "goal_name",
+              "progress_percentage",
+              "on_track"
+            ]
+          }
+        },
+        "last_modified_by": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Last Modified By"
+            }
+          },
+          "type": "string"
+        },
+        "last_modified_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Last Modified Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "modelling_updated": {
+          "ui": {
+            "inputType": "checkbox",
+            "props": {
+              "label": "Modelling Updated"
+            }
+          },
+          "type": "boolean"
+        },
+        "new_advice_generated": {
+          "ui": {
+            "inputType": "checkbox",
+            "props": {
+              "label": "New Advice Generated"
+            }
+          },
+          "type": "boolean"
+        },
+        "new_advice_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "New Advice ID"
+            }
+          },
+          "type": "string"
+        },
+        "next_review_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Next Review Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "portfolio_performance_summary": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Portfolio Performance Summary"
+            }
+          },
+          "type": "string"
+        },
+        "review_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Review Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "review_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Review ID"
+            }
+          },
+          "type": "string"
+        },
+        "review_notes": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Review Notes"
+            }
+          },
+          "type": "string"
+        },
+        "review_status": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Review Status",
+              "options": [
+                {
+                  "text": "Completed",
+                  "value": "completed"
+                },
+                {
+                  "text": "In Progress",
+                  "value": "in_progress"
+                },
+                {
+                  "text": "Pending Client Response",
+                  "value": "pending_client_response"
+                }
+              ]
+            }
+          },
+          "default": "completed",
+          "type": "string"
+        },
+        "review_type": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Review Type",
+              "options": [
+                {
+                  "text": "Formal Annual",
+                  "value": "formal_annual"
+                },
+                {
+                  "text": "Checkpoint",
+                  "value": "checkpoint"
+                },
+                {
+                  "text": "Triggered",
+                  "value": "triggered"
+                }
+              ]
+            }
+          },
+          "type": "string"
+        },
+        "scheduled_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Scheduled Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "strategy_changes": {
+          "ui": {
+            "inputType": "array",
+            "props": {
+              "helpText": {
+                "markdown": "Strategy changes recommended or made"
+              },
+              "label": "Strategy Changes"
+            }
+          },
+          "description": "Strategy changes recommended or made",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "change_description": {
+                "ui": {
+                  "inputType": "textarea",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Description of the change"
+                    },
+                    "label": "Change Description"
+                  }
+                },
+                "description": "Description of the change",
+                "type": "string"
+              },
+              "reason_for_change": {
+                "ui": {
+                  "inputType": "textarea",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Why this change is recommended"
+                    },
+                    "label": "Reason for Change"
+                  }
+                },
+                "description": "Why this change is recommended",
+                "type": "string"
+              },
+              "strategy_id": {
+                "ui": {
+                  "inputType": "text",
+                  "props": {
+                    "helpText": {
+                      "markdown": "ID of the strategy"
+                    },
+                    "label": "Strategy ID"
+                  }
+                },
+                "description": "ID of the strategy",
+                "type": "string"
+              }
+            },
+            "required": [
+              "strategy_id",
+              "change_description",
+              "reason_for_change"
+            ]
+          }
+        },
+        "strategy_changes_recommended": {
+          "ui": {
+            "inputType": "checkbox",
+            "props": {
+              "label": "Strategy Changes Recommended"
+            }
+          },
+          "type": "boolean"
+        },
+        "trigger_reason": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Trigger Reason"
+            }
+          },
+          "type": "string"
+        }
+      },
+      "required": [
+        "review_id",
+        "client_id",
+        "review_type",
+        "review_date",
+        "advisor_id",
+        "advisor_name",
+        "circumstances_updated",
+        "modelling_updated",
+        "strategy_changes_recommended",
+        "new_advice_generated",
+        "next_review_date",
+        "review_status",
+        "created_date",
+        "created_by",
+        "last_modified_date",
+        "last_modified_by"
+      ]
+    },
+    "views": {
+      "form": {
+        "type": "grid",
+        "props": {
+          "gridTemplateColumns": "1fr 1fr",
+          "gap": 16
+        },
+        "children": [
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr",
+              "gap": 16
+            },
+            "children": [
+              {
+                "type": "",
+                "field": "review_id"
+              },
+              {
+                "type": "",
+                "field": "client_id"
+              },
+              {
+                "type": "",
+                "field": "review_type"
+              },
+              {
+                "type": "",
+                "field": "review_date"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr",
+              "gap": 16
+            },
+            "children": [
+              {
+                "type": "",
+                "field": "advisor_id"
+              },
+              {
+                "type": "",
+                "field": "advisor_name"
+              },
+              {
+                "type": "",
+                "field": "next_review_date"
+              },
+              {
+                "type": "",
+                "field": "review_status"
+              }
+            ]
+          }
+        ]
+      },
+      "table": {
+        "type": "table",
+        "columns": [
+          {
+            "field": "review_id",
+            "order": 1
+          },
+          {
+            "field": "client_id",
+            "order": 2
+          },
+          {
+            "field": "review_date",
+            "order": 3
+          },
+          {
+            "field": "review_type",
+            "order": 4
+          },
+          {
+            "field": "review_status",
+            "order": 5
+          }
+        ]
+      }
+    },
+    "created_at": "2026-07-10T14:48:34Z",
+    "updated_at": "2026-07-10T15:24:46Z"
+  }
+}

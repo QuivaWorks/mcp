@@ -1,0 +1,612 @@
+{
+  "slug": "recommendation",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "config_id": "recommendation",
+    "harvested": "live record config (configs only — no record data)"
+  },
+  "featured": false,
+  "teaches": [
+    "required fields",
+    "format: date",
+    "enums",
+    "schema types: array, number, number|null, object, object|null, string, string|null"
+  ],
+  "form_node_count": 0,
+  "config": {
+    "id": "recommendation",
+    "name": "Recommendation",
+    "description": "Product recommendations within strategies",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "advice_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Advice ID"
+            }
+          },
+          "type": "string"
+        },
+        "alternatives_considered": {
+          "ui": {
+            "inputType": "array",
+            "props": {
+              "helpText": {
+                "markdown": "Alternatives considered and why not recommended"
+              },
+              "label": "Alternatives Considered"
+            }
+          },
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "alternative_description": {
+                "ui": {
+                  "inputType": "textarea",
+                  "props": {
+                    "label": "Description of alternative"
+                  }
+                },
+                "type": "string"
+              },
+              "alternative_name": {
+                "ui": {
+                  "inputType": "text",
+                  "props": {
+                    "label": "Name of alternative product"
+                  }
+                },
+                "type": "string"
+              },
+              "reason_not_recommended": {
+                "ui": {
+                  "inputType": "textarea",
+                  "props": {
+                    "label": "Why this alternative was not recommended"
+                  }
+                },
+                "type": "string"
+              }
+            },
+            "required": [
+              "alternative_name",
+              "alternative_description",
+              "reason_not_recommended"
+            ]
+          }
+        },
+        "created_by": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Created By"
+            }
+          },
+          "type": "string"
+        },
+        "created_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Created Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "fees_and_costs": {
+          "ui": {
+            "inputType": "key-value",
+            "props": {
+              "helpText": {
+                "markdown": "Fees and costs associated with product"
+              },
+              "label": "Fees and Costs"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "adviser_fee": {
+              "ui": {
+                "inputType": "currency",
+                "props": {
+                  "decimalPlace": 2,
+                  "label": "Adviser fee"
+                }
+              },
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "entry_fee": {
+              "ui": {
+                "inputType": "currency",
+                "props": {
+                  "decimalPlace": 2,
+                  "label": "Entry/establishment fee"
+                }
+              },
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "exit_fee": {
+              "ui": {
+                "inputType": "currency",
+                "props": {
+                  "decimalPlace": 2,
+                  "label": "Exit/termination fee"
+                }
+              },
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "management_fee_percentage": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "label": "Annual management fee percentage"
+                }
+              },
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "total_estimated_cost": {
+              "ui": {
+                "inputType": "currency",
+                "props": {
+                  "decimalPlace": 2,
+                  "label": "Total estimated first year cost"
+                }
+              },
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          }
+        },
+        "implementation_timeframe": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Implementation Timeframe"
+            }
+          },
+          "type": "string"
+        },
+        "last_modified_by": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Last Modified By"
+            }
+          },
+          "type": "string"
+        },
+        "last_modified_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Last Modified Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "product_code": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Product Code"
+            }
+          },
+          "type": "string"
+        },
+        "product_name": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Product Name"
+            }
+          },
+          "type": "string"
+        },
+        "product_provider": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Product Provider"
+            }
+          },
+          "type": "string"
+        },
+        "product_risks": {
+          "ui": {
+            "inputType": "array",
+            "props": {
+              "helpText": {
+                "markdown": "Risks associated with recommended product"
+              },
+              "label": "Product Risks"
+            }
+          },
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "mitigation": {
+                "ui": {
+                  "inputType": "textarea",
+                  "props": {
+                    "label": "How this risk is mitigated"
+                  }
+                },
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "risk_description": {
+                "ui": {
+                  "inputType": "textarea",
+                  "props": {
+                    "label": "Description of the risk"
+                  }
+                },
+                "type": "string"
+              },
+              "risk_level": {
+                "ui": {
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "Risk level",
+                    "options": [
+                      {
+                        "text": "Low",
+                        "value": "low"
+                      },
+                      {
+                        "text": "Moderate",
+                        "value": "moderate"
+                      },
+                      {
+                        "text": "High",
+                        "value": "high"
+                      }
+                    ]
+                  }
+                },
+                "type": "string",
+                "enum": [
+                  "low",
+                  "moderate",
+                  "high"
+                ]
+              }
+            },
+            "required": [
+              "risk_description",
+              "risk_level"
+            ]
+          }
+        },
+        "product_type": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Product Type",
+              "options": [
+                {
+                  "text": "Managed Fund",
+                  "value": "managed_fund"
+                },
+                {
+                  "text": "ETF",
+                  "value": "etf"
+                },
+                {
+                  "text": "Direct Shares",
+                  "value": "direct_shares"
+                },
+                {
+                  "text": "Bonds",
+                  "value": "bonds"
+                },
+                {
+                  "text": "Superannuation",
+                  "value": "superannuation"
+                },
+                {
+                  "text": "Insurance",
+                  "value": "insurance"
+                },
+                {
+                  "text": "Property",
+                  "value": "property"
+                },
+                {
+                  "text": "Other",
+                  "value": "other"
+                }
+              ]
+            }
+          },
+          "type": "string"
+        },
+        "rationale": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Rationale"
+            }
+          },
+          "type": "string"
+        },
+        "recommendation_detail": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Recommendation Detail"
+            }
+          },
+          "type": "string"
+        },
+        "recommendation_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Recommendation ID"
+            }
+          },
+          "type": "string"
+        },
+        "recommended_amount": {
+          "ui": {
+            "inputType": "number",
+            "props": {
+              "label": "Recommended Amount"
+            }
+          },
+          "type": "number"
+        },
+        "recommended_amount_type": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Amount Type",
+              "options": [
+                {
+                  "text": "Lump Sum",
+                  "value": "lump_sum"
+                },
+                {
+                  "text": "Monthly",
+                  "value": "monthly"
+                },
+                {
+                  "text": "Quarterly",
+                  "value": "quarterly"
+                },
+                {
+                  "text": "Annual",
+                  "value": "annual"
+                },
+                {
+                  "text": "Percentage",
+                  "value": "percentage"
+                }
+              ]
+            }
+          },
+          "type": "string"
+        },
+        "status": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Status",
+              "options": [
+                {
+                  "text": "Recommended",
+                  "value": "recommended"
+                },
+                {
+                  "text": "Accepted",
+                  "value": "accepted"
+                },
+                {
+                  "text": "Declined",
+                  "value": "declined"
+                },
+                {
+                  "text": "Implemented",
+                  "value": "implemented"
+                },
+                {
+                  "text": "Superseded",
+                  "value": "superseded"
+                }
+              ]
+            }
+          },
+          "default": "recommended",
+          "type": "string"
+        },
+        "strategy_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Strategy ID"
+            }
+          },
+          "type": "string"
+        },
+        "tax_implications": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Tax Implications"
+            }
+          },
+          "type": "string"
+        }
+      },
+      "required": [
+        "recommendation_id",
+        "advice_id",
+        "strategy_id",
+        "product_name",
+        "product_type",
+        "product_provider",
+        "recommendation_detail",
+        "recommended_amount",
+        "recommended_amount_type",
+        "implementation_timeframe",
+        "rationale",
+        "status",
+        "created_date",
+        "created_by",
+        "last_modified_date",
+        "last_modified_by",
+        "alternatives_considered"
+      ]
+    },
+    "views": {
+      "form": {
+        "type": "grid",
+        "props": {
+          "gridTemplateColumns": "1fr 1fr",
+          "gap": 16
+        },
+        "children": [
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr",
+              "gap": 16
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "recommendation_id"
+              },
+              {
+                "type": "field",
+                "field": "advice_id"
+              },
+              {
+                "type": "field",
+                "field": "strategy_id"
+              },
+              {
+                "type": "field",
+                "field": "product_name"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr",
+              "gap": 16
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "product_type"
+              },
+              {
+                "type": "field",
+                "field": "product_provider"
+              },
+              {
+                "type": "field",
+                "field": "product_code"
+              },
+              {
+                "type": "field",
+                "field": "recommended_amount"
+              }
+            ]
+          },
+          {
+            "type": "field",
+            "field": "recommendation_detail"
+          },
+          {
+            "type": "field",
+            "field": "rationale"
+          },
+          {
+            "type": "field",
+            "field": "tax_implications"
+          },
+          {
+            "type": "field",
+            "field": "recommended_amount_type"
+          },
+          {
+            "type": "field",
+            "field": "implementation_timeframe"
+          },
+          {
+            "type": "field",
+            "field": "status"
+          },
+          {
+            "type": "field",
+            "field": "alternatives_considered"
+          },
+          {
+            "type": "field",
+            "field": "product_risks"
+          },
+          {
+            "type": "field",
+            "field": "fees_and_costs"
+          }
+        ]
+      },
+      "table": {
+        "type": "table",
+        "columns": [
+          {
+            "field": "recommendation_id",
+            "order": 1
+          },
+          {
+            "field": "product_name",
+            "order": 2
+          },
+          {
+            "field": "product_type",
+            "order": 3
+          },
+          {
+            "field": "recommended_amount",
+            "order": 4
+          },
+          {
+            "field": "status",
+            "order": 5
+          }
+        ]
+      }
+    },
+    "created_at": "2026-07-10T14:48:34Z",
+    "updated_at": "2026-07-10T15:22:42Z"
+  }
+}

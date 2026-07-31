@@ -1,0 +1,99 @@
+{
+  "nodes": [
+    {
+      "id": "TRIGGER",
+      "data": {
+        "id": "TRIGGER",
+        "node_type": "trigger",
+        "trigger_type": "manual",
+        "payload": {}
+      }
+    },
+    {
+      "id": "ASSESS_RISK",
+      "data": {
+        "id": "ASSESS_RISK",
+        "node_type": "agent",
+        "payload": {
+          "agent": {
+            "name": "risk-assessor",
+            "llm_provider": "claude",
+            "model": "claude-sonnet-4-6",
+            "behaviour": "You are an insurance underwriting assistant. Given an applicant, return a risk score from 0-100 (higher = riskier) and a one-sentence rationale.",
+            "output_schema": {
+              "risk_score": "integer 0-100, higher is riskier",
+              "rationale": "one sentence explaining the score"
+            }
+          },
+          "prompt": "Assess the insurance risk for this applicant: |$.trigger.applicant"
+        }
+      }
+    },
+    {
+      "id": "PARSE_RESULT",
+      "data": {
+        "id": "PARSE_RESULT",
+        "node_type": "eval",
+        "payload": {
+          "code": "JSON.parse(String(r).match(/\\{[\\s\\S]*\\}/)[0])",
+          "params": { "r": "$.ASSESS_RISK.result" }
+        }
+      }
+    },
+    {
+      "id": "CHECK_RISK",
+      "data": {
+        "id": "CHECK_RISK",
+        "node_type": "condition",
+        "payload": {
+          "rules": [
+            {
+              "if": "$.PARSE_RESULT.risk_score > 70",
+              "then": ["ESCALATE_REVIEW"],
+              "else": ["CREATE_RECORD"]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "CREATE_RECORD",
+      "data": {
+        "id": "CREATE_RECORD",
+        "node_type": "quiva-endpoint",
+        "subject": "REPLACE_WITH_records_create_endpoint_subject",
+        "payload": {
+          "payload": {
+            "config_id": "mcp_e2e_application",
+            "data": {
+              "applicant": "$.trigger.applicant",
+              "risk_score": "$.PARSE_RESULT.risk_score",
+              "rationale": "$.PARSE_RESULT.rationale",
+              "status": "auto_approved"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "ESCALATE_REVIEW",
+      "data": {
+        "id": "ESCALATE_REVIEW",
+        "node_type": "human-in-the-loop",
+        "payload": {
+          "title": "Manual underwriting review required",
+          "description": "Applicant scored above the auto-approval threshold and needs a human decision.",
+          "message": "Review applicant $.trigger.applicant (risk score $.PARSE_RESULT.risk_score)",
+          "priority": "high"
+        }
+      }
+    }
+  ],
+  "edges": [
+    { "id": "TRIGGER-ASSESS_RISK", "source": "TRIGGER", "target": "ASSESS_RISK" },
+    { "id": "ASSESS_RISK-PARSE_RESULT", "source": "ASSESS_RISK", "target": "PARSE_RESULT" },
+    { "id": "PARSE_RESULT-CHECK_RISK", "source": "PARSE_RESULT", "target": "CHECK_RISK" },
+    { "id": "CHECK_RISK-CREATE_RECORD", "source": "CHECK_RISK", "target": "CREATE_RECORD" },
+    { "id": "CHECK_RISK-ESCALATE_REVIEW", "source": "CHECK_RISK", "target": "ESCALATE_REVIEW" }
+  ]
+}

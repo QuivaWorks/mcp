@@ -1,0 +1,73 @@
+{
+  "slug": "submission-triage-agent",
+  "not_evidence": "HAND-WRITTEN. Every harvested example is a real config, but none of them combines a clean provider/model with an output_schema and a documented invoke call, so this one exists to show the whole authoring path in one place. It is NOT proof the platform accepts it — a live create + invoke is (see how_to_verify_on_staging).",
+  "teaches": [
+    "the create shape: create_agent builds the { config: {...} } wrapper for you, so pass the definition itself",
+    "output_schema is a { field: description } MAP, not JSON Schema — and the invoke result is still a STRING regardless, MARKDOWN-FENCED, so a bare JSON.parse throws (see expected_invoke_shape)",
+    "api_key names an account secret (CLAUDE_API_KEY), it is not the key itself; api_key_source \"system\" lets the platform resolve it",
+    "shared \"\" is the live default (148/189 configs) — \"private\" and \"team\" are also in use, and no live config uses \"public\"",
+    "the subject is SERVER-generated as ms.hub.config.agent.<md5-of-config>, so creating the same config twice returns 409 agent exists:<subject>",
+    "the {id} path param for get/update/delete is the uuid SUFFIX of the subject — not the subject, and not config.id"
+  ],
+  "config": {
+    "id": "MCP_VERIFICATION_TRIAGE",
+    "name": "Submission Triage (MCP verification)",
+    "description": "Classifies an inbound insurance submission and states whether it is in appetite.",
+    "behaviour": "You triage inbound commercial insurance submissions for an Australian broker.\n\nGiven a submission, decide:\n1. the class of business,\n2. whether it is in appetite (decline anything with an aggregate sum insured above 50,000,000 AUD or a risk address outside Australia),\n3. one sentence of reasoning.\n\nAnswer with the fields described by the output schema and nothing else.",
+    "llm_provider": "claude",
+    "model": "claude-haiku-4-5",
+    "api_key": "CLAUDE_API_KEY",
+    "api_key_source": "system",
+    "shared": "private",
+    "has_tools": false,
+    "tools": [],
+    "knowledge": [],
+    "output_schema": {
+      "class_of_business": "The class of business, e.g. 'Builders Risk' or 'Professional Indemnity'.",
+      "in_appetite": "true or false.",
+      "reason": "One sentence explaining the decision."
+    },
+    "llm_config": {
+      "temperature": 0,
+      "max_tokens": 16000
+    },
+    "timeout": 60000,
+    "context_limit": 200000,
+    "message_history_limit": 200
+  },
+  "invoke": {
+    "subject": "<the subject returned by create_agent>",
+    "prompt": "Submission: Ridgeline Constructions Pty Ltd, builders risk, project value 2,500,000 AUD, risk address 42 Example St, Melbourne VIC 3000."
+  },
+  "expected_invoke_shape": {
+    "verified": "2026-07-29 on staging, invoked twice with this exact config.",
+    "note": "The result is a STRING even with output_schema set — and it is NOT raw JSON. It comes back MARKDOWN-FENCED, so a bare JSON.parse THROWS. Extract the object first: JSON.parse(String(result).match(/\\{[\\s\\S]*\\}/)[0]). In a flow that goes in an eval node between the agent node and any condition.",
+    "actual_result_observed": "```json\n{\n  \"class_of_business\": \"Builders Risk\",\n  \"in_appetite\": true,\n  \"reason\": \"Sum insured of 2,500,000 AUD is below the 50,000,000 AUD threshold and risk address is located in Melbourne, Australia.\"\n}\n```",
+    "what_the_docs_used_to_say": "Both this MCP and quiva-flows-mcp said the result was a JSON-encoded string to be JSON.parse'd. That advice fails as written — the fence has to come off first. Corrected in both."
+  },
+  "max_tokens_trap": {
+    "symptom": "create_agent succeeds, the config stores and reads back perfectly, and then invoke_agent returns 400 EXECUTION_ERROR: thinking_tokens must be less than max_tokens (thinking=8000, max=1024).",
+    "cause": "bellerophon-workforce/cmd/agent-service/service/process_invoke.go:893-902 — when ENABLE_NATIVE_THINKING is on and the model supports thinking, the service INJECTS thinking_enabled=true and thinking_tokens=8000, but only for fields the caller left unset. It never compares that injected budget against the caller's max_tokens, so any llm_config.max_tokens at or below 8000 fails at invoke time.",
+    "why_it_is_a_trap": "Nothing rejects it at create time — the config is valid, stored and served. 1024 and 2048 are the natural values to pick. Hit live 2026-07-29 with max_tokens: 1024, which is why this example now uses 16000.",
+    "live_blast_radius": "8 of the 144 live configs with an llm_config set max_tokens <= 8000 with no thinking_tokens, so they cannot currently be invoked at all (Anthropic Model Selector 1000, Decision-Making Assistant x3 at 1024, email-priority-organizer 2000, JavaScript Code Review Agent 2000, weather-historian 2000).",
+    "three_ways_out": [
+      "set max_tokens comfortably above 8000 (what this example does)",
+      "set llm_config.thinking_tokens explicitly to something below max_tokens — injection only fills fields left nil",
+      "omit max_tokens entirely and let the provider default apply"
+    ]
+  },
+  "provider_rules_that_bite": [
+    "invoke_agent accepts only llm_provider \"claude\" or \"anthropic\" — anything else returns 400 \"unsupported provider\" (hub-service/handler/agents.go)",
+    "STORING another provider is fine: 12 gemini, 6 openai and 1 workforce config are live on staging right now. Creating and invoking have different rules",
+    "use platform model aliases (claude-haiku-4-5, claude-sonnet-4-6) rather than dated ids where possible"
+  ],
+  "how_to_verify_on_staging": [
+    "validate_agent_config with this config",
+    "create_agent — keep the returned `subject`; the {id} for later calls is subject.split('.').pop()",
+    "invoke_agent with that subject and the prompt above (THIS SPENDS LLM TOKENS — one claude-haiku-4-5 call). Keep llm_config.max_tokens above 8000 or this step 400s — see max_tokens_trap",
+    "get_agent with the path id to confirm the stored config round-tripped",
+    "open the agent editor at https://app.microstrate.io/en/hub/agents/edit/<subject with every \".\" replaced by \"+\"> — NOT /en/hub/agents, which has no +page.svelte. Agents are labelled \"Assistants\" in the UI",
+    "create_agent a second time with the identical config to confirm the documented 409 (the subject is an md5 of the config)",
+    "delete_agent to clean up — then note that get_agent on the deleted subject returns a HOLLOW all-empty config rather than 404"
+  ]
+}

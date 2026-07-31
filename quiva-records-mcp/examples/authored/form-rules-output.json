@@ -1,0 +1,157 @@
+{
+  "topic": "form-rules",
+  "summary": "How to write conditional rules on view nodes. Rules drive an element's state (visible / required / disabled / readonly / value) from the live form value, evaluated by json-logic-engine (LogicEngine.run). Rules are OPTIONAL — add one only when a node's behaviour genuinely depends on other fields; default to none.",
+  "rule_shape": "A rule attached to a node is `{ \"id\": \"<Field>.<property>\", \"property\": \"visible|required|disabled|readonly|value\", \"logic\": <json-logic>, \"description\"?: \"<one plain sentence>\" }`. `id` convention is \"<FieldPath>.<property>\" (e.g. \"Address.Country.visible\") and must be present on a stored node rule. `description` is human-readable and does not affect evaluation. (Note: a form-rule generator agent emits `{ property, logic, description, warning? }` WITHOUT an id — add the `id` when you attach it to a node.)",
+  "properties": {
+    "values": [
+      "visible",
+      "required",
+      "disabled",
+      "readonly",
+      "value"
+    ],
+    "by_node_kind": {
+      "field": [
+        "visible",
+        "required",
+        "disabled",
+        "readonly",
+        "value"
+      ],
+      "grid": [
+        "visible"
+      ],
+      "array-field": [
+        "visible (reserved — not evaluated in v1)"
+      ],
+      "table": [
+        "(rules not evaluated by the form renderer)"
+      ]
+    },
+    "value_types": "visible/required/disabled/readonly are coerced to boolean; `value` keeps the raw computed value (any type) and writes it back into the field. A bare boolean logic is valid for an unconditional state (e.g. always read-only: { \"property\": \"readonly\", \"logic\": true })."
+  },
+  "field_references": "Read other fields with `{ \"var\": \"FieldPath\" }`; dotted paths allowed ({ \"var\": \"Address.Country\" }). At the form root, `var` resolves against the whole record-data object. Inside an array-field item, a child rule's `var` resolves against the CURRENT ITEM (sibling fields in the same entry) — there is no ambient access to the record root or other items.",
+  "operators": {
+    "comparison": [
+      "==",
+      "===",
+      "!=",
+      "!==",
+      "<",
+      "<=",
+      ">",
+      ">="
+    ],
+    "logical": [
+      "and",
+      "or",
+      "!",
+      "not"
+    ],
+    "conditional": [
+      "if"
+    ],
+    "array": [
+      "in",
+      "all",
+      "some",
+      "none",
+      "filter",
+      "map",
+      "reduce"
+    ],
+    "string": [
+      "cat",
+      "substr"
+    ],
+    "numeric": [
+      "+",
+      "-",
+      "*",
+      "/",
+      "%",
+      "min",
+      "max"
+    ],
+    "access": [
+      "var"
+    ],
+    "note": "Standard json-logic-engine operators; no custom operators are registered. Malformed logic evaluates to \"no opinion\" (undefined/falsy). An empty {} logic is skipped. When two rules target the same property, the last one wins."
+  },
+  "examples": [
+    {
+      "property": "visible",
+      "logic": {
+        ">=": [
+          {
+            "var": "Age"
+          },
+          18
+        ]
+      },
+      "description": "The element is visible only if Age is 18 or older."
+    },
+    {
+      "property": "required",
+      "logic": {
+        "==": [
+          {
+            "var": "Type"
+          },
+          "company"
+        ]
+      },
+      "description": "The element is required when Type is \"company\"."
+    },
+    {
+      "property": "disabled",
+      "logic": {
+        "!=": [
+          {
+            "var": "Address.Country"
+          },
+          "us"
+        ]
+      },
+      "description": "The element is disabled when Address.Country is not \"us\"."
+    },
+    {
+      "property": "value",
+      "logic": {
+        "if": [
+          {
+            ">=": [
+              {
+                "var": "Age"
+              },
+              18
+            ]
+          },
+          "https",
+          ""
+        ]
+      },
+      "description": "The value is computed from Age."
+    },
+    {
+      "property": "required",
+      "logic": {
+        "==": [
+          {
+            "var": "IsPrimary"
+          },
+          true
+        ]
+      },
+      "description": "(inside a repeater item) Email is required when IsPrimary is true."
+    }
+  ],
+  "when_to_add": [
+    "Dependent visibility: a field is pointless until another has a value (property visible).",
+    "Conditional requirement: a field becomes mandatory based on another (property required).",
+    "Conditional lock: read-only/disabled under a condition (property readonly / disabled).",
+    "Derived value: one field is computed from others (property value).",
+    "If nothing genuinely depends on other fields, output no rules."
+  ],
+  "description_style": "One plain-English sentence (British English) describing the condition and outcome, referencing field paths (e.g. \"Address.Country\") and using AND/OR/NOT for compound logic. Concise but complete."
+}

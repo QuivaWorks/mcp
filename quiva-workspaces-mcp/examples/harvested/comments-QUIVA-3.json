@@ -1,0 +1,33 @@
+{
+  "slug": "comments-QUIVA-3",
+  "kind": "comments",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "task_id": "QUIVA-3",
+    "space_id": "QUIVA",
+    "url": "https://app.microstrate.io/en/hub/spaces/QUIVA/tasks?task=QUIVA-3",
+    "harvested_from": "GET /workspaces/task/QUIVA-3/comments"
+  },
+  "teaches": [
+    "1 real comment(s) with server-generated ids (c_<nanoid>)",
+    "reactions is a map, `{}` when empty (react_to_comment writes { \"<emoji>\": true|false })",
+    "subject: ms.workspaces.task-comment.{TASK-ID}.{COMMENT-ID}",
+    "url anchors the comment: ...?task={TASK-ID}#comment-{COMMENT-ID}",
+    "read-only fields a create/update body must NOT echo back: author, created_at, updated_at, url, reactions"
+  ],
+  "comments": [
+    {
+      "author": "<<REDACTED:user-id>>",
+      "body": "hello",
+      "created_at": "2026-06-04T12:09:55.99875Z",
+      "id": "c_0ERopllAn4",
+      "modified": 1780574996,
+      "reactions": {},
+      "sequence": 1231,
+      "subject": "ms.workspaces.task-comment.QUIVA-3.c_0ERopllAn4",
+      "type": "created",
+      "updated_at": "2026-06-04T12:09:55.99875Z",
+      "url": "https://app.microstrate.io/en/hub/spaces/QUIVA/tasks?task=QUIVA-3#comment-c_0ERopllAn4"
+    }
+  ]
+}

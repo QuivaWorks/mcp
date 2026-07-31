@@ -1,0 +1,642 @@
+{
+  "slug": "insurers",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "config_id": "insurers",
+    "harvested": "live record config (configs only — no record data)"
+  },
+  "featured": true,
+  "teaches": [
+    "required fields",
+    "schema types: array, object, string, string|null",
+    "grid containers",
+    "field nodes bound by dotted path",
+    "array-field repeater (arrays of objects)",
+    "node-level inputType: phone, textarea"
+  ],
+  "form_node_count": 48,
+  "config": {
+    "id": "insurers",
+    "name": "Insurers",
+    "description": "Comprehensive record configuration for managing insurance companies, their contact details, products offered, and key personnel",
+    "label": "Insurers",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "business_insurance": {
+          "title": "Business Insurance",
+          "description": "Business insurance products offered (e.g., Couriers, Hairdressers, Home-based businesses)",
+          "type": "string"
+        },
+        "company_name": {
+          "title": "Company Name",
+          "description": "Name of the insurance company",
+          "type": "string"
+        },
+        "contents_insurance": {
+          "title": "Contents Insurance",
+          "description": "Home contents insurance products offered",
+          "type": "string"
+        },
+        "email": {
+          "title": "Company Email",
+          "description": "Primary company email address",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "financial_protection": {
+          "title": "Financial Protection Insurance",
+          "description": "Mortgage and consumer credit protection insurance",
+          "type": "string"
+        },
+        "home_building_insurance": {
+          "title": "Home/Building Insurance",
+          "description": "Home, apartment, and holiday property insurance",
+          "type": "string"
+        },
+        "liability_insurance": {
+          "title": "Liability Insurance",
+          "description": "Public liability and professional indemnity insurance",
+          "type": "string"
+        },
+        "logo_url": {
+          "display": {
+            "formatter": {
+              "type": "text"
+            }
+          },
+          "title": "Logo URL",
+          "description": "URL to company logo image",
+          "type": "string"
+        },
+        "marine_insurance": {
+          "title": "Marine Insurance",
+          "description": "Marine insurance products (boats, jet skis, yachts, etc.)",
+          "type": "string"
+        },
+        "motor_bikes_scooters": {
+          "title": "Motor Bikes, Scooters & Cycles",
+          "description": "Insurance for motor bikes, scooters, and cycles",
+          "type": "string"
+        },
+        "motor_insurance": {
+          "title": "Motor Insurance",
+          "description": "Motor vehicle insurance (cars, caravans, commercial vehicles, etc.)",
+          "type": "string"
+        },
+        "personal_insurance": {
+          "title": "Personal Insurance",
+          "description": "Accident, disability, and TPD insurance",
+          "type": "string"
+        },
+        "persons": {
+          "title": "Key Personnel",
+          "description": "Individual persons working at this insurer",
+          "type": "array",
+          "items": {
+            "ui": {
+              "inputType": "array",
+              "props": {
+                "label": "Personnel"
+              }
+            },
+            "type": "object",
+            "properties": {
+              "email": {
+                "ui": {
+                  "inputType": "text",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Direct email address"
+                    },
+                    "label": "Email",
+                    "placeholder": "john.smith@company.com"
+                  }
+                },
+                "title": "Email",
+                "description": "Email address",
+                "type": "string"
+              },
+              "name": {
+                "ui": {
+                  "inputType": "text",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Contact person's full name"
+                    },
+                    "label": "Full Name",
+                    "placeholder": "John Smith"
+                  }
+                },
+                "title": "Full Name",
+                "description": "Person's full name",
+                "type": "string"
+              },
+              "notes": {
+                "ui": {
+                  "inputType": "textarea",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Additional information or special notes"
+                    },
+                    "label": "Notes"
+                  }
+                },
+                "title": "Notes",
+                "description": "Additional notes or remarks",
+                "type": "string"
+              },
+              "phone_number": {
+                "ui": {
+                  "inputType": "phone",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Direct contact phone number"
+                    },
+                    "label": "Phone Number",
+                    "placeholder": "+61 2 1234 5678"
+                  }
+                },
+                "title": "Phone Number",
+                "description": "Direct phone number",
+                "type": "string"
+              },
+              "role_title": {
+                "ui": {
+                  "inputType": "text",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Job title or position within the company"
+                    },
+                    "label": "Role/Title",
+                    "placeholder": "Sales Manager"
+                  }
+                },
+                "title": "Role/Title",
+                "description": "Job title or role",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "role_title"
+            ]
+          }
+        },
+        "pet_insurance": {
+          "title": "Pet Insurance",
+          "description": "Pet insurance products offered",
+          "type": "string"
+        },
+        "phone_claims_enquiries": {
+          "title": "Claims Enquiries Phone",
+          "description": "Phone number for claims inquiries",
+          "type": "string"
+        },
+        "phone_existing_customers": {
+          "title": "Existing Customers Phone",
+          "description": "Support line for existing customers",
+          "type": "string"
+        },
+        "phone_general": {
+          "title": "General Enquiries Phone",
+          "description": "Phone number for general inquiries",
+          "type": "string"
+        },
+        "phone_new_customers": {
+          "title": "New Customers Phone",
+          "description": "Contact line for new customers",
+          "type": "string"
+        },
+        "rural_farm_insurance": {
+          "title": "Rural/Farm Insurance",
+          "description": "Equipment, crop, and livestock insurance",
+          "type": "string"
+        },
+        "source_url": {
+          "title": "Source URL",
+          "description": "Reference source URL (e.g., Insurance Council listing)",
+          "type": "string"
+        },
+        "travel_insurance": {
+          "title": "Travel Insurance",
+          "description": "Domestic, international, and cruise travel insurance",
+          "type": "string"
+        },
+        "website": {
+          "title": "Website",
+          "description": "Company website URL",
+          "type": "string"
+        }
+      },
+      "required": [
+        "company_name"
+      ]
+    },
+    "views": {
+      "forms": [
+        {
+          "description": "Details of the insurers we have Terms of Business Arrangements with",
+          "id": "default",
+          "layout": {
+            "children": [
+              {
+                "children": [
+                  {
+                    "field": "company_name",
+                    "props": {
+                      "label": "Company Name",
+                      "placeholder": "Enter company name"
+                    },
+                    "type": "field"
+                  },
+                  {
+                    "field": "logo_url",
+                    "props": {
+                      "label": "Logo URL",
+                      "placeholder": "https://..."
+                    },
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "2fr 1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "website",
+                    "props": {
+                      "label": "Website",
+                      "placeholder": "https://www.example.com"
+                    },
+                    "type": "field"
+                  },
+                  {
+                    "field": "email",
+                    "props": {
+                      "label": "Company Email",
+                      "placeholder": "contact@company.com"
+                    },
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr 1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "phone_general",
+                    "inputType": "phone",
+                    "props": {
+                      "label": "General Enquiries Phone",
+                      "placeholder": "+61 2 1234 5678"
+                    },
+                    "type": "field"
+                  },
+                  {
+                    "field": "phone_new_customers",
+                    "inputType": "phone",
+                    "props": {
+                      "label": "New Customers Phone",
+                      "placeholder": "+61 2 1234 5678"
+                    },
+                    "type": "field"
+                  },
+                  {
+                    "field": "phone_existing_customers",
+                    "inputType": "phone",
+                    "props": {
+                      "label": "Existing Customers Phone",
+                      "placeholder": "+61 2 1234 5678"
+                    },
+                    "type": "field"
+                  },
+                  {
+                    "field": "phone_claims_enquiries",
+                    "inputType": "phone",
+                    "props": {
+                      "label": "Claims Enquiries Phone",
+                      "placeholder": "+61 2 1234 5678"
+                    },
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr 1fr 1fr 1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "source_url",
+                    "props": {
+                      "label": "Source URL",
+                      "placeholder": "https://..."
+                    },
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "field": "name",
+                            "props": {
+                              "label": "Full Name",
+                              "placeholder": "John Smith"
+                            },
+                            "type": "field"
+                          },
+                          {
+                            "field": "role_title",
+                            "props": {
+                              "label": "Role/Title",
+                              "placeholder": "Sales Manager"
+                            },
+                            "type": "field"
+                          }
+                        ],
+                        "props": {
+                          "gridTemplateColumns": "1fr 1fr"
+                        },
+                        "type": "grid"
+                      },
+                      {
+                        "children": [
+                          {
+                            "field": "email",
+                            "props": {
+                              "label": "Email",
+                              "placeholder": "john.smith@company.com"
+                            },
+                            "type": "field"
+                          },
+                          {
+                            "field": "phone_number",
+                            "inputType": "phone",
+                            "props": {
+                              "label": "Phone Number",
+                              "placeholder": "+61 2 1234 5678"
+                            },
+                            "type": "field"
+                          }
+                        ],
+                        "props": {
+                          "gridTemplateColumns": "1fr 1fr"
+                        },
+                        "type": "grid"
+                      },
+                      {
+                        "children": [
+                          {
+                            "field": "notes",
+                            "inputType": "textarea",
+                            "props": {
+                              "label": "Notes"
+                            },
+                            "type": "field"
+                          }
+                        ],
+                        "props": {
+                          "gridTemplateColumns": "1fr"
+                        },
+                        "type": "grid"
+                      }
+                    ],
+                    "field": "persons",
+                    "props": {
+                      "itemLabel": "Personnel",
+                      "label": "Key Personnel"
+                    },
+                    "type": "array-field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "motor_insurance",
+                    "inputType": "textarea",
+                    "props": {
+                      "label": "Motor Insurance"
+                    },
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "motor_bikes_scooters",
+                    "inputType": "textarea",
+                    "props": {
+                      "label": "Motor Bikes, Scooters & Cycles"
+                    },
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "home_building_insurance",
+                    "inputType": "textarea",
+                    "props": {
+                      "label": "Home/Building Insurance"
+                    },
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "contents_insurance",
+                    "inputType": "textarea",
+                    "props": {
+                      "label": "Contents Insurance"
+                    },
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "business_insurance",
+                    "inputType": "textarea",
+                    "props": {
+                      "label": "Business Insurance"
+                    },
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "liability_insurance",
+                    "inputType": "textarea",
+                    "props": {
+                      "label": "Liability Insurance"
+                    },
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "pet_insurance",
+                    "inputType": "textarea",
+                    "props": {
+                      "label": "Pet Insurance"
+                    },
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "travel_insurance",
+                    "inputType": "textarea",
+                    "props": {
+                      "label": "Travel Insurance"
+                    },
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "marine_insurance",
+                    "inputType": "textarea",
+                    "props": {
+                      "label": "Marine Insurance"
+                    },
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "rural_farm_insurance",
+                    "inputType": "textarea",
+                    "props": {
+                      "label": "Rural/Farm Insurance"
+                    },
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "personal_insurance",
+                    "inputType": "textarea",
+                    "props": {
+                      "label": "Personal Insurance"
+                    },
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "financial_protection",
+                    "inputType": "textarea",
+                    "props": {
+                      "label": "Financial Protection Insurance"
+                    },
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              }
+            ],
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "type": "grid"
+          },
+          "title": "Insurers Database"
+        }
+      ]
+    },
+    "created_at": "2026-07-24T12:07:28Z",
+    "updated_at": "2026-07-24T12:46:50Z"
+  }
+}

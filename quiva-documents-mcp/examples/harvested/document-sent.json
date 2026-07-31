@@ -1,0 +1,63 @@
+{
+  "slug": "document-sent",
+  "kind": "document",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "subject": "ms.document.document.spaces.FAHUB.<<REDACTED:name>>.new_name.pdf",
+    "key": "new_name.pdf",
+    "harvested_from": "generated document (PII scrubbed — shape only)"
+  },
+  "teaches": [
+    "the generated-document record shape (what get_document returns)",
+    "signature status(es) present: SENT",
+    "a SENT/EXPIRED signature carries extra fields (request, error, signed_at) that a DRAFT one does not",
+    "output.key is a storage URI (obj://bucket/dot.separated.path)",
+    "errors: null on a successful generation"
+  ],
+  "redactions": 11,
+  "config": {
+    "created_at": "2026-07-23T08:48:30.321Z",
+    "errors": null,
+    "modified": 1784796514,
+    "name": "new_name.pdf",
+    "output": {
+      "key": "obj://microstrate-workspaces/spaces.FAHUB.<<REDACTED:name>>.new_name.pdf"
+    },
+    "sequence": 125,
+    "signatures": [
+      {
+        "email": "<<REDACTED:email>>",
+        "error": null,
+        "expiry": "2027-07-23T08:48:33.174Z",
+        "name": "<<REDACTED:name>>",
+        "order": 0,
+        "request": {
+          "id": "<<REDACTED:id>>",
+          "is_embedded": true,
+          "signature_id": "<<REDACTED:id>>"
+        },
+        "signed_at": null,
+        "status": "SENT"
+      },
+      {
+        "email": "<<REDACTED:email>>",
+        "error": null,
+        "expiry": "2027-07-23T08:48:33.175Z",
+        "name": "<<REDACTED:name>>",
+        "order": 1,
+        "request": {
+          "id": "<<REDACTED:id>>",
+          "is_embedded": true,
+          "signature_id": "<<REDACTED:id>>"
+        },
+        "signed_at": null,
+        "status": "SENT"
+      }
+    ],
+    "subject": "ms.document.document.spaces.FAHUB.<<REDACTED:name>>.new_name.pdf",
+    "template": {
+      "key": "<<REDACTED:name>>-test-multiple"
+    },
+    "type": "upserted"
+  }
+}

@@ -1,0 +1,698 @@
+{
+  "id": "zz_fs_demo_clone",
+  "name": "FS Demo Clone (throwaway)",
+  "description": "Throwaway clone of financial_situation to demo a node-level form (form-creator) + rules (form-rule). Safe to delete.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "aml_status": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "in_progress",
+          "verified",
+          "failed"
+        ]
+      },
+      "client_id": {
+        "type": "string"
+      },
+      "created_by": {
+        "type": "string"
+      },
+      "created_date": {
+        "type": "string",
+        "format": "date"
+      },
+      "dependents": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "date_of_birth": {
+              "type": "string",
+              "format": "date"
+            },
+            "name": {
+              "type": "string"
+            },
+            "relationship": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "date_of_birth",
+            "relationship"
+          ]
+        }
+      },
+      "employment_status": {
+        "type": "string",
+        "enum": [
+          "employed",
+          "self_employed",
+          "retired",
+          "unemployed",
+          "other"
+        ]
+      },
+      "financial_situation_id": {
+        "type": "string"
+      },
+      "investment_experience": {
+        "type": "string",
+        "enum": [
+          "none",
+          "limited",
+          "moderate",
+          "extensive"
+        ]
+      },
+      "jurisdiction": {
+        "type": "string",
+        "enum": [
+          "australia",
+          "uk"
+        ]
+      },
+      "kyc_provider": {
+        "type": "string"
+      },
+      "kyc_status": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "in_progress",
+          "verified",
+          "failed"
+        ]
+      },
+      "kyc_verification_date": {
+        "type": "string",
+        "format": "date"
+      },
+      "last_modified_by": {
+        "type": "string"
+      },
+      "last_modified_date": {
+        "type": "string",
+        "format": "date"
+      },
+      "liquid_assets": {
+        "type": "number"
+      },
+      "net_worth": {
+        "type": "number"
+      },
+      "relationship_status": {
+        "type": "string",
+        "enum": [
+          "single",
+          "married",
+          "de_facto",
+          "civil_partnership",
+          "divorced",
+          "widowed"
+        ]
+      },
+      "risk_profile": {
+        "type": "string",
+        "enum": [
+          "conservative",
+          "moderate",
+          "balanced",
+          "growth",
+          "aggressive"
+        ]
+      },
+      "status": {
+        "default": "active",
+        "type": "string",
+        "enum": [
+          "active",
+          "inactive",
+          "archived"
+        ]
+      },
+      "total_assets": {
+        "type": "number"
+      },
+      "total_liabilities": {
+        "type": "number"
+      }
+    },
+    "required": [
+      "financial_situation_id",
+      "client_id",
+      "kyc_status",
+      "aml_status",
+      "status",
+      "created_date",
+      "created_by",
+      "last_modified_date",
+      "last_modified_by",
+      "jurisdiction"
+    ]
+  },
+  "views": {
+    "forms": [
+      {
+        "id": "default",
+        "title": "Full Intake",
+        "description": "Node-level form with dependents repeater and KYC rules.",
+        "layout": {
+          "type": "grid",
+          "props": {
+            "gridTemplateColumns": "1fr",
+            "gap": 16
+          },
+          "children": [
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr",
+                "gap": 16
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "financial_situation_id",
+                  "inputType": "text",
+                  "props": {
+                    "label": "Financial Situation ID"
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "client_id",
+                  "inputType": "text",
+                  "props": {
+                    "label": "Client ID"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr",
+                "gap": 16
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "status",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "Status",
+                    "options": [
+                      {
+                        "value": "active",
+                        "text": "Active"
+                      },
+                      {
+                        "value": "inactive",
+                        "text": "Inactive"
+                      },
+                      {
+                        "value": "archived",
+                        "text": "Archived"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "jurisdiction",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "Jurisdiction",
+                    "options": [
+                      {
+                        "value": "australia",
+                        "text": "Australia"
+                      },
+                      {
+                        "value": "uk",
+                        "text": "UK"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr",
+                "gap": 16
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "kyc_status",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "KYC Status",
+                    "options": [
+                      {
+                        "value": "pending",
+                        "text": "Pending"
+                      },
+                      {
+                        "value": "in_progress",
+                        "text": "In Progress"
+                      },
+                      {
+                        "value": "verified",
+                        "text": "Verified"
+                      },
+                      {
+                        "value": "failed",
+                        "text": "Failed"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "aml_status",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "AML Status",
+                    "options": [
+                      {
+                        "value": "pending",
+                        "text": "Pending"
+                      },
+                      {
+                        "value": "in_progress",
+                        "text": "In Progress"
+                      },
+                      {
+                        "value": "verified",
+                        "text": "Verified"
+                      },
+                      {
+                        "value": "failed",
+                        "text": "Failed"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr",
+                "gap": 16
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "kyc_verification_date",
+                  "inputType": "date",
+                  "props": {
+                    "label": "KYC Verification Date"
+                  },
+                  "rules": [
+                    {
+                      "id": "kyc_verification_date.required",
+                      "property": "required",
+                      "logic": {
+                        "==": [
+                          {
+                            "var": "kyc_status"
+                          },
+                          "verified"
+                        ]
+                      },
+                      "description": "KYC verification date is required when KYC status is Verified."
+                    }
+                  ]
+                },
+                {
+                  "type": "field",
+                  "field": "kyc_provider",
+                  "inputType": "text",
+                  "props": {
+                    "label": "KYC Provider"
+                  },
+                  "rules": [
+                    {
+                      "id": "kyc_provider.visible",
+                      "property": "visible",
+                      "logic": {
+                        "!=": [
+                          {
+                            "var": "kyc_status"
+                          },
+                          "pending"
+                        ]
+                      },
+                      "description": "KYC provider is shown once KYC status is no longer Pending."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr",
+                "gap": 16
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "total_assets",
+                  "inputType": "currency",
+                  "props": {
+                    "label": "Total Assets",
+                    "min": 0,
+                    "decimalPlace": 2
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "total_liabilities",
+                  "inputType": "currency",
+                  "props": {
+                    "label": "Total Liabilities",
+                    "min": 0,
+                    "decimalPlace": 2
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr",
+                "gap": 16
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "net_worth",
+                  "inputType": "currency",
+                  "props": {
+                    "label": "Net Worth",
+                    "min": 0,
+                    "decimalPlace": 2
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "liquid_assets",
+                  "inputType": "currency",
+                  "props": {
+                    "label": "Liquid Assets",
+                    "min": 0,
+                    "decimalPlace": 2
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr",
+                "gap": 16
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "employment_status",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "Employment Status",
+                    "options": [
+                      {
+                        "value": "employed",
+                        "text": "Employed"
+                      },
+                      {
+                        "value": "self_employed",
+                        "text": "Self Employed"
+                      },
+                      {
+                        "value": "retired",
+                        "text": "Retired"
+                      },
+                      {
+                        "value": "unemployed",
+                        "text": "Unemployed"
+                      },
+                      {
+                        "value": "other",
+                        "text": "Other"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "investment_experience",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "Investment Experience",
+                    "options": [
+                      {
+                        "value": "none",
+                        "text": "None"
+                      },
+                      {
+                        "value": "limited",
+                        "text": "Limited"
+                      },
+                      {
+                        "value": "moderate",
+                        "text": "Moderate"
+                      },
+                      {
+                        "value": "extensive",
+                        "text": "Extensive"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr",
+                "gap": 16
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "risk_profile",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "Risk Profile",
+                    "options": [
+                      {
+                        "value": "conservative",
+                        "text": "Conservative"
+                      },
+                      {
+                        "value": "moderate",
+                        "text": "Moderate"
+                      },
+                      {
+                        "value": "balanced",
+                        "text": "Balanced"
+                      },
+                      {
+                        "value": "growth",
+                        "text": "Growth"
+                      },
+                      {
+                        "value": "aggressive",
+                        "text": "Aggressive"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "relationship_status",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "Relationship Status",
+                    "options": [
+                      {
+                        "value": "single",
+                        "text": "Single"
+                      },
+                      {
+                        "value": "married",
+                        "text": "Married"
+                      },
+                      {
+                        "value": "de_facto",
+                        "text": "De Facto"
+                      },
+                      {
+                        "value": "civil_partnership",
+                        "text": "Civil Partnership"
+                      },
+                      {
+                        "value": "divorced",
+                        "text": "Divorced"
+                      },
+                      {
+                        "value": "widowed",
+                        "text": "Widowed"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr",
+                "gap": 16
+              },
+              "children": [
+                {
+                  "type": "array-field",
+                  "field": "dependents",
+                  "props": {
+                    "label": "Dependents",
+                    "itemLabel": "Dependent",
+                    "minItems": 0
+                  },
+                  "children": [
+                    {
+                      "type": "grid",
+                      "props": {
+                        "gridTemplateColumns": "1fr 1fr 1fr",
+                        "gap": 16
+                      },
+                      "children": [
+                        {
+                          "type": "field",
+                          "field": "name",
+                          "inputType": "text",
+                          "props": {
+                            "label": "Name"
+                          }
+                        },
+                        {
+                          "type": "field",
+                          "field": "date_of_birth",
+                          "inputType": "date",
+                          "props": {
+                            "label": "Date of Birth"
+                          }
+                        },
+                        {
+                          "type": "field",
+                          "field": "relationship",
+                          "inputType": "text",
+                          "props": {
+                            "label": "Relationship"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr",
+                "gap": 16
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "created_date",
+                  "inputType": "date",
+                  "props": {
+                    "label": "Created Date"
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "created_by",
+                  "inputType": "text",
+                  "props": {
+                    "label": "Created By"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr",
+                "gap": 16
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "last_modified_date",
+                  "inputType": "date",
+                  "props": {
+                    "label": "Last Modified Date"
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "last_modified_by",
+                  "inputType": "text",
+                  "props": {
+                    "label": "Last Modified By"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "table": {
+      "type": "table",
+      "columns": [
+        {
+          "field": "financial_situation_id",
+          "order": 1
+        },
+        {
+          "field": "client_id",
+          "order": 2
+        },
+        {
+          "field": "net_worth",
+          "order": 3
+        },
+        {
+          "field": "risk_profile",
+          "order": 4
+        },
+        {
+          "field": "kyc_status",
+          "order": 5
+        },
+        {
+          "field": "aml_status",
+          "order": 6
+        },
+        {
+          "field": "status",
+          "order": 7
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "slug": "agent-provider-gemini",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "subject": "ms.hub.config.agent.795b392f-081a-3cc7-b723-fa8b113a9231",
+    "path_id": "795b392f-081a-3cc7-b723-fa8b113a9231",
+    "name": "Marketplace reporter agent",
+    "harvested_from": "GET /hub/agent"
+  },
+  "teaches": [
+    "PROOF that a non-Claude llm_provider is STORED without complaint",
+    "invoke_agent still rejects it with 400 \"unsupported provider\" — storing and invoking have different rules, and the MCP validator currently conflates them"
+  ],
+  "facts": [
+    "llm_provider \"gemini\" / model \"gemini-2.5-flash-lite\"",
+    "shared: \"\""
+  ],
+  "config": {
+    "name": "Marketplace reporter agent",
+    "description": "Gathers details from the reporting action on marketplace and submits it to admin for review",
+    "behaviour": "The chat starts with a default message \"thanks for reporting\"",
+    "llm_provider": "gemini",
+    "model": "gemini-2.5-flash-lite",
+    "has_tools": true,
+    "timeout": 30,
+    "context_limit": 50000,
+    "message_history_limit": 200,
+    "prompt": "",
+    "ai_smart_context": true,
+    "ai_summary_threshold": 0.7,
+    "ai_summary_model": "claude-3-5-sonnet-20241022",
+    "preserve_most_recent": 5,
+    "ai_prompt": false,
+    "api_key": "GEMINI_API_KEY",
+    "await": true,
+    "shared": "",
+    "owner": ""
+  }
+}

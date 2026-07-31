@@ -1,0 +1,63 @@
+{
+  "slug": "space-ESCALATE",
+  "kind": "space",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "id": "ESCALATE",
+    "url": "https://app.microstrate.io/en/hub/spaces/ESCALATE/tasks",
+    "harvested_from": "GET /workspaces/spaces"
+  },
+  "teaches": [
+    "6 custom board statuses (columns)",
+    "statuses carry the board's presentation fields (color, complete) — the API does not require them, the board reads them",
+    "default_status naming the column new tasks land in",
+    "read-only fields a create/update body must NOT echo back: owner, created_at, updated_at, url"
+  ],
+  "config": {
+    "name": "Escalations",
+    "id": "ESCALATE",
+    "description": "A dedicated space for managing escalation tasks routed from automated flow executions or assistant converstions.",
+    "default_status": "open",
+    "statuses": [
+      {
+        "id": "open",
+        "name": "Open",
+        "color": "#9ca3af",
+        "complete": false
+      },
+      {
+        "id": "in_progress",
+        "name": "In Progress",
+        "color": "#3b82f6",
+        "complete": false
+      },
+      {
+        "id": "waiting_for_user",
+        "name": "Waiting For User",
+        "color": "#f59e0b",
+        "complete": false
+      },
+      {
+        "id": "waiting_for_internal_team",
+        "name": "Waiting For Internal Team",
+        "color": "#aa4cac",
+        "complete": false
+      },
+      {
+        "id": "resolved",
+        "name": "Resolved",
+        "color": "#22c55e",
+        "complete": false
+      },
+      {
+        "id": "cancelled",
+        "name": "Cancelled",
+        "color": "#ef4444",
+        "complete": false
+      }
+    ],
+    "created_at": "2026-05-28T08:01:46Z",
+    "updated_at": "2026-05-28T08:01:46Z",
+    "url": "https://app.microstrate.io/en/hub/spaces/ESCALATE/tasks"
+  }
+}

@@ -1,0 +1,153 @@
+{
+  "slug": "certificate-of-currency",
+  "kind": "template",
+  "not_evidence": "HAND-WRITTEN. The two harvested templates on staging are thin (no output.name expression, no filters, no sub_templates), so this example exists to show the full surface. It is NOT proof the platform accepts it — the only proof is a live create -> publish -> trigger. See docs/lessons.md.",
+  "teaches": [
+    "output.name as an expression with no file extension (the extension comes from content_type)",
+    "output bucket + folder placement, and the dot-separated document key that results",
+    "signatories[].name/email as expressions resolved from the trigger payload",
+    "sub_templates[].conditions in the form the ENGINE evaluates (rule-engine v2), not the {all:[...]} form this MCP used to document",
+    "THE PAYLOAD MUST BE KEYED TO THE PLACEHOLDERS THAT EXIST IN THE SOURCE DOCX. A key that matches nothing merges to an empty string with no error anywhere — the first version of this example got this wrong and shipped a blank certificate. See placeholder_mismatch_is_silent.",
+    "a HelloSign [sig|...] anchor renders as literal text when no signature request is created"
+  ],
+  "conditions_proven_live": {
+    "verified": "2026-07-30, all three documents regenerated from the SAME populated payload.",
+    "vic_56903_condition_met_v2_form": "sub-template MERGED — the extra page is present.",
+    "nsw_55018_condition_unmet_v2_form": "sub-template correctly OMITTED.",
+    "wrongform_55296_condition_MET_but_json_rules_engine_shape": "sub-template SILENTLY DROPPED. It is ~1,600 B smaller than the vic document despite the condition being met, i.e. it is missing the merged page.",
+    "note_on_the_278_byte_gap": "wrongform (55,296) is not byte-identical to nsw (55,018) the way the blank versions were (both 44,582). The 278-byte gap is just the longer policy number string \"-wrongform\" now rendering INSIDE the document. With blank fields nothing was rendered, so they matched exactly. Compare against vic, not against nsw.",
+    "why_it_matters": "The { all: [...] } json-rules-engine shape has no `outcome`, and the engine requires the resolved cell to have outcome === true — so the sub-template is dropped with no error anywhere. All four templates live on staging have sub_templates: [], so nothing in production was affected."
+  },
+  "conditions_warning": "sub_templates[].conditions is evaluated by rule-engine v2 (file-generator-service/src/consumer/template-trigger.ts:274 wraps it as resolveRulesV2({ rules: { trigger: conditions } }) and requires ...outcome === true). A json-rules-engine object like { all: [ { fact, operator, value } ] } has no `outcome`, so isRuleCellV2 rejects it, the whole object becomes the outcome, and the sub-template is SILENTLY DROPPED from the generated document. Facts are auto-derived from the trigger payload as `<key>.value`, so reference them as \"@fact:risk_state.value\". As of 2026-07-29 NO live template on staging uses conditions, so nothing is broken in production today — but this MCP would have taught the broken form.",
+  "config": {
+    "key": "mcp-verification-certificate",
+    "label": "Certificate of Currency (MCP verification)",
+    "source": {
+      "key": "Sample_Insurance_Certificate _.docx",
+      "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    },
+    "output": {
+      "name": "certificate-{policy_number}",
+      "content_type": "application/pdf",
+      "bucket": "microstrate-documents",
+      "folder": "mcp-verification"
+    },
+    "signatories": [
+      {
+        "name": "{insured_name}",
+        "email": "{insured_email}",
+        "validity": {
+          "day": 14
+        },
+        "order": 1
+      }
+    ],
+    "sub_templates": [
+      {
+        "key": "mcp-verification-terms-vic",
+        "conditions": {
+          "operator": "=",
+          "input": [
+            "@fact:risk_state.value",
+            "VIC"
+          ]
+        }
+      }
+    ]
+  },
+  "wrong_conditions_negative_control": {
+    "key": "mcp-verification-terms-vic",
+    "conditions": {
+      "all": [
+        {
+          "fact": "risk_state.value",
+          "operator": "equal",
+          "value": "VIC"
+        }
+      ]
+    }
+  },
+  "trigger_payload": {
+    "_why_these_keys": "These are the placeholder names ACTUALLY PRESENT in the source DOCX, extracted from word/document.xml with zipfile — not names invented to suit this example. See placeholder_mismatch_is_silent. `policy_number` is additionally required because output.name is \"certificate-{policy_number}\", and `risk_state` because the sub-template condition reads @fact:risk_state.value. Neither appears in the DOCX.",
+    "policy_number": "POL-2026-0087",
+    "risk_state": "VIC",
+    "firstName": "Ridgeline Constructions",
+    "lastName": "Pty Ltd",
+    "dateOfBirth": "1998-03-12",
+    "policyNumber": "POL-2026-0087",
+    "streetAddress": "42 Example Street",
+    "city": "Melbourne",
+    "state": "VIC",
+    "zipCode": "3000",
+    "email": "accounts@example.invalid",
+    "phoneNumber": "+61 3 9000 0000",
+    "coverageType": "Commercial Property & Liability",
+    "effectiveDate": "2026-08-01",
+    "expirationDate": "2027-08-01",
+    "coverageLimit": "AUD 2,500,000",
+    "deductibleAmount": "AUD 10,000",
+    "premiumAmount": "AUD 18,450.50",
+    "agentName": "Northbridge Mutual Brokers",
+    "agentPhone": "+61 3 9000 1111",
+    "beneficiaryFirstName": "Ridgeline",
+    "beneficiaryLastName": "Holdings Pty Ltd",
+    "beneficiaryRelationship": "Parent company",
+    "issueDate": "2026-07-30"
+  },
+  "placeholders_actually_in_this_docx": {
+    "source": "Sample_Insurance_Certificate _.docx",
+    "extracted_how": "zipfile -> word/document.xml -> re.findall(r'{[^{}]{1,60}}')",
+    "count": 22,
+    "names": [
+      "firstName",
+      "lastName",
+      "dateOfBirth",
+      "policyNumber",
+      "streetAddress",
+      "city",
+      "state",
+      "zipCode",
+      "email",
+      "phoneNumber",
+      "coverageType",
+      "effectiveDate",
+      "expirationDate",
+      "coverageLimit",
+      "deductibleAmount",
+      "premiumAmount",
+      "agentName",
+      "agentPhone",
+      "beneficiaryFirstName",
+      "beneficiaryLastName",
+      "beneficiaryRelationship",
+      "issueDate"
+    ],
+    "also_present": "[sig|req|signer1] — a HelloSign anchor, NOT an expression. It renders as LITERAL TEXT when no signature request is created (this example omits insured_email on purpose so the signatory is skipped), which is why the PDF shows 'Sig: [sig|req|signer1]' at the bottom. That is expected here, not a defect.",
+    "note": "This DOCX uses plain substitution only — no filters, loops or ternaries. The expression FEATURES the engine supports are listed separately under expression_syntax_reference; do not assume they appear in this file."
+  },
+  "expression_syntax_reference": {
+    "_note": "A syntax reference for the file-generator expression language — NOT a description of the DOCX above. The previous version of this example called this field \"expressions_used_in_the_docx\", which implied these were present in the source file. They are not, and that mislabelling is part of how the blank-PDF mistake went unnoticed.",
+    "examples": [
+      "{insured_name} — plain substitution",
+      "{inception_date | formatdate:\"dd MMM yyyy\":0:en-AU} — all three filter args are positional and required",
+      "{premium | formatcurrency:AUD:en-AU:true}",
+      "{#coverage_lines}{description}: {limit | formatcurrency:AUD:en-AU:true}\n{/coverage_lines} — loop, closed with {/name} or {/}",
+      "{sum_insured > 1000000 ? \"Large risk\" : \"Standard risk\"} — ternary"
+    ]
+  },
+  "how_to_verify_on_staging": [
+    "validate_template_config with this config (expect valid; the conditions form above passes the shape check either way — the validator's error text is what is wrong, not its verdict)",
+    "create_template -> publish_template -> trigger_templates with trigger_payload",
+    "the 200 from trigger is a BARE ARRAY: { template, subject } means queued, { template, errors } means it never ran",
+    "poll get_document with key \"mcp-verification.certificate-POL-2026-0087.pdf\" (bucket is not part of the key; folder is, dot-separated)",
+    "output.key set = generated; errors set = failed; signatures fills once the HelloSign request is sent"
+  ],
+  "placeholder_mismatch_is_silent": {
+    "what_went_wrong": "The first version of this example sent a payload of my own invention — insured_name, sum_insured, premium, inception_date, coverage_lines. NOT ONE of those keys exists as a placeholder in the source DOCX, so every field merged to empty and the generated certificate was completely blank. It shipped that way and was only caught when someone opened the PDF.",
+    "why_nothing_complained": "A placeholder with no matching payload key resolves to an empty string. There is no error, no warning, and no `errors` entry on the document — trigger_templates returns a subject, the job succeeds, and a blank PDF lands in the bucket. Every mechanical check passes: the template published, the trigger queued, the document generated, the bytes differed between runs. Only the CONTENT was wrong.",
+    "the_tell": "Literal punctuation left stranded. The address line rendered as \"Mailing Address: , , \" — three empty placeholders with the DOCX's own commas between them.",
+    "how_to_avoid_it": "Read the placeholders out of the DOCX before writing a payload: python3 -c \"import zipfile,re;print(sorted(set(re.findall(r'{[^{}]{1,60}}', zipfile.ZipFile(F).read('word/document.xml').decode()))))\" — then key the payload to exactly those names. validate_docx does NOT do this for you.",
+    "expression_syntax_confirmed": "{key} is the platform expression form, resolved against the trigger payload. Confirmed independently by the live alex-test template, whose signatory is {\"email\": \"{email}\", \"name\": \"{firstName}\"}, and by output.name \"certificate-{policy_number}\" resolving correctly into the filename all along — which is exactly why the failure was invisible: the part I authored worked, the part I never inspected did not.",
+    "sizes_before_and_after": "Blank: vic 46,551 B / nsw 44,582 B. Populated with the keys above: vic 56,903 B / nsw 55,018 B / wrongform 55,296 B. Roughly 10 KB per document of actual text."
+  }
+}

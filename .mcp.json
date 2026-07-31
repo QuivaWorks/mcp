@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "quiva-flows": {
+      "command": "sh",
+      "args": ["quiva-flows-mcp/bin/run.sh"]
+    },
+    "quiva-records": {
+      "command": "sh",
+      "args": ["quiva-records-mcp/bin/run.sh"]
+    },
+    "quiva-documents": {
+      "command": "sh",
+      "args": ["quiva-documents-mcp/bin/run.sh"]
+    },
+    "quiva-workspaces": {
+      "command": "sh",
+      "args": ["quiva-workspaces-mcp/bin/run.sh"]
+    },
+    "quiva-agents": {
+      "command": "sh",
+      "args": ["quiva-agents-mcp/bin/run.sh"]
+    }
+  }
+}

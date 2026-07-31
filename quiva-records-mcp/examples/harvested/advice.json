@@ -1,0 +1,537 @@
+{
+  "slug": "advice",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "config_id": "advice",
+    "harvested": "live record config (configs only — no record data)"
+  },
+  "featured": false,
+  "teaches": [
+    "required fields",
+    "format: date",
+    "schema types: array, boolean, number, object, string"
+  ],
+  "form_node_count": 0,
+  "config": {
+    "id": "advice",
+    "name": "Advice",
+    "description": "Financial advice documents and records",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "advice_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Advice Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "advice_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Advice ID"
+            }
+          },
+          "type": "string"
+        },
+        "advice_reference_number": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Advice Reference Number"
+            }
+          },
+          "type": "string"
+        },
+        "advice_summary": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Advice Summary"
+            }
+          },
+          "type": "string"
+        },
+        "advice_type": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Advice Type",
+              "options": [
+                {
+                  "text": "Initial",
+                  "value": "initial"
+                },
+                {
+                  "text": "Updated",
+                  "value": "updated"
+                },
+                {
+                  "text": "Review",
+                  "value": "review"
+                },
+                {
+                  "text": "Ad Hoc",
+                  "value": "ad_hoc"
+                }
+              ]
+            }
+          },
+          "type": "string"
+        },
+        "advisor_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Advisor ID"
+            }
+          },
+          "type": "string"
+        },
+        "advisor_license_number": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Advisor License Number"
+            }
+          },
+          "type": "string"
+        },
+        "advisor_name": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Advisor Name"
+            }
+          },
+          "type": "string"
+        },
+        "advisor_signed_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Advisor Signed Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "best_interests_declaration": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Best Interests Declaration"
+            }
+          },
+          "type": "string"
+        },
+        "circumstances": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Circumstances"
+            }
+          },
+          "type": "string"
+        },
+        "client_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Client ID"
+            }
+          },
+          "type": "string"
+        },
+        "client_signed_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Client Signed Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "conflicts_of_interest": {
+          "ui": {
+            "inputType": "array",
+            "props": {
+              "helpText": {
+                "markdown": "Conflicts of interest declared"
+              },
+              "label": "Conflicts of Interest"
+            }
+          },
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "conflict_description": {
+                "ui": {
+                  "inputType": "textarea",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Description of conflict"
+                    },
+                    "label": "Description of conflict"
+                  }
+                },
+                "type": "string"
+              },
+              "conflict_mitigation": {
+                "ui": {
+                  "inputType": "textarea",
+                  "props": {
+                    "helpText": {
+                      "markdown": "How conflict is mitigated"
+                    },
+                    "label": "How conflict is mitigated"
+                  }
+                },
+                "type": "string"
+              }
+            },
+            "required": [
+              "conflict_description",
+              "conflict_mitigation"
+            ]
+          }
+        },
+        "created_by": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Created By"
+            }
+          },
+          "type": "string"
+        },
+        "created_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Created Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "document_status": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Document Status",
+              "options": [
+                {
+                  "text": "Draft",
+                  "value": "draft"
+                },
+                {
+                  "text": "Ready for Review",
+                  "value": "ready_for_review"
+                },
+                {
+                  "text": "Under Review",
+                  "value": "under_review"
+                },
+                {
+                  "text": "Approved",
+                  "value": "approved"
+                },
+                {
+                  "text": "Signed",
+                  "value": "signed"
+                },
+                {
+                  "text": "Archived",
+                  "value": "archived"
+                }
+              ]
+            }
+          },
+          "default": "draft",
+          "type": "string"
+        },
+        "document_version": {
+          "ui": {
+            "inputType": "number",
+            "props": {
+              "label": "Document Version"
+            }
+          },
+          "default": 1,
+          "type": "number"
+        },
+        "financial_modelling_conducted": {
+          "ui": {
+            "inputType": "checkbox",
+            "props": {
+              "label": "Financial Modelling Conducted"
+            }
+          },
+          "default": false,
+          "type": "boolean"
+        },
+        "joint_client_signed_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "helpText": {
+                "markdown": "Date joint client signed document (if applicable)"
+              },
+              "label": "Joint Client Signed Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "last_modified_by": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Last Modified By"
+            }
+          },
+          "type": "string"
+        },
+        "last_modified_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Last Modified Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "modelling_scenarios": {
+          "ui": {
+            "inputType": "array",
+            "props": {
+              "helpText": {
+                "markdown": "Array of modelling scenario IDs included in advice"
+              },
+              "label": "Modelling Scenarios"
+            }
+          },
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "scenario_id": {
+                "ui": {
+                  "inputType": "text",
+                  "props": {
+                    "helpText": {
+                      "markdown": "ID of modelling scenario"
+                    },
+                    "label": "ID of modelling scenario"
+                  }
+                },
+                "type": "string"
+              }
+            },
+            "required": [
+              "scenario_id"
+            ]
+          }
+        },
+        "modelling_summary": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Modelling Summary"
+            }
+          },
+          "type": "string"
+        },
+        "objectives": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Objectives"
+            }
+          },
+          "type": "string"
+        },
+        "recommendations": {
+          "ui": {
+            "inputType": "array",
+            "props": {
+              "helpText": {
+                "markdown": "Array of recommendation IDs associated with this advice"
+              },
+              "label": "Recommendations"
+            }
+          },
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "recommendation_id": {
+                "ui": {
+                  "inputType": "text",
+                  "props": {
+                    "helpText": {
+                      "markdown": "ID of recommendation"
+                    },
+                    "label": "ID of recommendation"
+                  }
+                },
+                "type": "string"
+              }
+            },
+            "required": [
+              "recommendation_id"
+            ]
+          }
+        },
+        "soa_roa_document_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "helpText": {
+                "markdown": "Reference to generated SoA/RoA document"
+              },
+              "label": "SoA/RoA Document ID"
+            }
+          },
+          "type": "string"
+        }
+      },
+      "required": [
+        "advice_id",
+        "client_id",
+        "advice_type",
+        "advice_reference_number",
+        "advice_date",
+        "advisor_id",
+        "advisor_name",
+        "advisor_license_number",
+        "advice_summary",
+        "circumstances",
+        "objectives",
+        "financial_modelling_conducted",
+        "best_interests_declaration",
+        "document_status",
+        "document_version",
+        "created_date",
+        "created_by",
+        "last_modified_date",
+        "last_modified_by",
+        "recommendations"
+      ]
+    },
+    "views": {
+      "form": {
+        "type": "grid",
+        "props": {
+          "gridTemplateColumns": "1fr 1fr",
+          "gap": 16
+        },
+        "children": [
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "advice_id"
+              },
+              {
+                "type": "field",
+                "field": "advice_reference_number"
+              },
+              {
+                "type": "field",
+                "field": "advice_date"
+              },
+              {
+                "type": "field",
+                "field": "advice_type"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "advisor_id"
+              },
+              {
+                "type": "field",
+                "field": "advisor_name"
+              },
+              {
+                "type": "field",
+                "field": "advisor_license_number"
+              },
+              {
+                "type": "field",
+                "field": "document_status"
+              }
+            ]
+          },
+          {
+            "type": "field",
+            "field": "recommendations"
+          },
+          {
+            "type": "field",
+            "field": "modelling_scenarios"
+          },
+          {
+            "type": "field",
+            "field": "conflicts_of_interest"
+          },
+          {
+            "type": "field",
+            "field": "joint_client_signed_date"
+          },
+          {
+            "type": "field",
+            "field": "soa_roa_document_id"
+          }
+        ]
+      },
+      "table": {
+        "type": "table",
+        "columns": [
+          {
+            "field": "advice_id",
+            "order": 1
+          },
+          {
+            "field": "client_id",
+            "order": 2
+          },
+          {
+            "field": "advice_reference_number",
+            "order": 3
+          },
+          {
+            "field": "advice_date",
+            "order": 4
+          },
+          {
+            "field": "document_status",
+            "order": 5
+          }
+        ]
+      }
+    },
+    "created_at": "2026-07-10T14:48:34Z",
+    "updated_at": "2026-07-10T15:23:11Z"
+  }
+}

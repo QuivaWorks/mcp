@@ -1,0 +1,20 @@
+{
+  "slug": "escalation_request",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "config_id": "escalation_request",
+    "harvested": "live record config (configs only — no record data)"
+  },
+  "featured": false,
+  "teaches": [
+    "schema types: "
+  ],
+  "form_node_count": 0,
+  "config": {
+    "id": "escalation_request",
+    "name": "Escalation Request",
+    "schema": {},
+    "created_at": "2026-06-02T12:22:21Z",
+    "updated_at": "2026-06-02T12:22:21Z"
+  }
+}

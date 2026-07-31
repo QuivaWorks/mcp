@@ -1,0 +1,13 @@
+node_modules/
+
+# Real credentials. Each server reads its own .env; the .env.example files are
+# templates and MUST stay blank — a live staging API key has been committed to a
+# .env.example before.
+.env
+*/.env
+
+# Local Claude Code overrides (.claude/settings.json is shared and IS tracked)
+.claude/settings.local.json
+
+.DS_Store
+*.log
