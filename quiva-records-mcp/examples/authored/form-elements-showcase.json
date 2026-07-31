@@ -1,0 +1,355 @@
+{
+  "slug": "form-elements-showcase",
+  "not_evidence": "HAND-WRITTEN. Every element prop, value token and rule property here was read off the two files that decide behaviour — form-editor/builder/element-catalog.config.ts (which gates the builder UI) and records/form/view-element.component.svelte (which gates runtime) — not off the Form Creator spec, which disagrees with the renderer in three places. It is not proof the platform renders it: tools/push-form-elements.mjs pushes it to staging so it can be checked in the UI.",
+  "teaches": [
+    "element nodes RENDER now: record-view-renderer gained an `{:else if view.type === 'element'}` branch handing the node to view-element.component.svelte. Before that they fell through to the FIELD renderer and their children were silently dropped",
+    "there are exactly seven kinds: text-heading, text-paragraph, text-note, text-link, alert (leaves) and card, card-collapsable (containers)",
+    "a CONTAINER element's children are grid ROWS, laid out exactly like the top level — a field placed straight into a card skips the row layer",
+    "leaf elements take no children; anything nested in one is dropped",
+    "element rules ARE evaluated (view-element receives the whole node and reads node.rules itself) — unlike the array-field repeater, whose own rules are still never passed to ViewRepeater",
+    "text-note aligns with `align`; text-heading and text-paragraph use `textAlign`. The builder writes textAlign on a note, which the renderer ignores — see divergences_verified",
+    "text-note and text-paragraph carry content in `markdown`, but a `text` RULE is what overrides it (element-catalog ruleTargets)",
+    "alert.showSeverityIcon defaults to TRUE — the renderer tests `props.showSeverityIcon !== false`, so only an explicit false hides the icon",
+    "card accent \"none\" is normalised to undefined by the renderer, so it is the same as omitting it"
+  ],
+  "config": {
+    "id": "MCP_FORM_ELEMENTS",
+    "name": "Form Elements Showcase (MCP verification)",
+    "description": "Exercises all seven element kinds, both containers, and every rule-driven element property. Authored by quiva-records-mcp.",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "legal_name": { "type": "string", "title": "Legal name" },
+        "uses_trading_name": { "type": "boolean", "title": "Trades under another name" },
+        "trading_name": { "type": "string", "title": "Trading name" },
+        "industry": {
+          "type": "string",
+          "title": "Industry",
+          "enum": ["construction", "hospitality", "retail"]
+        },
+        "employee_count": { "type": "integer", "title": "Employees", "minimum": 1, "maximum": 5000 },
+        "description": { "type": "string", "title": "Business description" },
+        "sum_insured": { "type": "number", "title": "Sum insured", "minimum": 0 },
+        "excess_percent": { "type": "number", "title": "Excess", "minimum": 0, "maximum": 50 },
+        "start_date": { "type": "string", "format": "date", "title": "Cover start date" },
+        "contact_phone": { "type": "string", "title": "Contact number" },
+        "portal_enabled": { "type": "boolean", "title": "Enable portal access" },
+        "portal_api_key": { "type": "string", "title": "API key" },
+        "terms_accepted": { "type": "boolean", "title": "Terms accepted" }
+      },
+      "required": ["legal_name"]
+    },
+    "views": {
+      "forms": [
+        {
+          "id": "default",
+          "title": "Submission",
+          "description": "Every element kind in one form, so each can be checked in the UI.",
+          "layout": {
+            "type": "grid",
+            "props": { "gridTemplateColumns": "1fr", "gap": 16 },
+            "children": [
+              {
+                "type": "grid",
+                "props": { "gridTemplateColumns": "1fr" },
+                "children": [
+                  {
+                    "type": "element",
+                    "element": "text-heading",
+                    "props": {
+                      "text": "Commercial submission",
+                      "size": "large",
+                      "textAlign": "left",
+                      "overflowWrap": "break-word",
+                      "spacing": "xSmall",
+                      "helpText": { "markdown": "Captures the business, the cover requested and portal access." }
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "grid",
+                "props": { "gridTemplateColumns": "1fr" },
+                "children": [
+                  {
+                    "type": "element",
+                    "element": "text-paragraph",
+                    "props": {
+                      "markdown": "Complete each section below. The **portal** section is optional and can be revisited later.",
+                      "textAlign": "left",
+                      "wordWrap": "normal",
+                      "spacing": "small"
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "grid",
+                "props": { "gridTemplateColumns": "1fr" },
+                "children": [
+                  {
+                    "type": "element",
+                    "element": "alert",
+                    "props": {
+                      "title": "Terms not yet accepted",
+                      "text": "The submission cannot be completed until the terms of business are accepted at the bottom of this form.",
+                      "severity": "warning",
+                      "showSeverityIcon": true,
+                      "spacing": "small"
+                    },
+                    "rules": [
+                      {
+                        "id": "alert.visible",
+                        "property": "visible",
+                        "logic": { "!": [{ "var": "terms_accepted" }] },
+                        "description": "Shown while the terms of business have not been accepted."
+                      },
+                      {
+                        "id": "alert.severity",
+                        "property": "severity",
+                        "logic": { "if": [{ "var": "legal_name" }, "warning", "info"] },
+                        "description": "Warns once a legal name is entered; informational before that."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "grid",
+                "props": { "gridTemplateColumns": "2fr 1fr" },
+                "children": [
+                  { "type": "field", "field": "legal_name", "inputType": "text", "props": { "label": "Legal name", "placeholder": "As registered" } },
+                  { "type": "field", "field": "uses_trading_name", "inputType": "toggle", "props": { "label": "Trades under another name" } }
+                ]
+              },
+              {
+                "type": "grid",
+                "props": { "gridTemplateColumns": "1fr 1fr 1fr" },
+                "children": [
+                  {
+                    "type": "field",
+                    "field": "trading_name",
+                    "inputType": "text",
+                    "props": { "label": "Trading name", "placeholder": "Name used publicly" },
+                    "rules": [
+                      {
+                        "id": "trading_name.visible",
+                        "property": "visible",
+                        "logic": { "==": [{ "var": "uses_trading_name" }, true] },
+                        "description": "Shown only when the business trades under another name."
+                      },
+                      {
+                        "id": "trading_name.required",
+                        "property": "required",
+                        "logic": { "==": [{ "var": "uses_trading_name" }, true] },
+                        "description": "Required when the business trades under another name."
+                      }
+                    ]
+                  },
+                  {
+                    "type": "field",
+                    "field": "industry",
+                    "inputType": "dropdown",
+                    "props": {
+                      "label": "Industry",
+                      "placeholder": "Select an industry",
+                      "options": [
+                        { "value": "construction", "text": "Construction" },
+                        { "value": "hospitality", "text": "Hospitality" },
+                        { "value": "retail", "text": "Retail" }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "field",
+                    "field": "employee_count",
+                    "inputType": "number",
+                    "props": { "label": "Employees", "min": 1, "max": 5000, "decimalPlace": 0, "showControls": true, "step": 1 }
+                  }
+                ]
+              },
+              {
+                "type": "grid",
+                "props": { "gridTemplateColumns": "1fr" },
+                "children": [
+                  { "type": "field", "field": "description", "inputType": "textarea", "props": { "label": "Business description", "placeholder": "What does the business do?", "strictMultiline": true } }
+                ]
+              },
+              {
+                "type": "grid",
+                "props": { "gridTemplateColumns": "1fr" },
+                "children": [
+                  {
+                    "type": "element",
+                    "element": "card",
+                    "props": { "accent": "primary", "border": "all", "borderRadius": "all", "highlight": true, "spacing": "small" },
+                    "children": [
+                      {
+                        "type": "grid",
+                        "props": { "gridTemplateColumns": "1fr" },
+                        "children": [
+                          { "type": "element", "element": "text-heading", "props": { "text": "Cover requested", "size": "small", "spacing": "xSmall" } }
+                        ]
+                      },
+                      {
+                        "type": "grid",
+                        "props": { "gridTemplateColumns": "1fr 1fr" },
+                        "children": [
+                          { "type": "field", "field": "sum_insured", "inputType": "currency", "props": { "label": "Sum insured", "placeholder": "0.00", "min": 0, "decimalPlace": 2 } },
+                          {
+                            "type": "field",
+                            "field": "excess_percent",
+                            "inputType": "slider",
+                            "props": { "label": "Excess (%)", "min": 0, "max": 50, "decimalPlace": 0 },
+                            "rules": [
+                              {
+                                "id": "excess_percent.disabled",
+                                "property": "disabled",
+                                "logic": { "!": [{ "var": "sum_insured" }] },
+                                "description": "Disabled until a sum insured is entered."
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "grid",
+                        "props": { "gridTemplateColumns": "1fr 1fr" },
+                        "children": [
+                          { "type": "field", "field": "start_date", "inputType": "date", "props": { "label": "Cover start date", "placeholder": "Select a date" } },
+                          { "type": "field", "field": "contact_phone", "inputType": "phone", "props": { "label": "Contact number" } }
+                        ]
+                      },
+                      {
+                        "type": "grid",
+                        "props": { "gridTemplateColumns": "1fr" },
+                        "children": [
+                          {
+                            "type": "element",
+                            "element": "text-note",
+                            "props": { "markdown": "We only use this number for claims and renewal contact.", "size": "small", "align": "left", "lineClamp": 2, "spacing": "small" }
+                          }
+                        ]
+                      }
+                    ],
+                    "rules": [
+                      {
+                        "id": "card.visible",
+                        "property": "visible",
+                        "logic": { "!=": [{ "var": "legal_name" }, ""] },
+                        "description": "Shown once the business has a legal name."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "grid",
+                "props": { "gridTemplateColumns": "1fr" },
+                "children": [
+                  {
+                    "type": "element",
+                    "element": "card-collapsable",
+                    "props": {
+                      "text": "Portal & integrations",
+                      "textSize": "small",
+                      "note": "Optional — only for clients using the self-service portal",
+                      "helpText": { "markdown": "Credentials are stored encrypted and never shown in full again." },
+                      "border": "all",
+                      "borderRadius": "all",
+                      "highlight": false,
+                      "defaultOpen": false,
+                      "spacing": "small"
+                    },
+                    "children": [
+                      {
+                        "type": "grid",
+                        "props": { "gridTemplateColumns": "1fr" },
+                        "children": [
+                          { "type": "field", "field": "portal_enabled", "inputType": "toggle", "props": { "label": "Enable portal access" } }
+                        ]
+                      },
+                      {
+                        "type": "grid",
+                        "props": { "gridTemplateColumns": "1fr" },
+                        "children": [
+                          {
+                            "type": "field",
+                            "field": "portal_api_key",
+                            "inputType": "secret",
+                            "props": { "label": "API key", "placeholder": "Paste the provider key" },
+                            "rules": [
+                              {
+                                "id": "portal_api_key.visible",
+                                "property": "visible",
+                                "logic": { "==": [{ "var": "portal_enabled" }, true] },
+                                "description": "Shown only when portal access is enabled."
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "grid",
+                "props": { "gridTemplateColumns": "1fr 1fr" },
+                "children": [
+                  { "type": "field", "field": "terms_accepted", "inputType": "checkbox", "props": { "label": "I accept the terms of business" } },
+                  {
+                    "type": "element",
+                    "element": "text-link",
+                    "props": {
+                      "text": "Read the terms of business",
+                      "href": "https://example.com/terms-of-business",
+                      "note": "Opens in a new tab",
+                      "noteSize": "small",
+                      "underline": true
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "divergences_verified": {
+    "why": "The builder catalog, the Form Creator spec and the runtime renderer disagree in three places. RUNTIME WINS, because that is what a stored config actually does. Each was read off both files.",
+    "text-note alignment": {
+      "runtime": "view-element.component.svelte renders a note with align={str('align') ?? 'default'} — it reads props.align.",
+      "builder": "element-catalog.config.ts gives text-note a prop editor keyed textAlign.",
+      "verdict": "FRONTEND BUG. Aligning a note in the visual builder writes a key the renderer never reads, so it does nothing. This example authors `align`. text-heading and text-paragraph genuinely use `textAlign`, so the inconsistency is real."
+    },
+    "card visible rules": {
+      "runtime": "both the card and card-collapsable branches are wrapped in {#if !ruleState.visible}, so a visible rule hides the card and everything in it.",
+      "builder": "allowedRuleProperties for card and card-collapsable omit 'visible'.",
+      "verdict": "Safe to author (this example does, on the Cover card) but the builder's Rules tab will not offer it and may not round-trip it."
+    },
+    "repeater visible rules": {
+      "runtime": "record-view-renderer passes schema/fieldRef/childNodes/value/errors/nodeProps/onChange to ViewRepeater and NEVER passes rules, so an array-field's own rules are not evaluated.",
+      "spec": "the Form Creator spec claims the repeater container supports `visible`.",
+      "verdict": "The spec is wrong. A visible rule on an array-field is inert — put it on the enclosing grid row. This example therefore uses no repeater rule."
+    }
+  },
+  "corpus_context": {
+    "swept": "every bundled harvested + authored config, 2026-07-30",
+    "counts": "211 \"field\", 158 \"grid\", 46 \"\", 17 \"table\", 4 \"array-field\", 1 \"element\"",
+    "the_one_element": "sc8DhU6CEXh4gkJPnS_Le carries the only element node on staging — an element: \"card\" with correctly-rowed children. It did NOT render before this release and does now, so that config's form gained a card it was previously missing.",
+    "no_legacy_shape": "Zero configs use type \"element\" without an `element` kind. That shape would render NOTHING now (view-element derives kind from node.element and its branch chain has no final else), so the validator warns about it even though nothing live is affected."
+  },
+  "how_to_verify_on_staging": [
+    "validate_record_config with this config — expect valid with no warnings",
+    "create_record_config, then open the form's Preview tab (the Edit tab sets pointer-events: none, so inputs will not respond there)",
+    "check each element: the large heading with its info icon, the intro paragraph, the warning alert, the primary-accented Cover card, the quiet note inside it, the collapsed Portal card, and the terms link",
+    "leave `terms_accepted` unticked: the alert must be visible. Tick it: the alert must disappear (element visible rules)",
+    "type a legal name: the alert's severity must switch from info to warning, and the Cover card must appear (card visible rule — the one the builder will not let you author)",
+    "leave `sum_insured` empty: the Excess slider must be disabled",
+    "expand Portal & integrations and toggle Enable portal access: the API key field appears",
+    "clean up with delete_record_config (which also purges its records)"
+  ]
+}

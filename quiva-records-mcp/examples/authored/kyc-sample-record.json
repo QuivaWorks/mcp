@@ -1,0 +1,22 @@
+{
+  "config_id": "KYC",
+  "data": {
+    "fullLegalName": "Jordan Alexander Pearce",
+    "dob": "1987-03-14",
+    "email": "jordan.pearce@example.com",
+    "nationality": "Australian",
+    "residentialAddress": "42 Marlin Street, Manly NSW 2095, Australia",
+    "idDocumentType": "passport",
+    "idDocumentNumber": "PA1234567",
+    "sourceOfFunds": "Salaried employment (software engineering) plus long-term managed-fund investments.",
+    "sourceOfFundsVerified": true,
+    "verificationMethod": "electronic",
+    "verificationStatus": "verified",
+    "sanctionsCheckStatus": "clear",
+    "sanctionsMatchSummary": "No matches against OFAC/UN/EU/DFAT screening.",
+    "riskRating": "low",
+    "pepSelfDeclared": false,
+    "beneficialOwnershipConfirmed": true,
+    "screeningReference": "SCR-KYC-TEST-0001"
+  }
+}
