@@ -41,6 +41,15 @@ const SERVERS = [
 const CITATION =
   /(?:workspaces-service|records-service|hub-service|file-generator-service|datahub-js-nodes|microstrate\/src)[A-Za-z0-9/._-]*\.(?:go|ts|svelte)/g;
 
+// The OpenAPI specs our docs argue with now live in THIS repo, at
+// specs/openapi/. They were never on evari-olympus main — they were authored on
+// the brack-vertical-mcp branch alongside the MCP work — so there is no upstream
+// copy to drift against, and checking them here would report a permanent false
+// MISSING. Resolved locally instead: a citation must name a file we actually have.
+const SPEC_CITATION =
+  /\bquiva-(?:flows|records|documents|workspace|agents|endpoints)\.json\b/g;
+const SPEC_DIR = join(ROOT, 'specs', 'openapi');
+
 const SKIP_DIRS = new Set(['node_modules', '.git']);
 
 function walk(dir, out = []) {
@@ -52,6 +61,19 @@ function walk(dir, out = []) {
   }
   return out;
 }
+
+// Which spec files we actually hold, so a citation naming one we do not have is
+// caught rather than silently reading as verified.
+const localSpecs = new Set(
+  (() => {
+    try {
+      return readdirSync(SPEC_DIR).filter((f) => f.endsWith('.json'));
+    } catch {
+      return [];
+    }
+  })()
+);
+const missingSpecs = new Set();
 
 // path -> Set of repo-relative files that cite it
 function collectCitations() {
@@ -66,10 +88,13 @@ function collectCitations() {
     }
     for (const file of files) {
       const text = readFileSync(file, 'utf8');
+      const rel = file.slice(ROOT.length + 1);
       for (const match of text.matchAll(CITATION)) {
-        const rel = file.slice(ROOT.length + 1);
         if (!cited.has(match[0])) cited.set(match[0], new Set());
         cited.get(match[0]).add(rel);
+      }
+      for (const match of text.matchAll(SPEC_CITATION)) {
+        if (!localSpecs.has(match[0])) missingSpecs.add(`${match[0]} (cited by ${rel})`);
       }
     }
   }
@@ -183,8 +208,14 @@ if (mode === 'pin') {
 // --- check ---------------------------------------------------------------
 console.log(`${repo}@${branch} is at ${sha.slice(0, 12)}`);
 console.log(`pinned at                ${String(manifest.pinned_at).slice(0, 12)}`);
-console.log(`${cited.size} cited file(s): ${fresh.length} unchanged, ${drifted.length} changed, ${missing.length} missing, ${added.length} unpinned\n`);
+console.log(`${cited.size} cited file(s): ${fresh.length} unchanged, ${drifted.length} changed, ${missing.length} missing, ${added.length} unpinned`);
+console.log(`${localSpecs.size} platform spec(s) held locally in specs/openapi/ (not drift-checked — never on ${branch})\n`);
 
+if (missingSpecs.size) {
+  console.log('MISSING SPEC — a doc cites a spec file this repo does not hold:');
+  for (const s of [...missingSpecs].sort()) console.log(`  ${s}`);
+  console.log('');
+}
 if (missing.length) {
   console.log('MISSING — cited path does not exist on main (moved, renamed or deleted):');
   for (const m of missing) console.log(`  ${m.path}\n      cited by ${m.cited_by.join(', ')}`);
@@ -205,7 +236,7 @@ if (added.length) {
   console.log('');
 }
 
-if (!drifted.length && !missing.length && !added.length) {
+if (!drifted.length && !missing.length && !added.length && !missingSpecs.size) {
   console.log('No drift. Every cited engine file is byte-identical to when it was read.');
   process.exit(0);
 }

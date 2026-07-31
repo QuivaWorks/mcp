@@ -1,0 +1,1796 @@
+{
+    "name": "quiva records",
+    "schema": {
+        "openapi": "3.0.3",
+        "info": {
+            "title": "Records Service API",
+            "description": "Manages record configurations (schemas) and the records that conform to them. Record IDs are server-generated; config IDs are client-supplied (^[a-zA-Z0-9_-]+$). Configs and records are updated with PUT (partial: config update applies only the fields sent; record update merges `data`). Editing a config schema does not retroactively re-validate existing records. The engine also exposes a records-count-by-config capability (records-per-config counts) that currently has no public REST route.",
+            "version": "1.0.3"
+        },
+        "servers": [
+            {
+                "url": "https://api.quiva.ai",
+                "description": "Production API server"
+            },
+            {
+                "url": "https://api.microstrate.io",
+                "description": "Staging server"
+            }
+        ],
+        "security": [
+            {
+                "bearerAuth": []
+            },
+            {
+                "apiKeyAuth": []
+            }
+        ],
+        "paths": {
+            "/records/config": {
+                "get": {
+                    "summary": "List record configurations",
+                    "description": "Returns all record configurations in the account. Each configuration defines the schema (field names, types, validation rules) and UI hints for a category of records. Call this first to discover available record types before listing or querying records. Pass `ids` to batch-fetch specific configurations instead of all.",
+                    "operationId": "listRecordConfigs",
+                    "tags": [
+                        "Record Configs"
+                    ],
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.records.get.configs",
+                    "parameters": [
+                        {
+                            "name": "ids",
+                            "in": "query",
+                            "required": false,
+                            "description": "Comma-separated config IDs to fetch a specific subset. Omit to return all configurations.",
+                            "schema": {
+                                "type": "string"
+                            }
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "List of record configurations",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "allOf": [
+                                            {
+                                                "$ref": "#/components/schemas/Response"
+                                            },
+                                            {
+                                                "properties": {
+                                                    "body": {
+                                                        "$ref": "#/components/schemas/RecordConfigList"
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "post": {
+                    "summary": "Create a record configuration",
+                    "description": "Defines a new category of records by specifying a schema (field names, types, validation constraints) and UI rendering hints. The `id` you choose becomes the `config_id` used in all subsequent record operations for this type. Returns 409 if a configuration with the same ID already exists.",
+                    "operationId": "createRecordConfig",
+                    "tags": [
+                        "Record Configs"
+                    ],
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.records.post.config",
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RecordConfigCreate"
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Created record configuration",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "allOf": [
+                                            {
+                                                "$ref": "#/components/schemas/Response"
+                                            },
+                                            {
+                                                "properties": {
+                                                    "body": {
+                                                        "$ref": "#/components/schemas/RecordConfig"
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "description": "Validation error (invalid ID format, invalid schema, missing required fields)",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    }
+                                }
+                            }
+                        },
+                        "409": {
+                            "description": "A record configuration with the given ID already exists",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "/records/config/{id}": {
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "Record configuration ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "get": {
+                    "summary": "Get a record configuration",
+                    "description": "Retrieves the full schema and UI layout for a specific record configuration. Use this to inspect field definitions and validation rules before creating or updating records of that type.",
+                    "operationId": "getRecordConfig",
+                    "tags": [
+                        "Record Configs"
+                    ],
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.records.get.config",
+                    "responses": {
+                        "200": {
+                            "description": "Record configuration",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "allOf": [
+                                            {
+                                                "$ref": "#/components/schemas/Response"
+                                            },
+                                            {
+                                                "properties": {
+                                                    "body": {
+                                                        "$ref": "#/components/schemas/RecordConfig"
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "description": "Missing required parameter",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    }
+                                }
+                            }
+                        },
+                        "404": {
+                            "description": "Record configuration not found",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "put": {
+                    "summary": "Update a record configuration",
+                    "description": "Updates a record configuration. Schema changes do not retroactively affect existing records.",
+                    "operationId": "updateRecordConfig",
+                    "tags": [
+                        "Record Configs"
+                    ],
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.records.put.config",
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RecordConfigUpdate"
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Updated record configuration",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "allOf": [
+                                            {
+                                                "$ref": "#/components/schemas/Response"
+                                            },
+                                            {
+                                                "properties": {
+                                                    "body": {
+                                                        "$ref": "#/components/schemas/RecordConfig"
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "description": "Validation error",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    }
+                                }
+                            }
+                        },
+                        "404": {
+                            "description": "Record configuration not found",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "delete": {
+                    "summary": "Delete a record configuration",
+                    "description": "Deletes the configuration and its associated records storage bucket.",
+                    "operationId": "deleteRecordConfig",
+                    "tags": [
+                        "Record Configs"
+                    ],
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.records.delete.config",
+                    "responses": {
+                        "200": {
+                            "description": "Configuration deleted",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "allOf": [
+                                            {
+                                                "$ref": "#/components/schemas/Response"
+                                            },
+                                            {
+                                                "properties": {
+                                                    "body": {
+                                                        "$ref": "#/components/schemas/SuccessMessage"
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "description": "Missing required parameter",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    }
+                                }
+                            }
+                        },
+                        "404": {
+                            "description": "Record configuration not found",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "/records": {
+                "get": {
+                    "summary": "Query records",
+                    "description": "Search for records across a folder or space (index-backed). At least one of `folder` or `space_id` must be provided, and a Bearer JWT is required (used to derive the tenant) — an API key alone is rejected on this endpoint. `folder`/`space_id` conditions are ANDed. Results are sorted by `created_at`.",
+                    "operationId": "queryRecords",
+                    "tags": [
+                        "Records"
+                    ],
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.records.get.query-records",
+                    "parameters": [
+                        {
+                            "name": "folder",
+                            "in": "query",
+                            "required": false,
+                            "description": "Folder ID to filter records by. At least one of `folder` or `space_id` must be provided.",
+                            "schema": {
+                                "type": "string"
+                            }
+                        },
+                        {
+                            "name": "space_id",
+                            "in": "query",
+                            "required": false,
+                            "description": "Space ID to filter records by. At least one of `folder` or `space_id` must be provided.",
+                            "schema": {
+                                "type": "string"
+                            }
+                        },
+                        {
+                            "name": "config_id",
+                            "in": "query",
+                            "required": false,
+                            "description": "Comma-separated config IDs to narrow the query. One ID is ANDed with the folder/space filter; multiple IDs form an OR group.",
+                            "schema": {
+                                "type": "string"
+                            }
+                        },
+                        {
+                            "name": "limit",
+                            "in": "query",
+                            "required": false,
+                            "description": "Maximum number of records to return.",
+                            "schema": {
+                                "type": "integer"
+                            }
+                        },
+                        {
+                            "name": "offset",
+                            "in": "query",
+                            "required": false,
+                            "description": "Number of records to skip (pagination).",
+                            "schema": {
+                                "type": "integer"
+                            }
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Matching records",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "allOf": [
+                                            {
+                                                "$ref": "#/components/schemas/Response"
+                                            },
+                                            {
+                                                "properties": {
+                                                    "body": {
+                                                        "$ref": "#/components/schemas/RecordList"
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "description": "Missing required filter parameter or invalid authorization token",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    }
+                                }
+                            }
+                        },
+                        "404": {
+                            "description": "No records found matching the query",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "/records/{config_id}": {
+                "parameters": [
+                    {
+                        "name": "config_id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ID of the record configuration that records belong to",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "get": {
+                    "summary": "List records",
+                    "description": "Returns all records that belong to the given configuration. Use this to retrieve every data entry for a specific record type. For filtered or cross-type queries, use GET /records instead.",
+                    "operationId": "listRecords",
+                    "tags": [
+                        "Records"
+                    ],
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.records.get.records",
+                    "responses": {
+                        "200": {
+                            "description": "List of records for the given configuration",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "allOf": [
+                                            {
+                                                "$ref": "#/components/schemas/Response"
+                                            },
+                                            {
+                                                "properties": {
+                                                    "body": {
+                                                        "$ref": "#/components/schemas/RecordList"
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "description": "Missing required parameter",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "post": {
+                    "summary": "Create a record",
+                    "description": "Creates a new record conforming to the specified configuration's schema. Record data is validated against the schema at creation time.",
+                    "operationId": "createRecord",
+                    "tags": [
+                        "Records"
+                    ],
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.records.post.record",
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RecordCreate"
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Created record",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "allOf": [
+                                            {
+                                                "$ref": "#/components/schemas/Response"
+                                            },
+                                            {
+                                                "properties": {
+                                                    "body": {
+                                                        "$ref": "#/components/schemas/Record"
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "description": "Validation error (missing required fields, type mismatch, invalid dropdown value)",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    }
+                                }
+                            }
+                        },
+                        "404": {
+                            "description": "Record configuration not found",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "/records/{config_id}/{id}": {
+                "parameters": [
+                    {
+                        "name": "config_id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ID of the record configuration that the record belongs to",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "Record ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "get": {
+                    "summary": "Get a record",
+                    "description": "Retrieves a single record by its ID within a given configuration. Returns the full data object and metadata (id, created_at, updated_at). Obtain the record ID from a list or query operation first.",
+                    "operationId": "getRecord",
+                    "tags": [
+                        "Records"
+                    ],
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.records.get.record",
+                    "responses": {
+                        "200": {
+                            "description": "Record",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "allOf": [
+                                            {
+                                                "$ref": "#/components/schemas/Response"
+                                            },
+                                            {
+                                                "properties": {
+                                                    "body": {
+                                                        "$ref": "#/components/schemas/Record"
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "description": "Missing required parameter",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    }
+                                }
+                            }
+                        },
+                        "404": {
+                            "description": "Record not found",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "put": {
+                    "summary": "Update a record",
+                    "description": "Updates a record. Provided data fields are merged into the existing record data. The merged result is validated against the current schema.",
+                    "operationId": "updateRecord",
+                    "tags": [
+                        "Records"
+                    ],
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.records.put.record",
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RecordUpdate"
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Updated record",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "allOf": [
+                                            {
+                                                "$ref": "#/components/schemas/Response"
+                                            },
+                                            {
+                                                "properties": {
+                                                    "body": {
+                                                        "$ref": "#/components/schemas/Record"
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "description": "Validation error",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    }
+                                }
+                            }
+                        },
+                        "404": {
+                            "description": "Record not found",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "delete": {
+                    "summary": "Delete a record",
+                    "description": "Permanently deletes a single record by its ID. This action is irreversible — the record's data and metadata are removed. The configuration and all other records are unaffected.",
+                    "operationId": "deleteRecord",
+                    "tags": [
+                        "Records"
+                    ],
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.records.delete.record",
+                    "responses": {
+                        "200": {
+                            "description": "Record deleted",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "allOf": [
+                                            {
+                                                "$ref": "#/components/schemas/Response"
+                                            },
+                                            {
+                                                "properties": {
+                                                    "body": {
+                                                        "$ref": "#/components/schemas/SuccessMessage"
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "description": "Missing required parameter",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    }
+                                }
+                            }
+                        },
+                        "404": {
+                            "description": "Record not found",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "components": {
+            "schemas": {
+                "RecordPropType": {
+                    "type": "string",
+                    "description": "Allowed JSON primitive/composite types for a schema field.",
+                    "enum": [
+                        "string",
+                        "number",
+                        "integer",
+                        "boolean",
+                        "object",
+                        "array",
+                        "null"
+                    ]
+                },
+                "FormatterType": {
+                    "type": "string",
+                    "description": "Display formatter applied when rendering a field value.",
+                    "enum": [
+                        "text",
+                        "number",
+                        "currency",
+                        "percent",
+                        "date",
+                        "datetime",
+                        "time",
+                        "boolean"
+                    ]
+                },
+                "FieldProps": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "Display / configuration props forwarded to the input widget. `label` should always be set. Which props apply depends on the input type (e.g. `options`/`sort` for dropdown, `min`/`max`/`decimalPlace` for number/currency, `minDate`/`maxDate` for date, `includedCountries`/`showNativeName` for country, `maxItems` for multi-select).",
+                    "properties": {
+                        "label": {
+                            "type": "string",
+                            "description": "Display label shown above/beside the input. Always set this."
+                        },
+                        "placeholder": {
+                            "type": "string",
+                            "description": "Placeholder text shown inside the input when empty."
+                        },
+                        "helpText": {
+                            "type": "object",
+                            "description": "Optional help text rendered below the input.",
+                            "properties": {
+                                "markdown": {
+                                    "type": "string",
+                                    "description": "Help text content in Markdown format."
+                                }
+                            },
+                            "additionalProperties": false
+                        },
+                        "options": {
+                            "type": "array",
+                            "description": "Choices for dropdown / multi-select / multi-toggle. Seed from the schema field's enum.",
+                            "items": {
+                                "type": "object",
+                                "required": [
+                                    "text",
+                                    "value"
+                                ],
+                                "properties": {
+                                    "text": {
+                                        "type": "string",
+                                        "description": "Human-readable label for the option."
+                                    },
+                                    "value": {
+                                        "type": "string",
+                                        "description": "Machine value submitted when this option is selected."
+                                    },
+                                    "note": {
+                                        "type": "string",
+                                        "description": "Optional extra description shown alongside the option."
+                                    }
+                                },
+                                "additionalProperties": false
+                            }
+                        },
+                        "sort": {
+                            "type": "boolean",
+                            "description": "When `true`, options are sorted alphabetically before rendering."
+                        },
+                        "minDate": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "Earliest selectable date (ISO 8601). Applies to `date` / `date-range` inputs."
+                        },
+                        "maxDate": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "Latest selectable date (ISO 8601). Applies to `date` / `date-range` inputs."
+                        },
+                        "min": {
+                            "type": "number",
+                            "description": "Minimum allowed numeric value. Applies to `number` / `currency` / `slider` inputs."
+                        },
+                        "max": {
+                            "type": "number",
+                            "description": "Maximum allowed numeric value. Applies to `number` / `currency` / `slider` inputs."
+                        },
+                        "decimalPlace": {
+                            "type": "integer",
+                            "description": "Number of decimal places displayed. Applies to `number` / `currency` inputs."
+                        },
+                        "maxItems": {
+                            "type": "integer",
+                            "description": "Maximum number of selections. Applies to `multi-select`."
+                        },
+                        "includedCountries": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Restrict the country list to these ISO codes (e.g. [\"uk\",\"ua\"]). Applies to `country` / `multi-country`."
+                        },
+                        "showNativeName": {
+                            "type": "boolean",
+                            "description": "Show each country's native name. Applies to `country` / `multi-country`."
+                        }
+                    }
+                },
+                "FieldUi": {
+                    "type": "object",
+                    "description": "LEGACY per-schema-field renderer hint. The current model places `inputType`/`props` on the view field node instead (see ViewFieldNode); the renderer reads node config first and only falls back to this schema-level `ui` for nested object-group members and array-item leaves that are not their own view node, and the frontend strips `ui` from placed fields on save. Prefer node-level config.",
+                    "properties": {
+                        "inputType": {
+                            "$ref": "#/components/schemas/InputType"
+                        },
+                        "props": {
+                            "$ref": "#/components/schemas/FieldProps"
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "FieldFormatter": {
+                    "type": "object",
+                    "description": "Formatter applied when displaying a field value.",
+                    "required": [
+                        "type"
+                    ],
+                    "properties": {
+                        "type": {
+                            "$ref": "#/components/schemas/FormatterType"
+                        },
+                        "props": {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "description": "Extra props forwarded to the formatter."
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "FieldDisplay": {
+                    "type": "object",
+                    "description": "Display configuration embedded in a schema field.",
+                    "properties": {
+                        "formatter": {
+                            "$ref": "#/components/schemas/FieldFormatter"
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "RecordSchemaField": {
+                    "type": "object",
+                    "description": "Definition of a single field at any depth of the schema tree. Recurses via `properties` (objects) and `items` (arrays). Only `type` is required. Input config for a placed form field belongs on the view node (ViewFieldNode.inputType/props), NOT here; the legacy `ui` hint is a fallback only.",
+                    "required": [
+                        "type"
+                    ],
+                    "properties": {
+                        "type": {
+                            "oneOf": [
+                                {
+                                    "$ref": "#/components/schemas/RecordPropType"
+                                },
+                                {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/RecordPropType"
+                                    },
+                                    "uniqueItems": true
+                                }
+                            ],
+                            "description": "JSON type(s) for this field. Use an array to allow multiple types (e.g. [\"string\", \"null\"])."
+                        },
+                        "label": {
+                            "type": "string",
+                            "description": "Human-readable label shown in UI."
+                        },
+                        "title": {
+                            "type": "string",
+                            "description": "JSON Schema title."
+                        },
+                        "description": {
+                            "type": "string"
+                        },
+                        "minimum": {
+                            "type": "number"
+                        },
+                        "maximum": {
+                            "type": "number"
+                        },
+                        "exclusiveMinimum": {
+                            "type": "number"
+                        },
+                        "exclusiveMaximum": {
+                            "type": "number"
+                        },
+                        "minLength": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "maxLength": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "pattern": {
+                            "type": "string"
+                        },
+                        "format": {
+                            "type": "string"
+                        },
+                        "enum": {
+                            "type": "array",
+                            "items": {}
+                        },
+                        "default": {},
+                        "properties": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "$ref": "#/components/schemas/RecordSchemaField"
+                            },
+                            "description": "Nested field definitions for object-typed fields."
+                        },
+                        "required": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "uniqueItems": true,
+                            "description": "Names of required nested fields. Only meaningful when `type` is \"object\"."
+                        },
+                        "items": {
+                            "$ref": "#/components/schemas/RecordSchemaField",
+                            "description": "Item schema for array-typed fields."
+                        },
+                        "ui": {
+                            "$ref": "#/components/schemas/FieldUi",
+                            "description": "LEGACY UI fallback (not standard JSON Schema). Prefer node-level inputType/props on the view field node; this is only read for descendants that are not their own view node and is stripped from placed fields on save."
+                        },
+                        "display": {
+                            "$ref": "#/components/schemas/FieldDisplay"
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "RecordSchema": {
+                    "type": "object",
+                    "description": "A JSON Schema document describing the record structure. Always a top-level object. UI and display hints (`ui`, `display`) are embedded directly in each field definition.",
+                    "required": [
+                        "type",
+                        "properties"
+                    ],
+                    "properties": {
+                        "$schema": {
+                            "type": "string",
+                            "description": "Optional JSON Schema dialect URI (e.g. \"https://json-schema.org/draft/2020-12/schema\")."
+                        },
+                        "type": {
+                            "type": "string",
+                            "enum": [
+                                "object"
+                            ],
+                            "description": "Must be \"object\" — a record schema always describes a top-level object."
+                        },
+                        "properties": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "$ref": "#/components/schemas/RecordSchemaField"
+                            },
+                            "description": "Top-level field definitions keyed by field name."
+                        },
+                        "required": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "uniqueItems": true,
+                            "description": "Names of required top-level fields."
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "ViewGridProps": {
+                    "type": "object",
+                    "description": "CSS Grid container properties.",
+                    "required": [
+                        "gridTemplateColumns"
+                    ],
+                    "properties": {
+                        "gridTemplateColumns": {
+                            "type": "string",
+                            "description": "CSS grid-template-columns value (e.g. \"1fr 1fr\", \"repeat(3, 1fr)\")."
+                        },
+                        "gap": {
+                            "type": "number",
+                            "description": "Gap between grid cells in pixels."
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "RuleProperty": {
+                    "type": "string",
+                    "description": "The element property a rule drives. Field nodes support all five; grid (container) nodes support `visible` only.",
+                    "enum": [
+                        "visible",
+                        "required",
+                        "disabled",
+                        "readonly",
+                        "value"
+                    ]
+                },
+                "ElementRule": {
+                    "type": "object",
+                    "description": "A conditional rule attached to a view node. `logic` is a json-logic-engine expression evaluated against the live form value ({ \"var\": \"FieldPath\" } reads another field; dotted paths allowed); at the form root it reads the whole record, inside an array-field item it reads that item. `logic` may also be a bare boolean for an unconditional state. The result sets `property` (booleans are coerced; `value` keeps the raw computed value).",
+                    "required": [
+                        "id",
+                        "property",
+                        "logic"
+                    ],
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                            "description": "Convention \"<FieldPath>.<property>\", e.g. \"email.required\"."
+                        },
+                        "property": {
+                            "$ref": "#/components/schemas/RuleProperty"
+                        },
+                        "logic": {
+                            "description": "A json-logic-engine expression object, or a boolean.",
+                            "oneOf": [
+                                {
+                                    "type": "object"
+                                },
+                                {
+                                    "type": "boolean"
+                                }
+                            ]
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "One plain-English sentence describing the condition and outcome. Does not affect evaluation."
+                        }
+                    },
+                    "additionalProperties": true
+                },
+                "ViewGridNode": {
+                    "type": "object",
+                    "description": "A grid layout container that arranges child nodes in CSS grid columns.",
+                    "required": [
+                        "type",
+                        "props",
+                        "children"
+                    ],
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "enum": [
+                                "grid"
+                            ]
+                        },
+                        "props": {
+                            "$ref": "#/components/schemas/ViewGridProps"
+                        },
+                        "children": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/ViewNode"
+                            }
+                        },
+                        "rules": {
+                            "type": "array",
+                            "description": "Conditional rules for this container. Only the `visible` property is honoured on a grid.",
+                            "items": {
+                                "$ref": "#/components/schemas/ElementRule"
+                            }
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "ViewFieldNode": {
+                    "type": "object",
+                    "description": "A leaf node that binds an input to a schema field via a dotted path. Input config lives HERE on the node — `inputType`, `props`, and `rules` — not on the schema, so one schema can back several forms with different config. Omit `inputType` to accept the type default (string→text, number/integer→number, boolean→toggle, array→tags, object→key-value).",
+                    "required": [
+                        "type",
+                        "field"
+                    ],
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "enum": [
+                                "field"
+                            ]
+                        },
+                        "field": {
+                            "type": "string",
+                            "description": "Dotted path to the schema field (e.g. \"name\", \"address.city\"). The property key is `field` (a `ref` key is ignored by the engine)."
+                        },
+                        "inputType": {
+                            "$ref": "#/components/schemas/InputType"
+                        },
+                        "props": {
+                            "$ref": "#/components/schemas/FieldProps"
+                        },
+                        "rules": {
+                            "type": "array",
+                            "description": "Conditional rules for this field. Field nodes support all five rule properties.",
+                            "items": {
+                                "$ref": "#/components/schemas/ElementRule"
+                            }
+                        }
+                    },
+                    "additionalProperties": false,
+                    "example": {
+                        "type": "field",
+                        "field": "policyNumber",
+                        "inputType": "text",
+                        "props": {
+                            "label": "Policy number"
+                        }
+                    }
+                },
+                "ViewTableColumn": {
+                    "type": "object",
+                    "description": "A column descriptor in a table view.",
+                    "required": [
+                        "field",
+                        "order"
+                    ],
+                    "properties": {
+                        "field": {
+                            "type": "string",
+                            "description": "Schema field key this column displays."
+                        },
+                        "order": {
+                            "type": "integer",
+                            "description": "Display order of this column (ascending)."
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "ViewTableNode": {
+                    "type": "object",
+                    "description": "A table view that lists columns to display and their order.",
+                    "required": [
+                        "type",
+                        "columns"
+                    ],
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "enum": [
+                                "table"
+                            ]
+                        },
+                        "columns": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/ViewTableColumn"
+                            }
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "ViewArrayFieldNode": {
+                    "type": "object",
+                    "description": "A repeating container (Repeater) bound to an array-of-object schema field. `children` is a builder-authored template of view nodes for one item; each child's `field` is ELEMENT-RELATIVE — resolved against the array field's `items.properties`, not the top-level schema (e.g. for array field \"products\", a child field \"title\" means \"products[].title\", not \"products.title\"). `props` (label, required, minItems, maxItems, collapsible, defaultCollapsed) is UI-only and not enforced by records-service; array size limits still come from the schema field's own JSON Schema minItems/maxItems if set there.",
+                    "required": [
+                        "type",
+                        "field",
+                        "children"
+                    ],
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "enum": [
+                                "array-field"
+                            ]
+                        },
+                        "field": {
+                            "type": "string",
+                            "description": "Dotted path to an array-of-object schema field."
+                        },
+                        "props": {
+                            "type": "object",
+                            "description": "UI-only container config: label, required (at least one item), minItems, maxItems, collapsible, defaultCollapsed."
+                        },
+                        "children": {
+                            "type": "array",
+                            "description": "View nodes for one item, with element-relative `field` refs. Child field nodes carry their own node-level inputType/props/rules.",
+                            "items": {
+                                "$ref": "#/components/schemas/ViewNode"
+                            }
+                        },
+                        "rules": {
+                            "type": "array",
+                            "description": "Reserved — array-field rules are NOT evaluated in v1. Put rules on the child field nodes instead.",
+                            "items": {
+                                "$ref": "#/components/schemas/ElementRule"
+                            }
+                        }
+                    },
+                    "additionalProperties": false,
+                    "example": {
+                        "type": "array-field",
+                        "field": "products",
+                        "props": {
+                            "label": "Products",
+                            "itemLabel": "Product",
+                            "required": true,
+                            "minItems": 1
+                        },
+                        "children": [
+                            {
+                                "type": "field",
+                                "field": "title",
+                                "inputType": "text",
+                                "props": {
+                                    "label": "Title"
+                                }
+                            },
+                            {
+                                "type": "field",
+                                "field": "price",
+                                "inputType": "currency",
+                                "props": {
+                                    "label": "Price",
+                                    "min": 0,
+                                    "decimalPlace": 2
+                                }
+                            }
+                        ]
+                    }
+                },
+                "ViewNode": {
+                    "description": "A node in the view tree — a grid container, a field leaf, an array-field repeater, or a table.",
+                    "oneOf": [
+                        {
+                            "$ref": "#/components/schemas/ViewGridNode"
+                        },
+                        {
+                            "$ref": "#/components/schemas/ViewFieldNode"
+                        },
+                        {
+                            "$ref": "#/components/schemas/ViewArrayFieldNode"
+                        },
+                        {
+                            "$ref": "#/components/schemas/ViewTableNode"
+                        }
+                    ]
+                },
+                "RecordForm": {
+                    "type": "object",
+                    "description": "One named form for a config: metadata plus a grid layout tree. `id` is unique within the config and appears in the app URL; the migrated legacy single form always gets id \"default\".",
+                    "required": [
+                        "id",
+                        "title",
+                        "layout"
+                    ],
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                            "description": "Unique within the config."
+                        },
+                        "title": {
+                            "type": "string"
+                        },
+                        "description": {
+                            "type": "string"
+                        },
+                        "layout": {
+                            "$ref": "#/components/schemas/ViewGridNode"
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "RecordViews": {
+                    "type": "object",
+                    "description": "UI layout definitions for different rendering contexts. `forms` (multiple named forms) is the current model. `form` (singular) is the deprecated legacy single form — the server still accepts it, but the frontend migrates it to `forms: [{ id: \"default\", ... }]` on read and never writes it back.",
+                    "properties": {
+                        "forms": {
+                            "type": "array",
+                            "description": "Current model — multiple named forms per config.",
+                            "items": {
+                                "$ref": "#/components/schemas/RecordForm"
+                            }
+                        },
+                        "form": {
+                            "$ref": "#/components/schemas/ViewGridNode",
+                            "deprecated": true,
+                            "description": "Deprecated legacy single form. Use `forms` instead."
+                        },
+                        "table": {
+                            "$ref": "#/components/schemas/ViewTableNode"
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "RecordConfig": {
+                    "type": "object",
+                    "required": [
+                        "id",
+                        "name",
+                        "schema"
+                    ],
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z0-9_-]+$",
+                            "description": "Unique identifier. Immutable after creation. Allowed characters: alphanumeric, underscore, hyphen."
+                        },
+                        "name": {
+                            "type": "string",
+                            "description": "Human-readable name for this configuration."
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Optional longer description of what this configuration represents."
+                        },
+                        "label": {
+                            "type": "string",
+                            "description": "Optional short label, e.g. for UI badges or tabs."
+                        },
+                        "schema": {
+                            "$ref": "#/components/schemas/RecordSchema"
+                        },
+                        "views": {
+                            "$ref": "#/components/schemas/RecordViews"
+                        },
+                        "created_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "readOnly": true,
+                            "description": "ISO 8601 timestamp set automatically on creation."
+                        },
+                        "updated_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "readOnly": true,
+                            "description": "ISO 8601 timestamp updated automatically on every modification."
+                        }
+                    }
+                },
+                "InputType": {
+                    "type": "string",
+                    "description": "Input widget type for form rendering.",
+                    "enum": [
+                        "array",
+                        "checkbox",
+                        "country",
+                        "currency",
+                        "date",
+                        "date-range",
+                        "dropdown",
+                        "key-value",
+                        "multi-country",
+                        "multi-select",
+                        "multi-toggle",
+                        "number",
+                        "phone",
+                        "slider",
+                        "tags",
+                        "text",
+                        "textarea",
+                        "toggle"
+                    ]
+                },
+                "RecordConfigCreate": {
+                    "type": "object",
+                    "required": [
+                        "id",
+                        "name"
+                    ],
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                            "pattern": "^[a-zA-Z0-9_-]+$",
+                            "description": "Unique identifier. Must be unique across all configurations. Allowed characters: alphanumeric, underscore, hyphen."
+                        },
+                        "name": {
+                            "type": "string",
+                            "description": "Human-readable name for this configuration."
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Optional longer description."
+                        },
+                        "label": {
+                            "type": "string",
+                            "description": "Optional short label."
+                        },
+                        "schema": {
+                            "$ref": "#/components/schemas/RecordSchema"
+                        },
+                        "views": {
+                            "$ref": "#/components/schemas/RecordViews"
+                        }
+                    },
+                    "example": {
+                        "id": "customer_feedback",
+                        "name": "Customer Feedback",
+                        "description": "Feedback submissions from customers",
+                        "schema": {
+                            "$schema": "https://json-schema.org/draft/2020-12/schema",
+                            "type": "object",
+                            "properties": {
+                                "rating": {
+                                    "type": "number",
+                                    "title": "Rating",
+                                    "description": "Rating (1–5)",
+                                    "display": {
+                                        "formatter": {
+                                            "type": "number"
+                                        }
+                                    }
+                                },
+                                "category": {
+                                    "type": "string",
+                                    "title": "Category",
+                                    "enum": [
+                                        "bug",
+                                        "feature",
+                                        "general"
+                                    ]
+                                },
+                                "comment": {
+                                    "type": "string",
+                                    "title": "Comment"
+                                }
+                            },
+                            "required": [
+                                "rating",
+                                "category"
+                            ]
+                        },
+                        "views": {
+                            "forms": [
+                                {
+                                    "id": "default",
+                                    "title": "Default",
+                                    "layout": {
+                                        "type": "grid",
+                                        "props": {
+                                            "gridTemplateColumns": "1fr"
+                                        },
+                                        "children": [
+                                            {
+                                                "type": "grid",
+                                                "props": {
+                                                    "gridTemplateColumns": "1fr 1fr"
+                                                },
+                                                "children": [
+                                                    {
+                                                        "type": "field",
+                                                        "field": "rating",
+                                                        "inputType": "slider",
+                                                        "props": {
+                                                            "label": "Rating",
+                                                            "min": 1,
+                                                            "max": 5
+                                                        }
+                                                    },
+                                                    {
+                                                        "type": "field",
+                                                        "field": "category",
+                                                        "inputType": "dropdown",
+                                                        "props": {
+                                                            "label": "Category",
+                                                            "options": [
+                                                                {
+                                                                    "text": "Bug",
+                                                                    "value": "bug"
+                                                                },
+                                                                {
+                                                                    "text": "Feature",
+                                                                    "value": "feature"
+                                                                },
+                                                                {
+                                                                    "text": "General",
+                                                                    "value": "general"
+                                                                }
+                                                            ]
+                                                        }
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "type": "field",
+                                                "field": "comment",
+                                                "inputType": "textarea",
+                                                "props": {
+                                                    "label": "Comment"
+                                                },
+                                                "rules": [
+                                                    {
+                                                        "id": "comment.required",
+                                                        "property": "required",
+                                                        "logic": {
+                                                            "<=": [
+                                                                {
+                                                                    "var": "rating"
+                                                                },
+                                                                2
+                                                            ]
+                                                        },
+                                                        "description": "A comment is required when the rating is 2 or lower."
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                }
+                            ],
+                            "table": {
+                                "type": "table",
+                                "columns": [
+                                    {
+                                        "field": "rating",
+                                        "order": 0
+                                    },
+                                    {
+                                        "field": "category",
+                                        "order": 1
+                                    },
+                                    {
+                                        "field": "comment",
+                                        "order": 2
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                "RecordConfigUpdate": {
+                    "type": "object",
+                    "description": "All fields are optional. Omitted fields are left unchanged. Schema changes do not retroactively affect existing records.",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Updated human-readable name."
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Updated description."
+                        },
+                        "label": {
+                            "type": "string",
+                            "description": "Updated label."
+                        },
+                        "schema": {
+                            "$ref": "#/components/schemas/RecordSchema"
+                        },
+                        "views": {
+                            "$ref": "#/components/schemas/RecordViews"
+                        }
+                    }
+                },
+                "RecordConfigList": {
+                    "type": "object",
+                    "properties": {
+                        "results": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/RecordConfig"
+                            }
+                        },
+                        "results_total": {
+                            "type": "integer",
+                            "description": "Total number of record configurations."
+                        }
+                    }
+                },
+                "Record": {
+                    "type": "object",
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                            "description": "Unique identifier. Auto-generated if not provided on creation."
+                        },
+                        "config_id": {
+                            "type": "string",
+                            "description": "ID of the RecordConfig that defines this record's schema."
+                        },
+                        "data": {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "description": "Key-value map of field values. Keys correspond to SchemaField IDs. Values must match the field type defined in the schema. Extra keys not defined in the schema are permitted."
+                        },
+                        "created_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "readOnly": true,
+                            "description": "ISO 8601 timestamp set automatically on creation."
+                        },
+                        "updated_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "readOnly": true,
+                            "description": "ISO 8601 timestamp updated automatically on every modification."
+                        }
+                    }
+                },
+                "RecordCreate": {
+                    "type": "object",
+                    "description": "The config_id is taken from the URL path and does not need to be repeated in the body. `data` is optional (defaults to an empty object) but is validated against the config schema when present.",
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                            "readOnly": true,
+                            "description": "Server-generated record ID (10-character nanoid). Any `id` sent in the request body is ignored."
+                        },
+                        "data": {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "description": "Field values validated against the configuration schema. Required schema fields must be present. Values are type-checked against the schema. Null values are accepted for optional fields. Extra keys not in the schema are allowed. If omitted, an empty object is used."
+                        },
+                        "space_id": {
+                            "type": "string",
+                            "description": "Optional space ID to associate the record with a specific space."
+                        },
+                        "folder": {
+                            "type": "string",
+                            "description": "Optional folder to organize the record into."
+                        }
+                    },
+                    "example": {
+                        "data": {
+                            "rating": 4.5,
+                            "category": "feature",
+                            "comment": "<p>Great product, would love dark mode.</p>"
+                        }
+                    }
+                },
+                "RecordUpdate": {
+                    "type": "object",
+                    "description": "Partial update. `data` is merged key-by-key into the existing record; `folder`/`space_id` are overwritten only when supplied. The merged result is validated against the current schema.",
+                    "properties": {
+                        "data": {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "description": "Fields to update. Merged into the existing record data (partial update). The merged result is validated against the current schema."
+                        },
+                        "space_id": {
+                            "type": "string",
+                            "description": "Optional space ID to associate the record with a specific space."
+                        },
+                        "folder": {
+                            "type": "string",
+                            "description": "Optional folder to organize the record into."
+                        }
+                    },
+                    "example": {
+                        "data": {
+                            "rating": 5,
+                            "comment": "<p>They added dark mode!</p>"
+                        }
+                    }
+                },
+                "RecordList": {
+                    "type": "object",
+                    "properties": {
+                        "results": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/Record"
+                            }
+                        },
+                        "results_total": {
+                            "type": "integer",
+                            "description": "Number of records returned in this response."
+                        },
+                        "total_hits": {
+                            "type": "integer",
+                            "description": "Total matching records across all pages (returned by the query endpoint; used with limit/offset)."
+                        }
+                    }
+                },
+                "Response": {
+                    "type": "object",
+                    "properties": {
+                        "status_code": {
+                            "type": "integer",
+                            "description": "HTTP status code echoed in the response body."
+                        },
+                        "body": {
+                            "type": "object",
+                            "description": "Response payload."
+                        }
+                    }
+                },
+                "ErrorResponse": {
+                    "type": "object",
+                    "properties": {
+                        "status_code": {
+                            "type": "integer"
+                        },
+                        "body": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string",
+                                    "description": "Human-readable error message."
+                                }
+                            }
+                        }
+                    },
+                    "example": {
+                        "status_code": 400,
+                        "body": {
+                            "error": "field 'rating' is required"
+                        }
+                    }
+                },
+                "SuccessMessage": {
+                    "type": "object",
+                    "properties": {
+                        "message": {
+                            "type": "string",
+                            "enum": [
+                                "success"
+                            ]
+                        }
+                    },
+                    "example": {
+                        "message": "success"
+                    }
+                }
+            },
+            "securitySchemes": {
+                "bearerAuth": {
+                    "type": "http",
+                    "scheme": "bearer",
+                    "bearerFormat": "JWT",
+                    "description": "JWT Authorization header using the Bearer scheme"
+                },
+                "apiKeyAuth": {
+                    "type": "apiKey",
+                    "in": "header",
+                    "name": "X-Api-Key"
+                }
+            }
+        },
+        "tags": [
+            {
+                "name": "Record Configs",
+                "description": "Manage record configuration schemas. Each configuration defines the structure (fields, types, validation rules) that records must conform to."
+            },
+            {
+                "name": "Records",
+                "description": "Manage individual data records. Each record belongs to exactly one configuration and its data is validated against that configuration's schema."
+            }
+        ]
+    }
+}

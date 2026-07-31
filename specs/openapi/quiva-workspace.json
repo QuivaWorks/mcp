@@ -1,0 +1,2429 @@
+{
+    "name": "quiva-workspace",
+    "schema": {
+        "openapi": "3.1.0",
+        "info": {
+            "title": "Workspaces Service API",
+            "version": "1.0.1",
+            "description": "API for managing workspaces, tasks, and comments with comprehensive CRUD operations and collaboration features.\n\nEngine-truth notes (corrected against the workspaces-service source and verified live on staging; see per-operation descriptions):\n- Every response is wrapped in `{ \"status_code\": N, \"body\": {...} }`; the schemas below describe the inner `body`. Errors carry the message under `body.error`.\n- Deletes return 200 `{ \"message\": \"success\" }`, NOT 204/no-body. Comment delete is a soft delete.\n- Space `id` is required on create, must match `^\\w+$` (letters/numbers/underscore only), and is UPPERCASED server-side. Duplicate id -> 409.\n- Task ids are server-generated (`{SPACEID}-{n}` or `t_<nanoid>`); comment ids are `c_<nanoid>`. Any id you send is ignored.\n- Updates are PATCH (partial merge). Build payloads from scratch; do not echo nested objects from a GET.\n- Auth: an API key alone drives the core CRUD, but attribution fields (space owner, task created_by, comment author) and comment reactions are only populated with a Bearer JWT. Prefer bearer auth.\n- `due_date` / `scheduled_at` are RFC3339 date-times, not date-only.\n- Tasks carry `time_tracking` ({ estimate?, logs[] }). On update `logs` REPLACES the stored array rather than appending, so adding an entry is read-modify-write; omitting `logs` entirely is safe. Totals/remaining/progress are derived in the browser and must never be sent. All four merge cases verified live 2026-07-29.\n- create_task with no `status` now inherits the space's `default_status` (only when `space_id` is set). A status-less task used to sit outside every board column.\n- Task ACTIONS (the per-task checklist) are WRITE-ONLY: PUT and DELETE work, but the GET on the same path is mapped at the write resource and always 400s, and the real list handler has no route. Nothing about a task action can be verified after writing. See /workspaces/task/{task_id}/action.\n- Routes this spec deliberately does not model (files/folders, file approvals, client folders) are inventoried under `x-gateway-routes-not-in-this-spec` with a note on which were probed live.\n\nMAINTENANCE NOTE: this file is a sourced `{name, schema}` tool-spec copy referenced by no build — edits here may be overwritten by whatever regenerates it. Apply the same corrections at the real source of truth.",
+            "x-oauth-provider": "workspacesServiceApi"
+        },
+        "servers": [
+            {
+                "url": "https://api.quiva.ai",
+                "description": "Production API server"
+            },
+            {
+                "url": "https://api.microstrate.io",
+                "description": "Staging server"
+            }
+        ],
+        "security": [
+            {
+                "bearerAuth": []
+            },
+            {
+                "apiKeyAuth": []
+            }
+        ],
+        "paths": {
+            "/workspaces/spaces": {
+                "get": {
+                    "summary": "List all spaces",
+                    "operationId": "listSpaces",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.workspaces.get.spaces",
+                    "tags": [
+                        "Spaces"
+                    ],
+                    "description": "Retrieves all workspaces for the authenticated user. Use this to display a list of available spaces or perform operations across multiple spaces. NOTE: the built-in ESCALATE (escalations) space is always appended to the results and cannot be updated or deleted.",
+                    "responses": {
+                        "200": {
+                            "description": "List of spaces retrieved successfully.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/SpaceList"
+                                    }
+                                }
+                            }
+                        },
+                        "401": {
+                            "description": "Unauthorized - provide valid authentication credentials."
+                        },
+                        "429": {
+                            "description": "Rate limit exceeded - wait before retrying."
+                        }
+                    }
+                }
+            },
+            "/workspaces/space": {
+                "post": {
+                    "summary": "Create a space",
+                    "operationId": "createSpace",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.workspaces.post.space",
+                    "tags": [
+                        "Spaces"
+                    ],
+                    "description": "Creates a new workspace with configurable statuses and settings. Use this to initialize a new space for team collaboration and task management.",
+                    "requestBody": {
+                        "description": "Fields for creating the workspace.",
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreateSpaceRequest"
+                                },
+                                "examples": {
+                                    "createSpaceExample": {
+                                        "summary": "Create a new workspace (id is REQUIRED and uppercased server-side)",
+                                        "value": {
+                                            "id": "Q2_MKTG",
+                                            "name": "Q2 Marketing Campaign",
+                                            "description": "All marketing activities for Q2 2024",
+                                            "default_status": "to_do",
+                                            "statuses": [
+                                                {
+                                                    "id": "to_do",
+                                                    "name": "To Do",
+                                                    "color": "#cccccc",
+                                                    "order": 1,
+                                                    "is_visible": true
+                                                },
+                                                {
+                                                    "id": "in_progress",
+                                                    "name": "In Progress",
+                                                    "color": "#0052cc",
+                                                    "order": 2,
+                                                    "is_visible": true
+                                                },
+                                                {
+                                                    "id": "done",
+                                                    "name": "Done",
+                                                    "color": "#36b37e",
+                                                    "order": 3,
+                                                    "is_visible": true
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Workspace created (status_code 201; body is the Space). `id` is uppercased server-side and `owner`/`created_at`/`updated_at`/`url` are set by the backend.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/Space"
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "$ref": "#/components/responses/BadRequest"
+                        },
+                        "401": {
+                            "description": "Unauthorized - authentication required."
+                        },
+                        "409": {
+                            "description": "A space with this id already exists (\"space exists\").",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/Error"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "/workspaces/space/{id}": {
+                "get": {
+                    "summary": "Get space",
+                    "operationId": "getSpace",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.workspaces.get.space",
+                    "tags": [
+                        "Spaces"
+                    ],
+                    "description": "Retrieves detailed information about a specific space including configuration and metadata. Use this to access space details before listing or creating tasks.",
+                    "parameters": [
+                        {
+                            "$ref": "#/components/parameters/SpaceId"
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Space retrieved successfully.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/Space"
+                                    }
+                                }
+                            }
+                        },
+                        "404": {
+                            "$ref": "#/components/responses/NotFound"
+                        },
+                        "401": {
+                            "description": "Unauthorized - authentication required."
+                        }
+                    }
+                },
+                "patch": {
+                    "summary": "Update space",
+                    "operationId": "updateSpace",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.workspaces.patch.space",
+                    "tags": [
+                        "Spaces"
+                    ],
+                    "description": "Updates space fields. Use minimal structures: name='text', description='text', default_status='statusId', statuses=[{id,name,color,order,is_visible}].",
+                    "parameters": [
+                        {
+                            "$ref": "#/components/parameters/SpaceId"
+                        }
+                    ],
+                    "requestBody": {
+                        "description": "Fields to update using minimal structures shown in operation description. ⚠️ CRITICAL: Construct from scratch - do NOT copy nested objects from GET responses. Validation: (1) No 'self', 'owner', 'created_at' metadata in nested objects, (2) Max 1-2 properties per nested object, (3) Use only formats shown in description.",
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UpdateSpaceRequest"
+                                },
+                                "examples": {
+                                    "updateSpaceExample": {
+                                        "summary": "Update space name and default status - use this exact structure, do not copy from GET responses",
+                                        "value": {
+                                            "name": "Updated Space Name",
+                                            "default_status": "in_progress"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Space updated (PATCH merge — only the fields you send are changed).",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/Space"
+                                    }
+                                }
+                            }
+                        },
+                        "202": {
+                            "description": "Space updated, but removing one or more priorities enqueued a background job to re-assign every task off the removed priorities onto the fallback priority. The space body is returned immediately; the task re-assignment completes asynchronously. NOTE: consumers that unwrap the { status_code, body } envelope cannot distinguish this from 200 by the body alone — inspect status_code if you need to detect in-progress migration.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/Space"
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "$ref": "#/components/responses/BadRequest"
+                        },
+                        "403": {
+                            "description": "Cannot update the built-in ESCALATE (escalations) space.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/Error"
+                                    }
+                                }
+                            }
+                        },
+                        "404": {
+                            "$ref": "#/components/responses/NotFound"
+                        }
+                    }
+                },
+                "delete": {
+                    "summary": "Delete space",
+                    "operationId": "deleteSpace",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.workspaces.delete.space",
+                    "tags": [
+                        "Spaces"
+                    ],
+                    "description": "Deletes a workspace and all associated data. Use this to remove spaces that are no longer needed.",
+                    "parameters": [
+                        {
+                            "$ref": "#/components/parameters/SpaceId"
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Space deleted (also purges its tasks, comments, and files). Returns { \"message\": \"success\" } — NOT 204/no-body.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/SuccessMessage"
+                                    }
+                                }
+                            }
+                        },
+                        "403": {
+                            "description": "Cannot delete the built-in ESCALATE (escalations) space.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/Error"
+                                    }
+                                }
+                            }
+                        },
+                        "404": {
+                            "$ref": "#/components/responses/NotFound"
+                        }
+                    }
+                }
+            },
+            "/workspaces/space/{space_id}/tasks": {
+                "get": {
+                    "summary": "List tasks",
+                    "operationId": "listTasks",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.workspaces.get.tasks",
+                    "tags": [
+                        "Tasks"
+                    ],
+                    "description": "Retrieves all tasks within a specific space with their current status and metadata. Use this to display task lists, filter by status, or synchronize task data.",
+                    "parameters": [
+                        {
+                            "$ref": "#/components/parameters/SpaceIdPath"
+                        },
+                        {
+                            "name": "archived",
+                            "in": "query",
+                            "schema": {
+                                "type": "boolean"
+                            }
+                        },
+                        {
+                            "name": "scheduled",
+                            "in": "query",
+                            "schema": {
+                                "type": "boolean"
+                            }
+                        },
+                        {
+                            "name": "limit",
+                            "in": "query",
+                            "description": "How many maximum results should be returned",
+                            "schema": {
+                                "type": "integer",
+                                "default": 300
+                            }
+                        },
+                        {
+                            "name": "offset",
+                            "in": "query",
+                            "description": "If there are more results than the limit, offset can be used to get to the next batch of results",
+                            "schema": {
+                                "type": "integer",
+                                "default": 0
+                            }
+                        },
+                        {
+                            "name": "sort_by",
+                            "in": "query",
+                            "description": "Name of the field used for sorting the list of results",
+                            "schema": {
+                                "type": "string",
+                                "default": "created_at"
+                            }
+                        },
+                        {
+                            "name": "sort_order",
+                            "in": "query",
+                            "description": "Should the results be sorted in ascending or descending order relative to sort_by field",
+                            "schema": {
+                                "type": "string",
+                                "enum": [
+                                    "asc",
+                                    "desc"
+                                ],
+                                "default": "asc"
+                            }
+                        },
+                        {
+                            "name": "created_by",
+                            "in": "query",
+                            "description": "Exact match on the user ID of the task creator",
+                            "schema": {
+                                "type": "string"
+                            }
+                        },
+                        {
+                            "name": "priority",
+                            "in": "query",
+                            "description": "Exact match on priority; comma-separated values to filter by priority",
+                            "schema": {
+                                "type": "string"
+                            }
+                        },
+                        {
+                            "name": "status",
+                            "in": "query",
+                            "description": "Exact match on status; comma-separated values to filter by multiple statuses",
+                            "schema": {
+                                "type": "string"
+                            }
+                        },
+                        {
+                            "name": "title",
+                            "in": "query",
+                            "description": "Term search on task title",
+                            "schema": {
+                                "type": "string"
+                            }
+                        },
+                        {
+                            "name": "assignees",
+                            "in": "query",
+                            "description": "Comma-separated assignee IDs; at least one must match",
+                            "schema": {
+                                "type": "string"
+                            }
+                        },
+                        {
+                            "name": "reporter",
+                            "in": "query",
+                            "schema": {
+                                "type": "string"
+                            }
+                        },
+                        {
+                            "name": "created_at",
+                            "in": "query",
+                            "description": "Filter by creation date. Use a single date or a range as `{start_date},{end_date}`",
+                            "schema": {
+                                "type": "string"
+                            }
+                        },
+                        {
+                            "name": "updated_at",
+                            "in": "query",
+                            "description": "Filter by last-updated date. Use a single date or a range as `{start_date},{end_date}`",
+                            "schema": {
+                                "type": "string"
+                            }
+                        },
+                        {
+                            "name": "scheduled_at",
+                            "in": "query",
+                            "description": "Filter by scheduled date. Use a single date or a range as `{start_date},{end_date}`",
+                            "schema": {
+                                "type": "string"
+                            }
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Task list retrieved successfully.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/TaskList"
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "$ref": "#/components/responses/BadRequest"
+                        },
+                        "404": {
+                            "description": "Space not found - verify the space_id is correct."
+                        }
+                    }
+                }
+            },
+            "/workspaces/task": {
+                "post": {
+                    "summary": "Create task",
+                    "operationId": "createTask",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.workspaces.post.task",
+                    "tags": [
+                        "Tasks"
+                    ],
+                    "description": "Creates a new task within a space with title, description, and optional metadata. Use this to add new work items for the team to track and manage.",
+                    "requestBody": {
+                        "description": "Fields for creating the task.",
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreateTaskRequest"
+                                },
+                                "examples": {
+                                    "createTaskExample": {
+                                        "summary": "Create a new task",
+                                        "value": {
+                                            "title": "Implement user authentication",
+                                            "description": "Add OAuth2 authentication to the platform",
+                                            "space_id": "space_001",
+                                            "priority": "high",
+                                            "status": "to_do",
+                                            "assignees": [
+                                                "user_123"
+                                            ],
+                                            "due_date": "2024-06-15"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "New task created with unique identifier.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/Task"
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "$ref": "#/components/responses/BadRequest"
+                        }
+                    }
+                }
+            },
+            "/workspaces/tasks": {
+                "patch": {
+                    "summary": "Update multiple tasks",
+                    "operationId": "updateMultiTask",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.workspaces.patch.tasks",
+                    "tags": [
+                        "Tasks"
+                    ],
+                    "description": "Updates multiple tasks in batch. Use minimal structures: status='statusId', priority='level', assignees=['userId1','userId2']. Do NOT copy nested objects from GET responses.",
+                    "requestBody": {
+                        "description": "Array of tasks to update using minimal structures shown in operation description. ⚠️ CRITICAL: Construct from scratch - do NOT copy nested objects from GET responses. Validation: (1) No 'created_at', 'updated_at', 'created_by' metadata, (2) Only include fields being updated, (3) Use only formats shown in description.",
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UpdateMultiTaskRequest"
+                                },
+                                "examples": {
+                                    "updateMultiTaskExample": {
+                                        "summary": "Update status for multiple tasks - use this exact structure, do not copy from GET responses",
+                                        "value": {
+                                            "tasks": [
+                                                {
+                                                    "id": "task_001",
+                                                    "status": "in_progress"
+                                                },
+                                                {
+                                                    "id": "task_002",
+                                                    "status": "done",
+                                                    "priority": "high"
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Tasks updated. The body is an OBJECT keyed by the task's position in the request array ({ \"0\": Task, \"1\": Task }), NOT an array.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "additionalProperties": {
+                                            "$ref": "#/components/schemas/Task"
+                                        },
+                                        "description": "Map of request-array index (as a string key) to the updated Task."
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "description": "At least one task update failed. The whole call returns 400 with an index-keyed object mixing successes and per-index { \"error\": ... } entries.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "additionalProperties": true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "/workspaces/task/{id}": {
+                "get": {
+                    "summary": "Get task",
+                    "operationId": "getTask",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.workspaces.get.task",
+                    "tags": [
+                        "Tasks"
+                    ],
+                    "description": "Retrieves detailed information about a specific task including description, assignees, and history. Use this to access task details before making updates or adding comments.",
+                    "parameters": [
+                        {
+                            "$ref": "#/components/parameters/TaskId"
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Task retrieved successfully.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/Task"
+                                    }
+                                }
+                            }
+                        },
+                        "404": {
+                            "$ref": "#/components/responses/NotFound"
+                        }
+                    }
+                },
+                "patch": {
+                    "summary": "Update task",
+                    "operationId": "updateTask",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.workspaces.patch.task",
+                    "tags": [
+                        "Tasks"
+                    ],
+                    "description": "Updates task fields (PATCH merge). Use minimal structures: status='statusId', priority='level', assignees=['userId1'], title='text', due_date=RFC3339 (e.g. '2024-06-15T00:00:00Z'). Also accepts archived, scheduled_at, order, tags.",
+                    "parameters": [
+                        {
+                            "$ref": "#/components/parameters/TaskId"
+                        }
+                    ],
+                    "requestBody": {
+                        "description": "Fields to update using minimal structures shown in operation description. ⚠️ CRITICAL: Construct from scratch - do NOT copy nested objects from GET responses. Validation: (1) No 'created_at', 'updated_at', 'created_by' metadata, (2) Max 1-2 properties per nested object, (3) Use only formats shown in description.",
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UpdateTaskRequest"
+                                },
+                                "examples": {
+                                    "updateTaskExample": {
+                                        "summary": "Update task status and priority - use this exact structure, do not copy from GET responses",
+                                        "value": {
+                                            "status": "in_progress",
+                                            "priority": "high",
+                                            "assignees": [
+                                                "user_123"
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Task updated successfully.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/Task"
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "$ref": "#/components/responses/BadRequest"
+                        },
+                        "404": {
+                            "$ref": "#/components/responses/NotFound"
+                        }
+                    }
+                },
+                "delete": {
+                    "summary": "Delete task",
+                    "operationId": "deleteTask",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.workspaces.delete.task",
+                    "tags": [
+                        "Tasks"
+                    ],
+                    "description": "Deletes a task and associated data. Use this to remove completed or no-longer-needed tasks from the workspace.",
+                    "parameters": [
+                        {
+                            "$ref": "#/components/parameters/TaskId"
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Task deleted (also purges its comments and reactions). Returns { \"message\": \"success\" } — NOT 204/no-body.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/SuccessMessage"
+                                    }
+                                }
+                            }
+                        },
+                        "404": {
+                            "$ref": "#/components/responses/NotFound"
+                        }
+                    }
+                }
+            },
+            "/workspaces/task/{task_id}/action": {
+                "put": {
+                    "operationId": "setTaskAction",
+                    "summary": "Create or update a task checklist action",
+                    "description": "Upsert a checklist action on a task. There is no POST — PUT is both create and update (service/service.go registers the handler in the \"put\" group).\n\nOmit `id` to create (server assigns `ta_<random>`); pass an existing id to address that action. `description` is required on EVERY write.\n\nVERIFIED LIVE 2026-07-29: 200 with the action for a valid body; 404 \"task not found\" when the task does not exist; 400 \"description is required\" when description is absent.\n\nTHE RESPONSE IS YOUR REQUEST ECHOED BACK, not the stored aggregate (response.SuccessWithBody(request, body)). Combined with the broken GET below that means NOTHING about a task action can be verified after writing — including whether a partial write merges or replaces. No frontend component reads task actions either, so an action written today is invisible in the UI.",
+                    "tags": [
+                        "Task Actions"
+                    ],
+                    "x-resource": "microstrate.workspaces.put.task-action",
+                    "parameters": [
+                        {
+                            "name": "task_id",
+                            "in": "path",
+                            "required": true,
+                            "schema": {
+                                "type": "string"
+                            },
+                            "description": "Task id the action hangs off."
+                        }
+                    ],
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TaskAction"
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "The action as submitted (echoed, not read back).",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/TaskAction"
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "description": "`description` missing, or the body could not be parsed.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/Error"
+                                    }
+                                }
+                            }
+                        },
+                        "404": {
+                            "description": "\"task not found\".",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/Error"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "get": {
+                    "operationId": "listTaskActions",
+                    "summary": "List task checklist actions — BROKEN, DO NOT USE",
+                    "description": "MISROUTED. The gateway maps this GET at the WRITE resource `microstrate.workspaces.put.task-action`, so it invokes AddTaskActionHandler and returns 400 \"description is required\" for every call. Verified live 2026-07-29.\n\nThe real list handler exists — ListTaskActionsHandler at workspaces-service/handler/task_actions.go:94, registered as `get.task-actions` in service/service.go:64 — but no gateway mapping points at it, so it is unreachable.\n\nCONSEQUENCE: task actions are write-only. They cannot be listed, counted, or verified after writing.\n\nFIX: repoint this mapping at `microstrate.workspaces.get.task-actions`. Once that lands, the 200 below becomes real and the write-only language across this spec, quiva-workspaces-mcp's docs/validator, and the renewal-review-board example should all be revised.",
+                    "tags": [
+                        "Task Actions"
+                    ],
+                    "deprecated": true,
+                    "x-resource": "microstrate.workspaces.put.task-action",
+                    "x-expected-resource": "microstrate.workspaces.get.task-actions",
+                    "x-broken": "Mapped at the write resource; always 400s. See description.",
+                    "parameters": [
+                        {
+                            "name": "task_id",
+                            "in": "path",
+                            "required": true,
+                            "schema": {
+                                "type": "string"
+                            },
+                            "description": "Task id the action hangs off."
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "What ListTaskActionsHandler WOULD return if it were routed. Never observed in practice.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "results": {
+                                                "type": "array",
+                                                "items": {
+                                                    "$ref": "#/components/schemas/TaskAction"
+                                                }
+                                            },
+                                            "results_total": {
+                                                "type": "integer"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "description": "WHAT YOU ACTUALLY GET: \"description is required\", from the add handler this route is wrongly mapped to.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/Error"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "/workspaces/task/{task_id}/action/{id}": {
+                "delete": {
+                    "operationId": "deleteTaskAction",
+                    "summary": "Delete a task checklist action",
+                    "description": "Purge one action. Returns 200 `{ \"message\": \"success\" }`, not 204. An unknown id returns 404 \"resource not found\". Verified live 2026-07-29.\n\nBecause the list route is broken, the id has to come from whatever created the action — there is no way to discover it.",
+                    "tags": [
+                        "Task Actions"
+                    ],
+                    "x-resource": "microstrate.workspaces.delete.task-action",
+                    "parameters": [
+                        {
+                            "name": "task_id",
+                            "in": "path",
+                            "required": true,
+                            "schema": {
+                                "type": "string"
+                            },
+                            "description": "Task id the action hangs off."
+                        },
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "required": true,
+                            "schema": {
+                                "type": "string"
+                            },
+                            "description": "Action id (`ta_<random>` unless you supplied one)."
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "`{ \"message\": \"success\" }`.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/SuccessMessage"
+                                    }
+                                }
+                            }
+                        },
+                        "404": {
+                            "description": "\"resource not found\".",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/Error"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "/workspaces/task/{task_id}/comment": {
+                "post": {
+                    "summary": "Create comment",
+                    "operationId": "createComment",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.workspaces.post.comment",
+                    "tags": [
+                        "Comments"
+                    ],
+                    "description": "Adds a new comment to a task with optional attachments and reactions. Use this to provide feedback, updates, or discussion on specific tasks.",
+                    "parameters": [
+                        {
+                            "$ref": "#/components/parameters/TaskIdPath"
+                        }
+                    ],
+                    "requestBody": {
+                        "description": "Fields for creating the comment.",
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreateCommentRequest"
+                                },
+                                "examples": {
+                                    "createCommentExample": {
+                                        "summary": "Add a comment to a task",
+                                        "value": {
+                                            "body": "This looks good, ready for review",
+                                            "reply_id": null
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "New comment created with unique identifier.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/Comment"
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "$ref": "#/components/responses/BadRequest"
+                        },
+                        "404": {
+                            "$ref": "#/components/responses/NotFound"
+                        }
+                    }
+                }
+            },
+            "/workspaces/task/{task_id}/comments": {
+                "get": {
+                    "summary": "List comments",
+                    "operationId": "listComments",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.workspaces.get.comments",
+                    "tags": [
+                        "Comments"
+                    ],
+                    "description": "Retrieves all comments on a specific task in chronological order. Use this to display task conversations or sync comment history.",
+                    "parameters": [
+                        {
+                            "$ref": "#/components/parameters/TaskIdPath"
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Comment list retrieved successfully.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/CommentList"
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "$ref": "#/components/responses/BadRequest"
+                        },
+                        "404": {
+                            "description": "Task not found - verify the task_id is correct."
+                        }
+                    }
+                }
+            },
+            "/workspaces/task/{task_id}/comment/{id}": {
+                "get": {
+                    "summary": "Get comment",
+                    "operationId": "getComment",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.workspaces.get.comment",
+                    "tags": [
+                        "Comments"
+                    ],
+                    "description": "Retrieves a specific comment with all metadata and reaction data. Use this to access detailed comment information for display or analysis.",
+                    "parameters": [
+                        {
+                            "$ref": "#/components/parameters/TaskIdPath"
+                        },
+                        {
+                            "$ref": "#/components/parameters/CommentId"
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Comment retrieved successfully.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/Comment"
+                                    }
+                                }
+                            }
+                        },
+                        "404": {
+                            "$ref": "#/components/responses/NotFound"
+                        }
+                    }
+                },
+                "patch": {
+                    "summary": "Update comment",
+                    "operationId": "updateComment",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.workspaces.patch.comment",
+                    "tags": [
+                        "Comments"
+                    ],
+                    "description": "Updates comment fields. Use minimal structures: body='text', reactions={...}, reply_id=null. Do NOT copy nested objects from GET responses.",
+                    "parameters": [
+                        {
+                            "$ref": "#/components/parameters/TaskIdPath"
+                        },
+                        {
+                            "$ref": "#/components/parameters/CommentId"
+                        }
+                    ],
+                    "requestBody": {
+                        "description": "Fields to update using minimal structures shown in operation description. ⚠️ CRITICAL: Construct from scratch - do NOT copy nested objects from GET responses. Validation: (1) No 'author', 'created_at', 'updated_at' metadata, (2) Only include fields being updated, (3) Use only formats shown in description.",
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UpdateCommentRequest"
+                                },
+                                "examples": {
+                                    "updateCommentExample": {
+                                        "summary": "Update comment text - use this exact structure, do not copy from GET responses",
+                                        "value": {
+                                            "body": "Updated comment text with corrections"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Comment updated successfully.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/Comment"
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "$ref": "#/components/responses/BadRequest"
+                        },
+                        "404": {
+                            "$ref": "#/components/responses/NotFound"
+                        }
+                    }
+                },
+                "delete": {
+                    "summary": "Delete comment",
+                    "operationId": "deleteComment",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.workspaces.delete.comment",
+                    "tags": [
+                        "Comments"
+                    ],
+                    "description": "Deletes a comment from a task permanently. Use this to remove outdated or unnecessary comments from task discussions.",
+                    "parameters": [
+                        {
+                            "$ref": "#/components/parameters/TaskIdPath"
+                        },
+                        {
+                            "$ref": "#/components/parameters/CommentId"
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Comment deleted (SOFT delete — the comment is poison-pilled, not hard-removed; its reactions are purged). Returns { \"message\": \"success\" } — NOT 204/no-body.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/SuccessMessage"
+                                    }
+                                }
+                            }
+                        },
+                        "404": {
+                            "$ref": "#/components/responses/NotFound"
+                        }
+                    }
+                }
+            },
+            "/workspaces/task/{task_id}/comment/{id}/reaction": {
+                "post": {
+                    "summary": "Add or remove reaction",
+                    "operationId": "reactToComment",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.workspaces.post.comment-reaction",
+                    "tags": [
+                        "Comments"
+                    ],
+                    "description": "Adds or removes a reaction emoji on a comment. Use this to express feedback or agreement with specific comments.",
+                    "parameters": [
+                        {
+                            "$ref": "#/components/parameters/TaskIdPath"
+                        },
+                        {
+                            "$ref": "#/components/parameters/CommentId"
+                        }
+                    ],
+                    "requestBody": {
+                        "description": "Reaction emoji to add or remove.",
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CommentReactionRequest"
+                                },
+                                "examples": {
+                                    "addReactionExample": {
+                                        "summary": "Add a reaction emoji to a comment",
+                                        "value": {
+                                            "reaction": {
+                                                "😛": true
+                                            }
+                                        }
+                                    },
+                                    "removeReactionExample": {
+                                        "summary": "Remove a reaction emoji from a comment",
+                                        "value": {
+                                            "reaction": {
+                                                "😛": false
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Reaction added or removed. Returns ONLY the aggregated reaction map { reactions: { \"<emoji>\": { count, users } } } — NOT the full comment. Requires a Bearer JWT to key the reacting user.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ReactionsResponse"
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "$ref": "#/components/responses/BadRequest"
+                        },
+                        "404": {
+                            "$ref": "#/components/responses/NotFound"
+                        }
+                    }
+                }
+            },
+            "/accounts/users/list": {
+                "get": {
+                    "summary": "List users",
+                    "operationId": "listUsers",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.accounts.get.list-users-by-account",
+                    "tags": [
+                        "User Management"
+                    ],
+                    "description": "Retrieves all active users in the current account. Use this to populate assignee lists when creating or updating tasks. NOTE: this is served by the ACCOUNTS service (microstrate.accounts.get.list-users-by-account), not workspaces — it is documented here only because assignee/reporter fields reference these user ids.",
+                    "responses": {
+                        "200": {
+                            "description": "Users retrieved successfully.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "required": [
+                                            "data"
+                                        ],
+                                        "properties": {
+                                            "data": {
+                                                "type": "array",
+                                                "items": {
+                                                    "$ref": "#/components/schemas/UserInfo"
+                                                },
+                                                "description": "Array of user objects."
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "401": {
+                            "description": "Unauthorized - provide valid authentication credentials.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/Error"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "components": {
+            "parameters": {
+                "SpaceId": {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "description": "Unique space identifier to retrieve or modify.",
+                    "schema": {
+                        "type": "string"
+                    },
+                    "example": "space_001"
+                },
+                "SpaceIdPath": {
+                    "name": "space_id",
+                    "in": "path",
+                    "required": true,
+                    "description": "Unique space identifier containing the tasks.",
+                    "schema": {
+                        "type": "string"
+                    },
+                    "example": "space_001"
+                },
+                "TaskId": {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "description": "Unique task identifier to retrieve or modify.",
+                    "schema": {
+                        "type": "string"
+                    },
+                    "example": "task_001"
+                },
+                "TaskIdPath": {
+                    "name": "task_id",
+                    "in": "path",
+                    "required": true,
+                    "description": "Unique task identifier containing the comments.",
+                    "schema": {
+                        "type": "string"
+                    },
+                    "example": "task_001"
+                },
+                "CommentId": {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "description": "Unique comment identifier to retrieve, modify, or delete.",
+                    "schema": {
+                        "type": "string"
+                    },
+                    "example": "comment_001"
+                }
+            },
+            "schemas": {
+                "Error": {
+                    "type": "object",
+                    "description": "Error response with error message details.",
+                    "properties": {
+                        "error": {
+                            "type": "string",
+                            "description": "Error message describing what went wrong.",
+                            "example": "Unauthorized access"
+                        }
+                    }
+                },
+                "SuccessMessage": {
+                    "type": "object",
+                    "description": "Standard success body returned by deletes and other side-effecting operations (inside the { status_code, body } envelope).",
+                    "properties": {
+                        "message": {
+                            "type": "string",
+                            "example": "success"
+                        }
+                    }
+                },
+                "ReactionsResponse": {
+                    "type": "object",
+                    "description": "Response body of reactToComment — the aggregated reaction map ONLY, not the full comment.",
+                    "properties": {
+                        "reactions": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "$ref": "#/components/schemas/CommentReactionEntry"
+                            },
+                            "description": "Reactions aggregated by emoji. Keys are emoji characters.",
+                            "example": {
+                                "👍": {
+                                    "count": 1,
+                                    "users": [
+                                        "user_123"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "UserInfo": {
+                    "type": "object",
+                    "required": [
+                        "id",
+                        "email",
+                        "role",
+                        "is_suspended",
+                        "email_confirmed",
+                        "first_name",
+                        "last_name",
+                        "invitation_pending"
+                    ],
+                    "description": "Represents a user account in the system with contact and status information.",
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                            "readOnly": true,
+                            "description": "Unique user identifier used for task assignments.",
+                            "example": "user_123"
+                        },
+                        "email": {
+                            "type": "string",
+                            "format": "email",
+                            "description": "User email address.",
+                            "example": "alice@example.com"
+                        },
+                        "first_name": {
+                            "type": "string",
+                            "description": "User first name.",
+                            "example": "Alice"
+                        },
+                        "last_name": {
+                            "type": "string",
+                            "description": "User last name.",
+                            "example": "Johnson"
+                        },
+                        "role": {
+                            "type": "string",
+                            "description": "User role in the account (e.g., admin, member, viewer).",
+                            "example": "admin"
+                        },
+                        "is_suspended": {
+                            "type": "boolean",
+                            "description": "Whether the user account is suspended and cannot access resources.",
+                            "example": false
+                        },
+                        "email_confirmed": {
+                            "type": "boolean",
+                            "description": "Whether the user's email address has been verified.",
+                            "example": true
+                        },
+                        "invitation_pending": {
+                            "type": "boolean",
+                            "description": "Whether the user invitation is still pending acceptance.",
+                            "example": false
+                        }
+                    }
+                },
+                "SpaceStatus": {
+                    "type": "object",
+                    "required": [
+                        "id",
+                        "name"
+                    ],
+                    "description": "Represents a workflow status state within a space.",
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                            "description": "Unique status identifier within the space.",
+                            "example": "to_do"
+                        },
+                        "name": {
+                            "type": "string",
+                            "description": "Human-readable status name (e.g., To Do, In Progress, Done).",
+                            "example": "To Do"
+                        },
+                        "color": {
+                            "type": "string",
+                            "description": "Hex color code for visual representation.",
+                            "example": "#cccccc"
+                        },
+                        "order": {
+                            "type": "integer",
+                            "description": "Display order among statuses in the space.",
+                            "example": 1
+                        },
+                        "is_visible": {
+                            "type": "boolean",
+                            "nullable": true,
+                            "description": "Whether status is visible in the UI.",
+                            "example": true
+                        },
+                        "complete": {
+                            "type": "boolean",
+                            "description": "Whether this status represents a completed/done state. Present on every status in engine responses.",
+                            "example": false
+                        }
+                    }
+                },
+                "CreateSpaceRequest": {
+                    "type": "object",
+                    "required": [
+                        "id",
+                        "name"
+                    ],
+                    "description": "Request payload for creating a new workspace.",
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                            "pattern": "^\\w+$",
+                            "description": "REQUIRED. Unique identifier for the space. Must match ^\\w+$ (letters, numbers, and underscores ONLY — no spaces or hyphens) and is UPPERCASED server-side (\"q2_mktg\" is stored and referenced as \"Q2_MKTG\"). Tasks in the space receive IDs prefixed with this uppercased value. Usually a short abbreviation of the name. Creating an id that already exists returns 409."
+                        },
+                        "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 255,
+                            "description": "Workspace name.",
+                            "example": "Product Development"
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Optional workspace description.",
+                            "example": "Space for managing product features and releases"
+                        },
+                        "default_status": {
+                            "type": "string",
+                            "description": "Default status for new tasks. Format: 'statusId'.",
+                            "example": "to_do"
+                        },
+                        "statuses": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/SpaceStatus"
+                            },
+                            "description": "Array of workflow statuses. Format: [{id:'X', name:'Y', color:'#HEX'}]. Create with hex colors unless explicitly told not to.",
+                            "example": [
+                                {
+                                    "id": "to_do",
+                                    "name": "To Do",
+                                    "color": "#3b82f6"
+                                }
+                            ]
+                        },
+                        "record_config_ids": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Record configuration IDs to associate with space.",
+                            "example": [
+                                "config_001"
+                            ]
+                        },
+                        "default_record_config_id": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Default record configuration for space.",
+                            "example": [
+                                "config_001"
+                            ]
+                        }
+                    }
+                },
+                "UpdateSpaceRequest": {
+                    "type": "object",
+                    "description": "Request payload for updating workspace fields using minimal structures.",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 255,
+                            "description": "Workspace name. Format: 'text'.",
+                            "example": "Updated Workspace Name"
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Workspace description. Format: 'text'.",
+                            "example": "Updated workspace description"
+                        },
+                        "default_status": {
+                            "type": "string",
+                            "description": "Default status for new tasks. Format: 'statusId'.",
+                            "example": "in_progress"
+                        },
+                        "statuses": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/SpaceStatus"
+                            },
+                            "description": "Updated workflow statuses. Format: [{id:'X', name:'Y'}].",
+                            "example": [
+                                {
+                                    "id": "to_do",
+                                    "name": "To Do"
+                                }
+                            ]
+                        },
+                        "record_config_ids": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Record configuration IDs.",
+                            "example": [
+                                "config_001"
+                            ]
+                        },
+                        "default_record_config_id": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Default record configuration.",
+                            "example": [
+                                "config_001"
+                            ]
+                        },
+                        "priorities": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {
+                                        "type": "string"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "default": {
+                                        "type": "boolean"
+                                    }
+                                }
+                            },
+                            "description": "Task priority definitions. Removing a priority that tasks still reference enqueues a background re-assignment onto the fallback priority (the default, or the first) and the update returns 202."
+                        },
+                        "tags": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {
+                                        "type": "string"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "color": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            "description": "Space-level tag definitions."
+                        },
+                        "logo": {
+                            "type": "boolean",
+                            "description": "Whether the space has a logo set."
+                        },
+                        "default_view": {
+                            "type": "string",
+                            "description": "Default board/list view for the space."
+                        }
+                    }
+                },
+                "Space": {
+                    "type": "object",
+                    "description": "Represents a workspace containing tasks and configurations.",
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                            "readOnly": true,
+                            "description": "Unique space identifier.",
+                            "example": "space_001"
+                        },
+                        "url": {
+                            "type": "string",
+                            "readOnly": true,
+                            "format": "uri",
+                            "description": "UI URL to navigate directly to this space.",
+                            "example": "https://app.quiva.ai/en/hub/spaces/space_001/tasks"
+                        },
+                        "name": {
+                            "type": "string",
+                            "description": "Workspace name.",
+                            "example": "Product Development"
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Workspace description.",
+                            "example": "Space for managing product features"
+                        },
+                        "default_status": {
+                            "type": "string",
+                            "description": "Default status identifier for new tasks.",
+                            "example": "to_do"
+                        },
+                        "statuses": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/SpaceStatus"
+                            },
+                            "description": "Available workflow statuses in space."
+                        },
+                        "owner": {
+                            "type": "string",
+                            "readOnly": true,
+                            "description": "User ID of the space creator, set by backend.",
+                            "example": "user_123"
+                        },
+                        "created_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "readOnly": true,
+                            "description": "Space creation timestamp (READ-ONLY from GET).",
+                            "example": "2024-01-15T10:30:00Z"
+                        },
+                        "updated_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "readOnly": true,
+                            "description": "Last update timestamp (READ-ONLY from GET).",
+                            "example": "2024-05-08T06:51:05Z"
+                        },
+                        "record_config_ids": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Associated record configuration identifiers."
+                        },
+                        "default_record_config_id": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Default record configuration identifiers."
+                        }
+                    }
+                },
+                "SpaceList": {
+                    "type": "object",
+                    "description": "List of workspaces with pagination metadata.",
+                    "properties": {
+                        "results": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/Space"
+                            },
+                            "description": "Array of workspace objects."
+                        },
+                        "results_total": {
+                            "type": "integer",
+                            "description": "Total number of workspaces.",
+                            "example": 5
+                        }
+                    }
+                },
+                "Task": {
+                    "type": "object",
+                    "description": "Represents a work item within a workspace.",
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                            "readOnly": true,
+                            "description": "Unique task identifier.",
+                            "example": "task_001"
+                        },
+                        "url": {
+                            "type": "string",
+                            "readOnly": true,
+                            "format": "uri",
+                            "description": "UI URL to navigate directly to this task.",
+                            "example": "https://app.quiva.ai/en/hub/spaces/space_001/tasks?task=space_001-1"
+                        },
+                        "title": {
+                            "type": "string",
+                            "description": "Task title.",
+                            "example": "Implement authentication"
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Task details in markdown or rich-text format.",
+                            "example": "Add OAuth2 and JWT support"
+                        },
+                        "assignees": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "nullable": true,
+                            "description": "Array of assigned user IDs.",
+                            "example": [
+                                "user_123"
+                            ]
+                        },
+                        "attachments": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "nullable": true,
+                            "description": "Array of attachment file URLs."
+                        },
+                        "created_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "readOnly": true,
+                            "description": "Task creation timestamp (READ-ONLY from GET).",
+                            "example": "2024-01-15T10:30:00Z"
+                        },
+                        "updated_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "readOnly": true,
+                            "description": "Last update timestamp (READ-ONLY from GET).",
+                            "example": "2024-05-08T06:51:05Z"
+                        },
+                        "created_by": {
+                            "type": "string",
+                            "readOnly": true,
+                            "description": "User ID of task creator, set by backend.",
+                            "example": "user_123"
+                        },
+                        "priority": {
+                            "type": "string",
+                            "description": "Task priority level.",
+                            "example": "high"
+                        },
+                        "folder": {
+                            "type": "string",
+                            "description": "Folder or category identifier.",
+                            "example": "features"
+                        },
+                        "reporter": {
+                            "type": "string",
+                            "description": "User ID of task reporter.",
+                            "example": "user_123"
+                        },
+                        "status": {
+                            "type": "string",
+                            "description": "Current task status identifier.",
+                            "example": "in_progress"
+                        },
+                        "space_id": {
+                            "type": "string",
+                            "description": "Parent space identifier.",
+                            "example": "space_001"
+                        },
+                        "due_date": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "Task due date. RFC3339 date-time (parsed as RFC3339 on read); a date-only value can fail to round-trip.",
+                            "example": "2024-06-15T00:00:00Z"
+                        },
+                        "scheduled_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "RFC3339 date-time at which the task is scheduled. Setting it schedules a background job; archiving the task clears it.",
+                            "example": "2024-06-15T09:00:00Z"
+                        },
+                        "archived": {
+                            "type": "boolean",
+                            "description": "Whether the task is archived. Setting true unschedules the task's events.",
+                            "example": false
+                        },
+                        "order": {
+                            "type": "number",
+                            "description": "Sort order of the task within its column/board."
+                        },
+                        "tags": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Free-form tag ids on the task."
+                        },
+                        "metadata": {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "description": "Arbitrary metadata bag stored on the task."
+                        },
+                        "watchers": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "readOnly": true,
+                            "description": "User ids watching the task. Present ONLY on the getTask response (top-level), not stored on the task."
+                        },
+                        "muted": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "readOnly": true,
+                            "description": "User ids who muted the task. Present ONLY on the getTask response (top-level)."
+                        },
+                        "time_tracking": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/TimeTracking"
+                                }
+                            ],
+                            "description": "Effort estimate plus logged entries. On update, `logs` REPLACES the stored array rather than appending — read the task first and send the complete set. See the TimeTracking schema for all four merge cases."
+                        }
+                    }
+                },
+                "CreateTaskRequest": {
+                    "type": "object",
+                    "required": [
+                        "title"
+                    ],
+                    "description": "Request payload for creating a new task.",
+                    "properties": {
+                        "title": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 255,
+                            "description": "Task title.",
+                            "example": "Implement user authentication"
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Task details in markdown or rich-text format.",
+                            "example": "Add OAuth2 and JWT support to the platform"
+                        },
+                        "assignees": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "nullable": true,
+                            "description": "Assigned user IDs. Format: ['userId1', 'userId2'].",
+                            "example": [
+                                "user_123"
+                            ]
+                        },
+                        "attachments": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "nullable": true,
+                            "description": "Attachment file URLs.",
+                            "example": []
+                        },
+                        "priority": {
+                            "type": "string",
+                            "description": "Task priority level.",
+                            "example": "high"
+                        },
+                        "folder": {
+                            "type": "string",
+                            "description": "Folder or category identifier.",
+                            "example": "backend"
+                        },
+                        "reporter": {
+                            "type": "string",
+                            "description": "Task reporter user ID.",
+                            "example": "user_123"
+                        },
+                        "status": {
+                            "type": "string",
+                            "description": "Initial status identifier. Format: 'statusId'. OMITTING IT now inherits the space's `default_status` (workspaces-service #1281: createTask fetches the space rather than only checking it exists). Verified live: {title, space_id} came back status \"awaiting_info\". Only applies when space_id is set — a task with no space still gets \"\". Before this change a status-less task sat outside every board column.",
+                            "example": "to_do"
+                        },
+                        "space_id": {
+                            "type": "string",
+                            "description": "Parent space identifier. Uppercased server-side; if provided, the space MUST already exist (else 400 \"space not found\"). If omitted, the task lands in the \"default\" space. The task id is server-generated ({SPACEID}-{n} when the space exists, else t_<nanoid>) — any id you send is ignored.",
+                            "example": "SPACE_001"
+                        },
+                        "due_date": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "Task due date. RFC3339 date-time, not date-only.",
+                            "example": "2024-06-15T00:00:00Z"
+                        },
+                        "scheduled_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "RFC3339 date-time to schedule the task.",
+                            "example": "2024-06-15T09:00:00Z"
+                        },
+                        "archived": {
+                            "type": "boolean",
+                            "description": "Create the task in an archived state.",
+                            "example": false
+                        },
+                        "tags": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Free-form tag ids."
+                        },
+                        "time_tracking": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/TimeTracking"
+                                }
+                            ],
+                            "description": "Effort estimate plus logged entries. On update, `logs` REPLACES the stored array rather than appending — read the task first and send the complete set. See the TimeTracking schema for all four merge cases."
+                        }
+                    }
+                },
+                "UpdateTaskRequest": {
+                    "type": "object",
+                    "description": "Request payload for updating task fields using minimal structures.",
+                    "properties": {
+                        "title": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 255,
+                            "description": "Task title. Format: 'text'.",
+                            "example": "Updated task title"
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Task details. Format: 'markdown/text'.",
+                            "example": "Updated task description"
+                        },
+                        "assignees": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "nullable": true,
+                            "description": "Assigned user IDs. Format: ['userId1', 'userId2'].",
+                            "example": [
+                                "user_123",
+                                "user_456"
+                            ]
+                        },
+                        "priority": {
+                            "type": "string",
+                            "description": "Task priority level. Format: 'level'.",
+                            "example": "high"
+                        },
+                        "folder": {
+                            "type": "string",
+                            "description": "Folder identifier. Format: 'folderId'.",
+                            "example": "backend"
+                        },
+                        "reporter": {
+                            "type": "string",
+                            "description": "Reporter user ID. Format: 'userId'.",
+                            "example": "user_123"
+                        },
+                        "status": {
+                            "type": "string",
+                            "description": "Status identifier. Format: 'statusId'.",
+                            "example": "in_progress"
+                        },
+                        "due_date": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "Due date. RFC3339 date-time, not date-only.",
+                            "example": "2024-06-15T00:00:00Z"
+                        },
+                        "scheduled_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "RFC3339 date-time to (re)schedule the task; set to an empty string to unschedule.",
+                            "example": "2024-06-15T09:00:00Z"
+                        },
+                        "archived": {
+                            "type": "boolean",
+                            "description": "Archive/unarchive the task. Archiving also unschedules its events.",
+                            "example": false
+                        },
+                        "order": {
+                            "type": "number",
+                            "description": "Sort order within the column/board."
+                        },
+                        "tags": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Free-form tag ids."
+                        },
+                        "time_tracking": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/TimeTracking"
+                                }
+                            ],
+                            "description": "Effort estimate plus logged entries. On update, `logs` REPLACES the stored array rather than appending — read the task first and send the complete set. See the TimeTracking schema for all four merge cases."
+                        }
+                    }
+                },
+                "UpdateMultiTaskRequest": {
+                    "type": "object",
+                    "required": [
+                        "tasks"
+                    ],
+                    "description": "Request payload for batch updating multiple tasks using minimal structures.",
+                    "properties": {
+                        "tasks": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/UpdateTaskRequest"
+                            },
+                            "description": "Array of task updates. Format: [{id:'taskId', status:'statusId'}, ...].",
+                            "example": [
+                                {
+                                    "id": "task_001",
+                                    "status": "in_progress"
+                                },
+                                {
+                                    "id": "task_002",
+                                    "status": "done"
+                                }
+                            ]
+                        }
+                    }
+                },
+                "TaskList": {
+                    "type": "object",
+                    "description": "List of tasks with pagination metadata.",
+                    "properties": {
+                        "results": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/Task"
+                            },
+                            "description": "Array of task objects."
+                        },
+                        "results_total": {
+                            "type": "integer",
+                            "description": "Total number of tasks in space.",
+                            "example": 15
+                        }
+                    }
+                },
+                "Comment": {
+                    "type": "object",
+                    "description": "Represents a discussion comment on a task.",
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                            "readOnly": true,
+                            "description": "Unique comment identifier.",
+                            "example": "comment_001"
+                        },
+                        "url": {
+                            "type": "string",
+                            "readOnly": true,
+                            "format": "uri",
+                            "description": "UI URL to navigate directly to this comment.",
+                            "example": "https://app.quiva.ai/en/hub/spaces/space_001/tasks?task=space_001-1#comment-comment_001"
+                        },
+                        "body": {
+                            "type": "string",
+                            "description": "Comment text in plain text or markdown format.",
+                            "example": "This looks good, ready for review"
+                        },
+                        "attachments": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Array of attachment file URLs.",
+                            "example": []
+                        },
+                        "author": {
+                            "type": "string",
+                            "readOnly": true,
+                            "description": "User ID of comment author, set by backend.",
+                            "example": "user_123"
+                        },
+                        "reactions": {
+                            "type": "object",
+                            "readOnly": true,
+                            "description": "Reactions aggregated by emoji. Keys are emoji characters; values are CommentReactionEntry.",
+                            "additionalProperties": {
+                                "$ref": "#/components/schemas/CommentReactionEntry"
+                            }
+                        },
+                        "reply_id": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "ID of parent comment if this is a reply.",
+                            "example": null
+                        },
+                        "created_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "readOnly": true,
+                            "description": "Comment creation timestamp (READ-ONLY from GET).",
+                            "example": "2024-01-15T10:30:00Z"
+                        },
+                        "updated_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "readOnly": true,
+                            "description": "Last update timestamp (READ-ONLY from GET).",
+                            "example": "2024-05-08T06:51:05Z"
+                        }
+                    }
+                },
+                "CreateCommentRequest": {
+                    "type": "object",
+                    "required": [
+                        "body"
+                    ],
+                    "description": "Request payload for creating a new comment.",
+                    "properties": {
+                        "body": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 5000,
+                            "description": "Comment text in plain text or markdown format.",
+                            "example": "This implementation looks good"
+                        },
+                        "attachments": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Attachment file URLs.",
+                            "example": []
+                        },
+                        "reply_id": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Parent comment ID if this is a reply. Format: 'commentId' or null.",
+                            "example": null
+                        }
+                    }
+                },
+                "UpdateCommentRequest": {
+                    "type": "object",
+                    "description": "Request payload for updating comment fields using minimal structures.",
+                    "properties": {
+                        "body": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 5000,
+                            "description": "Updated comment text. Format: 'text'.",
+                            "example": "Updated comment with corrections"
+                        },
+                        "reply_id": {
+                            "nullable": true,
+                            "description": "Parent comment ID. ENGINE QUIRK: on update the handler types this field as an object/map (not the plain string used on create) — sending it on update is inconsistent and best avoided; send `body` alone. Update requires at least one of `body` or `reply_id`.",
+                            "example": null
+                        }
+                    }
+                },
+                "CommentList": {
+                    "type": "object",
+                    "description": "List of comments with pagination metadata.",
+                    "properties": {
+                        "results": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/Comment"
+                            },
+                            "description": "Array of comment objects."
+                        },
+                        "results_total": {
+                            "type": "integer",
+                            "description": "Total number of comments on task.",
+                            "example": 8
+                        }
+                    }
+                },
+                "CommentReactionEntry": {
+                    "type": "object",
+                    "description": "Aggregated reaction data for a single emoji.",
+                    "properties": {
+                        "count": {
+                            "type": "integer",
+                            "description": "Number of users who reacted with this emoji.",
+                            "example": 2
+                        },
+                        "users": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "IDs of users who reacted with this emoji.",
+                            "example": [
+                                "user_123",
+                                "user_456"
+                            ]
+                        }
+                    }
+                },
+                "CommentReactionRequest": {
+                    "type": "object",
+                    "required": [
+                        "reaction"
+                    ],
+                    "description": "Request payload for adding or removing a reaction emoji on a comment.",
+                    "properties": {
+                        "reaction": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "boolean"
+                            },
+                            "description": "Map of emoji character to boolean. Set true to add the reaction, false to remove it.",
+                            "example": {
+                                "😛": true
+                            }
+                        }
+                    }
+                },
+                "TimeSpent": {
+                    "type": "object",
+                    "required": [
+                        "time_in_seconds"
+                    ],
+                    "description": "A duration. ALWAYS seconds — the UI parses a Jira-style \"2w 4d 6h 45m\" string into seconds before sending (1w = 5d, 1d = 8h; task-time-tracking.utils.ts). Those working-time conventions live entirely in the frontend.",
+                    "properties": {
+                        "time_in_seconds": {
+                            "type": "integer",
+                            "description": "Duration in seconds.",
+                            "example": 5400
+                        }
+                    }
+                },
+                "TimeLogUser": {
+                    "type": "object",
+                    "required": [
+                        "id",
+                        "name"
+                    ],
+                    "description": "Snapshot of who logged the time. CLIENT-SUPPLIED — the backend never derives it from the bearer token, so an omitted or wrong value leaves the entry unattributed in the UI. Resolve the uuid with GET /accounts/users/list. Deliberately excludes avatar info.",
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                            "description": "The user's uuid."
+                        },
+                        "name": {
+                            "type": "string",
+                            "description": "Display name at the time the entry was logged."
+                        }
+                    }
+                },
+                "TimeLog": {
+                    "type": "object",
+                    "required": [
+                        "id",
+                        "time_spent",
+                        "started_at",
+                        "user",
+                        "created_at"
+                    ],
+                    "description": "One logged time entry. EVERY field is client-supplied: the backend does no defaulting inside time_tracking, so it generates no id and stamps no created_at. The frontend mints `time_log_<uuid>`.",
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                            "description": "Client-supplied id. REQUIRED in practice — the backend generates none, so an entry without one cannot be addressed on a later update.",
+                            "example": "time_log_7c1f0e2a-2b44-4a1e-9f0d-3d5a6b8c1120"
+                        },
+                        "time_spent": {
+                            "$ref": "#/components/schemas/TimeSpent"
+                        },
+                        "started_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "RFC3339 — when the tracked work started.",
+                            "example": "2026-07-29T09:00:00Z"
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Optional free text describing the work."
+                        },
+                        "user": {
+                            "$ref": "#/components/schemas/TimeLogUser"
+                        },
+                        "created_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "RFC3339 — client-supplied, NOT stamped by the server."
+                        },
+                        "updated_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "RFC3339 — optional, client-supplied."
+                        }
+                    }
+                },
+                "TimeTracking": {
+                    "type": "object",
+                    "description": "All time-tracking data for a task: the effort estimate plus every logged entry. Nothing is pre-computed — total spent, remaining, progress percent and progress colour are ALL derived in the browser, so never send them.\n\nMERGE SEMANTICS (each case verified live 2026-07-29 by PATCHing and re-reading):\n  - `time_tracking` omitted from the PATCH  -> untouched\n  - present but WITHOUT `logs`              -> existing logs PRESERVED. The Go field has no omitempty so this marshals as \"logs\":null, which looks destructive and is not.\n  - `\"logs\": []`                            -> every log CLEARED\n  - `\"logs\": [ ... ]`                        -> the array is REPLACED wholesale, never appended\n\nSo adding one entry is read-modify-write: GET the task, take time_tracking.logs, append, and send the complete array back. Sending only the new entry silently discards the rest.",
+                    "properties": {
+                        "estimate": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/TimeSpent"
+                                }
+                            ],
+                            "description": "The original effort estimate. Optional."
+                        },
+                        "logs": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/TimeLog"
+                            },
+                            "description": "Every logged entry. REPLACES the stored array on write — see the merge semantics on this schema."
+                        }
+                    }
+                },
+                "TaskActionResource": {
+                    "type": "object",
+                    "required": [
+                        "resource_id",
+                        "resource_type"
+                    ],
+                    "description": "A platform resource linked from a checklist action. Both fields are free-form strings — the service does NOT check that the resource exists.",
+                    "properties": {
+                        "resource_id": {
+                            "type": "string",
+                            "example": "risk_programme"
+                        },
+                        "resource_type": {
+                            "type": "string",
+                            "example": "record-config"
+                        },
+                        "metadata": {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "description": "Free-form metadata carried alongside the link."
+                        }
+                    }
+                },
+                "TaskAction": {
+                    "type": "object",
+                    "required": [
+                        "description"
+                    ],
+                    "description": "A checklist item hung off a task. It lives on its OWN subject (`ms.workspaces.task-action.{taskID}.{actionID}`), not as a field on the task — so it never appears in GET /workspaces/task/{id}.\n\n`description` is required on EVERY write, not just creates: AddTaskActionHandler validates it before touching the store, so a call that only means to flip `done` still has to resend it.",
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                            "description": "Action id. Omit on create and the server assigns `ta_<random>`; pass an existing id to address that action.",
+                            "example": "ta_confirm_sum_insured"
+                        },
+                        "description": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "What the action is. Required on every write.",
+                            "example": "Confirm the revised sum insured with the insured"
+                        },
+                        "done": {
+                            "type": "boolean",
+                            "description": "Whether the item is ticked off."
+                        },
+                        "resources": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/TaskActionResource"
+                            },
+                            "description": "Platform resources linked from this action."
+                        }
+                    }
+                }
+            },
+            "responses": {
+                "BadRequest": {
+                    "description": "Bad request - check that required fields are present and valid.",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "Missing required field: name"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "NotFound": {
+                    "description": "Not found - verify the resource identifier is correct.",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "error": {
+                                        "type": "string",
+                                        "example": "Space not found with id: space_001"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "securitySchemes": {
+                "bearerAuth": {
+                    "type": "http",
+                    "scheme": "bearer",
+                    "bearerFormat": "JWT",
+                    "description": "JWT token for authentication. Provide token in Authorization header as: Bearer <token> "
+                },
+                "apiKeyAuth": {
+                    "type": "apiKey",
+                    "in": "header",
+                    "name": "X-Api-Key",
+                    "description": "API Key for authentication. Provide in X-Api-Key header."
+                }
+            }
+        },
+        "x-gateway-routes-not-in-this-spec": {
+            "why": "workspaces-service exposes more through the gateway than this spec models. This spec mirrors the surface quiva-workspaces-mcp covers (spaces, tasks, comments, and now task actions). The groups below are live but each is a subsystem of its own rather than a task/space operation, so they are inventoried here instead of guessed at. Notes marked PROBED were exercised against staging on 2026-07-29; the rest are read off the handler source and are NOT verified.",
+            "files_and_folders": [
+                "GET    /workspaces/files                     microstrate.workspaces.get.files          PROBED: 200 { results, results_total }",
+                "DELETE /workspaces/files                     microstrate.workspaces.delete.file",
+                "POST   /workspaces/files/folder              microstrate.workspaces.post.folder",
+                "DELETE /workspaces/files/folder              microstrate.workspaces.delete.folder",
+                "PATCH  /workspaces/file/{name}/metadata      microstrate.workspaces.patch.file-metadata",
+                "GET    /workspaces/files/trash               microstrate.workspaces.get.trash-files    PROBED: 200 { results, results_total }",
+                "POST   /workspaces/files/restore             microstrate.workspaces.post.restore-trash",
+                "NOTE: files are addressed by a dotted path (spaces.<SPACE_ID>.<folder>...). \".\" is the hierarchy separator, so it cannot appear inside a single name segment."
+            ],
+            "file_approvals": [
+                "GET    /workspaces/approvals                 microstrate.workspaces.get.approvals      PROBED: requires ?file_subject=... (without it 400 \"file subject is required\"; `subject` and `file` are NOT accepted)",
+                "POST   /workspaces/approvals                 microstrate.workspaces.post.approval",
+                "GET    /workspaces/approvals/{id}            microstrate.workspaces.get.approval",
+                "DELETE /workspaces/approvals/{id}            microstrate.workspaces.delete.approval",
+                "PATCH  /workspaces/approvals/{id}/approve    microstrate.workspaces.patch.approval-approve   is_public: true",
+                "PATCH  /workspaces/approvals/{id}/reject     microstrate.workspaces.patch.approval-reject    is_public: true",
+                "GET    /workspaces/approvals/{id}/events     microstrate.workspaces.get.approval-events",
+                "POST   /workspaces/approvals/{id}/events     microstrate.workspaces.post.approval-event      is_public: true",
+                "NOTE: approve/reject/events are the ONLY public routes in workspaces-service — they are reachable unauthenticated so an emailed approval link works without a session. This surface overlaps the file-generator approvals that quiva-documents-mcp covers."
+            ],
+            "client_folders": [
+                "POST   /workspaces/client                    microstrate.workspaces.post.client-folder",
+                "NOTE: one call does three things (handler/client.go CreateClientFolder): creates a folder object `spaces.{space_id}.{First Last - email}` in the microstrate-workspaces bucket, registers it in the file hierarchy index, and creates a record in the `Client` record config via microstrate.records.post.record. Requires space_id + first_name + last_name + email; 409 \"folder exists\" when it already exists. Dots from the email are rewritten to \"·\" because \".\" is the path separator.",
+                "NOT PROBED: it writes into a real space AND a real record config, so exercising it needs a throwaway space."
+            ]
+        }
+    }
+}

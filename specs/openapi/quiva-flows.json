@@ -1,0 +1,1813 @@
+{
+    "name": "quiva_flows",
+    "schema": {
+        "openapi": "3.0.3",
+        "info": {
+            "title": "Workflow Management API",
+            "description": "Create, manage, publish, execute and debug workflows (flows). A workflow is a directed ACYCLIC graph: nodes (agents, functions, integrations, ...) connected by edges. Nodes with no incoming edges all start immediately in parallel; a graph with no edges runs every node simultaneously. The server does NOT detect cycles \u2014 nodes in a cycle never run.\n\nData references (JSONPath, resolved in node payloads): $.trigger (run input), $.static (static vars), $.context (run context vars), $.env.auth_token / $.env.run_id / $.env.headers, $.<NODE_ID> (full output of an upstream node), $.<NODE_ID>.result (an agent node's answer). JSONPath is NOT resolved in static-node payloads (literals only) or inside eval-node code (only eval params values are resolved).\n\nNode ids must match ^[a-zA-Z_][a-zA-Z0-9_:]*$ and must not be: trigger, static, RESOLVE_ERROR, RESOLVE_SUCCESS.\n\nTypical build sequence: GET /hub/collections (or POST to create one) -> discover subjects via GET /compute/functions and GET /hub/quiva-endpoints -> POST /hub/workflows (draft) -> POST /hub/workflows/publish -> POST /hub/workflows/run. Debug with GET /hub/workflows/errored, GET /hub/workflows/paused and POST /hub/run-logs/search. Test payload fragments first with POST /hub/test-jpath, /hub/test-eval, /hub/test-http.",
+            "version": "1.1.0"
+        },
+        "servers": [
+            {
+                "url": "https://api.quiva.ai",
+                "description": "Production"
+            },
+            {
+                "url": "https://api.microstrate.io",
+                "description": "Staging"
+            }
+        ],
+        "security": [
+            {
+                "bearerAuth": []
+            },
+            {
+                "apiKeyAuth": []
+            }
+        ],
+        "paths": {
+            "/hub/collections": {
+                "get": {
+                    "summary": "List collections",
+                    "description": "Workflows live inside a collection. Returns collection subjects needed by createWorkflow.",
+                    "operationId": "listCollections",
+                    "parameters": [
+                        {
+                            "name": "collection_type",
+                            "in": "query",
+                            "schema": {
+                                "type": "string",
+                                "enum": [
+                                    "workflow",
+                                    "node"
+                                ],
+                                "default": "workflow"
+                            }
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "List of collections: { results: [{ subject, name, description }], resultsTotal }"
+                        }
+                    }
+                },
+                "post": {
+                    "summary": "Create a collection",
+                    "operationId": "createCollection",
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "name",
+                                        "collection_type"
+                                    ],
+                                    "properties": {
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "description": {
+                                            "type": "string"
+                                        },
+                                        "collection_type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "workflow",
+                                                "node"
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Created collection including its subject"
+                        }
+                    }
+                }
+            },
+            "/hub/workflows": {
+                "get": {
+                    "summary": "List workflows",
+                    "operationId": "listWorkflows",
+                    "parameters": [
+                        {
+                            "name": "collection_topic",
+                            "in": "query",
+                            "description": "Last segment of the collection subject, e.g. '2408930879'",
+                            "schema": {
+                                "type": "string"
+                            }
+                        },
+                        {
+                            "name": "version",
+                            "in": "query",
+                            "schema": {
+                                "type": "string",
+                                "enum": [
+                                    "draft",
+                                    "published"
+                                ]
+                            }
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "{ results: [{ subject, name, description, modified }], resultsTotal }"
+                        }
+                    }
+                },
+                "post": {
+                    "summary": "Create a workflow (draft)",
+                    "description": "Creates a draft workflow in a collection. Publish it to make it executable. Server-side validation (validate=true) checks: duplicate/reserved/invalid node ids, missing payloads, edges referencing missing nodes, and that function/flow subjects exist. It does NOT check for cycles.",
+                    "operationId": "createWorkflow",
+                    "parameters": [
+                        {
+                            "name": "validate",
+                            "in": "query",
+                            "schema": {
+                                "type": "boolean",
+                                "default": true
+                            }
+                        }
+                    ],
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreateWorkflowRequest"
+                                },
+                                "examples": {
+                                    "agentEvalHttp": {
+                                        "summary": "Agent -> eval -> http chain",
+                                        "value": {
+                                            "name": "Code Expert",
+                                            "description": "Writes a JS snippet, cleans it up, posts it to Slack",
+                                            "collection": "ms.hub.config.collection.workflow.4285896071",
+                                            "config": {
+                                                "nodes": [
+                                                    {
+                                                        "id": "CODE_EXPERT",
+                                                        "data": {
+                                                            "id": "CODE_EXPERT",
+                                                            "name": "Code Expert",
+                                                            "node_type": "agent",
+                                                            "payload": {
+                                                                "agent": {
+                                                                    "name": "code_expert",
+                                                                    "llm_provider": "claude",
+                                                                    "model": "claude-haiku-4-5",
+                                                                    "behaviour": "You write concise javascript. Return only the function.",
+                                                                    "timeout": 60
+                                                                },
+                                                                "prompt": "Write a function that |$.trigger.description",
+                                                                "await": true
+                                                            }
+                                                        }
+                                                    },
+                                                    {
+                                                        "id": "CLEAN_UP",
+                                                        "data": {
+                                                            "id": "CLEAN_UP",
+                                                            "node_type": "eval",
+                                                            "payload": {
+                                                                "code": "c.replace('```javascript\\n','').replace('\\n```','')",
+                                                                "params": {
+                                                                    "c": "$.CODE_EXPERT.result"
+                                                                }
+                                                            }
+                                                        }
+                                                    },
+                                                    {
+                                                        "id": "SLACK_POST",
+                                                        "data": {
+                                                            "id": "SLACK_POST",
+                                                            "node_type": "integration",
+                                                            "integration_id": "slack",
+                                                            "request_type_id": "post_chat_postMessage",
+                                                            "oauth": "slack.myconnection",
+                                                            "payload": {
+                                                                "base_url": "https://slack.com/api",
+                                                                "url": "/chat.postMessage",
+                                                                "method": "post",
+                                                                "data": {
+                                                                    "channel": "#engineering",
+                                                                    "text": "$.CLEAN_UP"
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                ],
+                                                "edges": [
+                                                    {
+                                                        "id": "CODE_EXPERT-CLEAN_UP",
+                                                        "source": "CODE_EXPERT",
+                                                        "target": "CLEAN_UP"
+                                                    },
+                                                    {
+                                                        "id": "CLEAN_UP-SLACK_POST",
+                                                        "source": "CLEAN_UP",
+                                                        "target": "SLACK_POST"
+                                                    }
+                                                ],
+                                                "result": "$.CLEAN_UP"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Created. Returns the workflow including its draft subject (ms.hub.config.workflow.draft.{collection}.{flow}) needed for publish.",
+                            "content": {
+                                "application/json": {
+                                    "example": {
+                                        "name": "Code Expert",
+                                        "subject": "ms.hub.config.workflow.draft.4285896071.1009853675",
+                                        "collection": "ms.hub.config.collection.workflow.4285896071",
+                                        "modified": 1759180804
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "$ref": "#/components/responses/BadRequest"
+                        },
+                        "404": {
+                            "description": "Collection not found"
+                        },
+                        "409": {
+                            "description": "Workflow name already used within this collection"
+                        }
+                    }
+                }
+            },
+            "/hub/workflows/{collection_topic}/{flow_topic}": {
+                "get": {
+                    "summary": "Get a workflow",
+                    "description": "Fetch a workflow's full config (nodes, edges, static, result). Path segments are the last two parts of the workflow subject.",
+                    "operationId": "getWorkflow",
+                    "parameters": [
+                        {
+                            "$ref": "#/components/parameters/collectionTopic"
+                        },
+                        {
+                            "$ref": "#/components/parameters/flowTopic"
+                        },
+                        {
+                            "name": "draft",
+                            "in": "query",
+                            "description": "true = draft version, false = published version",
+                            "schema": {
+                                "type": "boolean",
+                                "default": true
+                            }
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "The workflow with its config"
+                        },
+                        "404": {
+                            "description": "Not found"
+                        }
+                    }
+                },
+                "patch": {
+                    "summary": "Update a workflow",
+                    "description": "Partial update (only provided fields change). Updating a published workflow creates a new draft \u2014 publish again to make changes live.",
+                    "operationId": "updateWorkflow",
+                    "parameters": [
+                        {
+                            "$ref": "#/components/parameters/collectionTopic"
+                        },
+                        {
+                            "$ref": "#/components/parameters/flowTopic"
+                        },
+                        {
+                            "name": "validate",
+                            "in": "query",
+                            "schema": {
+                                "type": "boolean",
+                                "default": true
+                            }
+                        }
+                    ],
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UpdateWorkflowRequest"
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Updated workflow"
+                        },
+                        "400": {
+                            "$ref": "#/components/responses/BadRequest"
+                        },
+                        "404": {
+                            "description": "Not found"
+                        }
+                    }
+                },
+                "delete": {
+                    "summary": "Delete a workflow",
+                    "operationId": "deleteWorkflow",
+                    "parameters": [
+                        {
+                            "$ref": "#/components/parameters/collectionTopic"
+                        },
+                        {
+                            "$ref": "#/components/parameters/flowTopic"
+                        },
+                        {
+                            "name": "keep_draft",
+                            "in": "query",
+                            "description": "true removes only the published version",
+                            "schema": {
+                                "type": "boolean",
+                                "default": false
+                            }
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Deleted"
+                        }
+                    }
+                }
+            },
+            "/hub/workflows/publish": {
+                "post": {
+                    "summary": "Publish a draft workflow",
+                    "description": "Makes the workflow executable and wires up any schedule triggers.",
+                    "operationId": "publishWorkflow",
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublishWorkflowRequest"
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Published. The runnable subject is ms.hub.config.workflow.{collection}.{flow} (drop the '.draft.' segment - the response may only contain a success message).",
+                            "content": {
+                                "application/json": {
+                                    "example": {
+                                        "success": true,
+                                        "subject": "ms.hub.config.workflow.4285896071.1009853675"
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "$ref": "#/components/responses/BadRequest"
+                        },
+                        "404": {
+                            "description": "Draft not found"
+                        }
+                    }
+                }
+            },
+            "/hub/workflows/run": {
+                "post": {
+                    "summary": "Execute a workflow",
+                    "description": "Run a published workflow. await=true returns results synchronously; await=false returns a tracking_id immediately. Resume a paused (input/human-in-the-loop) run by passing its run_id plus the human response as trigger.",
+                    "operationId": "runWorkflow",
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RunWorkflowRequest"
+                                },
+                                "examples": {
+                                    "sync": {
+                                        "summary": "Synchronous run",
+                                        "value": {
+                                            "subject": "ms.hub.config.workflow.4285896071.1009853675",
+                                            "trigger": {
+                                                "description": "reverses a string"
+                                            },
+                                            "await": true
+                                        }
+                                    },
+                                    "resumePaused": {
+                                        "summary": "Resume a paused human-in-the-loop run",
+                                        "value": {
+                                            "subject": "ms.hub.config.workflow.4285896071.1009853675",
+                                            "run_id": "ms.hub.run.uuid123.ms.hub.config.workflow.4285896071.1009853675",
+                                            "trigger": {
+                                                "approved": true
+                                            },
+                                            "await": true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Run result. { tracking_id, result }. If config.result was set, result matches that JSONPath selection; otherwise result is the step-by-step log array where items with a 'paused': true flag indicate a human-in-the-loop pause (resume with run_id).",
+                            "content": {
+                                "application/json": {
+                                    "example": {
+                                        "tracking_id": "ms.hub.run.abc123.ms.hub.config.workflow.4285896071.1009853675",
+                                        "result": "export function reverse(s){return [...s].reverse().join('')}"
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "$ref": "#/components/responses/BadRequest"
+                        },
+                        "404": {
+                            "description": "Workflow not found or not published"
+                        }
+                    }
+                }
+            },
+            "/hub/workflows/paused": {
+                "get": {
+                    "summary": "List paused workflow runs",
+                    "description": "Runs waiting on human input. Each entry includes the run_id and the paused node's message; resume via runWorkflow.",
+                    "operationId": "listPausedWorkflows",
+                    "parameters": [
+                        {
+                            "name": "flow_subject",
+                            "in": "query",
+                            "schema": {
+                                "type": "string"
+                            }
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "{ results: [...], results_total }"
+                        }
+                    }
+                }
+            },
+            "/hub/workflows/errored": {
+                "get": {
+                    "summary": "List errored workflow runs",
+                    "description": "Runs that ended in an error, including the failing node id and lookup state at failure.",
+                    "operationId": "listErroredWorkflows",
+                    "parameters": [
+                        {
+                            "name": "flow_subject",
+                            "in": "query",
+                            "schema": {
+                                "type": "string"
+                            }
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "{ results: [...], results_total }"
+                        }
+                    }
+                }
+            },
+            "/hub/run-logs/search": {
+                "post": {
+                    "summary": "Search run logs",
+                    "operationId": "searchRunLogs",
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "conditions"
+                                    ],
+                                    "properties": {
+                                        "conditions": {
+                                            "type": "array",
+                                            "description": "ANDed conditions over indexed fields: run_id, flow_topic, collection_topic, status (success|error|paused|in_progress), session_id, error, draft",
+                                            "items": {
+                                                "type": "object",
+                                                "required": [
+                                                    "field",
+                                                    "keyword"
+                                                ],
+                                                "properties": {
+                                                    "field": {
+                                                        "type": "string"
+                                                    },
+                                                    "keyword": {
+                                                        "type": "string"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "limit": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "{ results: [...] }"
+                        }
+                    }
+                }
+            },
+            "/compute/functions": {
+                "get": {
+                    "summary": "List compute functions",
+                    "description": "Discover function subjects (ms.compute.*) referenced by function nodes in data.subject.",
+                    "operationId": "listFunctions",
+                    "responses": {
+                        "200": {
+                            "description": "{ results: [{ subject, name, ... }], resultsTotal }"
+                        }
+                    }
+                }
+            },
+            "/hub/quiva-endpoints": {
+                "get": {
+                    "summary": "List Quiva endpoints",
+                    "description": "Discover endpoint subjects referenced by quiva-endpoint nodes in data.subject.",
+                    "operationId": "listQuivaEndpoints",
+                    "responses": {
+                        "200": {
+                            "description": "{ results: [...], resultsTotal }"
+                        }
+                    }
+                }
+            },
+            "/hub/test-jpath": {
+                "post": {
+                    "summary": "Test a JSONPath expression",
+                    "description": "Resolve a JSONPath expression or template object against sample lookup data using the real engine resolver. Use before building node payloads.",
+                    "operationId": "testJsonPath",
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data",
+                                        "path"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "description": "Sample lookup, e.g. { \"trigger\": {...}, \"MY_NODE\": {...} }"
+                                        },
+                                        "path": {
+                                            "description": "JSONPath string or template object, e.g. \"$.trigger.email\""
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "The resolved value"
+                        }
+                    }
+                }
+            },
+            "/hub/test-eval": {
+                "post": {
+                    "summary": "Test an eval-node payload",
+                    "operationId": "testEval",
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "code",
+                                        "params"
+                                    ],
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "description": "JavaScript expression, as in an eval node"
+                                        },
+                                        "params": {
+                                            "type": "object",
+                                            "description": "Named params usable in code; values may be JSONPath resolved against lookup"
+                                        },
+                                        "lookup": {
+                                            "type": "object",
+                                            "description": "Optional lookup data for resolving $.X references in params values"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "The eval result"
+                        }
+                    }
+                }
+            },
+            "/hub/test-http": {
+                "post": {
+                    "summary": "Test an http/integration-node request",
+                    "operationId": "testHttp",
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "url",
+                                        "method"
+                                    ],
+                                    "properties": {
+                                        "base_url": {
+                                            "type": "string"
+                                        },
+                                        "url": {
+                                            "type": "string"
+                                        },
+                                        "method": {
+                                            "type": "string"
+                                        },
+                                        "headers": {
+                                            "type": "object"
+                                        },
+                                        "params": {
+                                            "type": "object"
+                                        },
+                                        "query": {
+                                            "type": "object"
+                                        },
+                                        "data": {
+                                            "description": "Request body"
+                                        },
+                                        "lookup": {
+                                            "type": "object",
+                                            "description": "Optional lookup data for resolving $.X references in the request"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "{ status, statusText, headers, data }"
+                        }
+                    }
+                }
+            }
+        },
+        "components": {
+            "securitySchemes": {
+                "bearerAuth": {
+                    "type": "http",
+                    "scheme": "bearer",
+                    "bearerFormat": "JWT"
+                },
+                "apiKeyAuth": {
+                    "type": "apiKey",
+                    "in": "header",
+                    "name": "X-Api-Key"
+                }
+            },
+            "parameters": {
+                "collectionTopic": {
+                    "name": "collection_topic",
+                    "in": "path",
+                    "required": true,
+                    "description": "Second-to-last segment of the workflow subject",
+                    "schema": {
+                        "type": "string"
+                    }
+                },
+                "flowTopic": {
+                    "name": "flow_topic",
+                    "in": "path",
+                    "required": true,
+                    "description": "Last segment of the workflow subject",
+                    "schema": {
+                        "type": "string"
+                    }
+                }
+            },
+            "schemas": {
+                "CreateWorkflowRequest": {
+                    "type": "object",
+                    "required": [
+                        "name",
+                        "collection"
+                    ],
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Unique within the collection"
+                        },
+                        "description": {
+                            "type": "string"
+                        },
+                        "collection": {
+                            "type": "string",
+                            "description": "Collection subject: ms.hub.config.collection.workflow.{collection_id} (from listCollections)",
+                            "pattern": "^ms\\.hub\\.config\\.collection\\.workflow\\."
+                        },
+                        "config": {
+                            "$ref": "#/components/schemas/WorkflowConfig"
+                        },
+                        "secrets": {
+                            "type": "array",
+                            "description": "Secret identifiers used by this workflow",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "UpdateWorkflowRequest": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string"
+                        },
+                        "description": {
+                            "type": "string"
+                        },
+                        "archived": {
+                            "type": "boolean",
+                            "description": "Archived workflows cannot be executed"
+                        },
+                        "config": {
+                            "$ref": "#/components/schemas/WorkflowConfig"
+                        },
+                        "secrets": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "PublishWorkflowRequest": {
+                    "type": "object",
+                    "required": [
+                        "subject"
+                    ],
+                    "properties": {
+                        "subject": {
+                            "type": "string",
+                            "description": "Draft subject: ms.hub.config.workflow.draft.{collection}.{flow}",
+                            "pattern": "^ms\\.hub\\.config\\.workflow\\.draft\\."
+                        },
+                        "commit": {
+                            "type": "string",
+                            "description": "Commit message"
+                        }
+                    }
+                },
+                "RunWorkflowRequest": {
+                    "type": "object",
+                    "required": [
+                        "subject"
+                    ],
+                    "properties": {
+                        "subject": {
+                            "type": "string",
+                            "pattern": "^ms\\.hub\\.config\\.workflow\\.",
+                            "description": "Workflow subject. Published: ms.hub.config.workflow.{collection}.{flow} (NO 'published' segment - get it from listWorkflows version=published). Draft: ms.hub.config.workflow.draft.{collection}.{flow}."
+                        },
+                        "trigger": {
+                            "type": "object",
+                            "description": "Run input, referenced in nodes via $.trigger"
+                        },
+                        "triggers": {
+                            "type": "array",
+                            "description": "Batch execution (use either trigger or triggers)",
+                            "items": {
+                                "type": "object"
+                            }
+                        },
+                        "await": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "true = wait for completion and return results; false = return tracking_id immediately"
+                        },
+                        "enable_log": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Store detailed run logs (searchable via searchRunLogs)"
+                        },
+                        "knowledge": {
+                            "type": "array",
+                            "description": "Knowledge URIs for agents: kv://, obj://, str://, sid://, dta://",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "session_id": {
+                            "type": "string",
+                            "description": "Agent conversation continuity; omit for new sessions"
+                        },
+                        "run_id": {
+                            "type": "string",
+                            "description": "Tracking id of a paused run to resume (human-in-the-loop)"
+                        },
+                        "retry": {
+                            "type": "boolean",
+                            "description": "Retry a failed run"
+                        }
+                    }
+                },
+                "WorkflowConfig": {
+                    "type": "object",
+                    "description": "The execution graph. Must be acyclic (not server-checked). Nodes run in topological order; condition nodes can alter the path.",
+                    "properties": {
+                        "nodes": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/NodeWorkflow"
+                            }
+                        },
+                        "edges": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/Edge"
+                            }
+                        },
+                        "static": {
+                            "type": "object",
+                            "description": "Static variables accessible via $.static"
+                        },
+                        "result": {
+                            "type": "string",
+                            "description": "JSONPath selecting the run's return value, e.g. '$.FINAL_NODE.result'. Without it the run returns the full step log array."
+                        },
+                        "options": {
+                            "type": "object",
+                            "properties": {
+                                "run_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "normal",
+                                        "debounced",
+                                        "ordered"
+                                    ]
+                                },
+                                "order_on": {
+                                    "type": "string",
+                                    "description": "JSONPath key for run_type=ordered"
+                                },
+                                "debounce_on": {
+                                    "type": "string",
+                                    "description": "JSONPath key for run_type=debounced"
+                                },
+                                "debounce_time": {
+                                    "type": "integer",
+                                    "description": "ms"
+                                },
+                                "debounce_max": {
+                                    "type": "integer",
+                                    "description": "ms"
+                                }
+                            }
+                        }
+                    }
+                },
+                "NodeWorkflow": {
+                    "type": "object",
+                    "required": [
+                        "id",
+                        "data"
+                    ],
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                            "description": "Must equal data.id"
+                        },
+                        "data": {
+                            "$ref": "#/components/schemas/NodeData"
+                        },
+                        "position": {
+                            "type": "object",
+                            "description": "Optional visual editor position { x, y }"
+                        }
+                    }
+                },
+                "NodeData": {
+                    "description": "Node definition. id: unique, ^[a-zA-Z_][a-zA-Z0-9_:]*$, not a reserved word (trigger, static, RESOLVE_ERROR, RESOLVE_SUCCESS). payload is REQUIRED on every node type. Reference a node's output downstream via $.{id}.",
+                    "discriminator": {
+                        "propertyName": "node_type",
+                        "mapping": {
+                            "trigger": "#/components/schemas/TriggerNodeData",
+                            "agent": "#/components/schemas/AgentNodeData",
+                            "function": "#/components/schemas/FunctionNodeData",
+                            "integration": "#/components/schemas/IntegrationNodeData",
+                            "http": "#/components/schemas/HttpNodeData",
+                            "flow": "#/components/schemas/FlowNodeData",
+                            "eval": "#/components/schemas/EvalNodeData",
+                            "condition": "#/components/schemas/ConditionNodeData",
+                            "rules": "#/components/schemas/RulesNodeData",
+                            "map": "#/components/schemas/MapNodeData",
+                            "static": "#/components/schemas/StaticNodeData",
+                            "delay": "#/components/schemas/DelayNodeData",
+                            "schedule": "#/components/schemas/ScheduleNodeData",
+                            "input": "#/components/schemas/InputNodeData",
+                            "human-in-the-loop": "#/components/schemas/HumanInTheLoopNodeData",
+                            "quiva-endpoint": "#/components/schemas/QuivaEndpointNodeData",
+                            "error": "#/components/schemas/ErrorNodeData"
+                        }
+                    },
+                    "oneOf": [
+                        {
+                            "$ref": "#/components/schemas/TriggerNodeData"
+                        },
+                        {
+                            "$ref": "#/components/schemas/AgentNodeData"
+                        },
+                        {
+                            "$ref": "#/components/schemas/FunctionNodeData"
+                        },
+                        {
+                            "$ref": "#/components/schemas/IntegrationNodeData"
+                        },
+                        {
+                            "$ref": "#/components/schemas/HttpNodeData"
+                        },
+                        {
+                            "$ref": "#/components/schemas/FlowNodeData"
+                        },
+                        {
+                            "$ref": "#/components/schemas/EvalNodeData"
+                        },
+                        {
+                            "$ref": "#/components/schemas/ConditionNodeData"
+                        },
+                        {
+                            "$ref": "#/components/schemas/RulesNodeData"
+                        },
+                        {
+                            "$ref": "#/components/schemas/MapNodeData"
+                        },
+                        {
+                            "$ref": "#/components/schemas/StaticNodeData"
+                        },
+                        {
+                            "$ref": "#/components/schemas/DelayNodeData"
+                        },
+                        {
+                            "$ref": "#/components/schemas/ScheduleNodeData"
+                        },
+                        {
+                            "$ref": "#/components/schemas/InputNodeData"
+                        },
+                        {
+                            "$ref": "#/components/schemas/HumanInTheLoopNodeData"
+                        },
+                        {
+                            "$ref": "#/components/schemas/QuivaEndpointNodeData"
+                        },
+                        {
+                            "$ref": "#/components/schemas/ErrorNodeData"
+                        }
+                    ]
+                },
+                "NodeDataCommon": {
+                    "type": "object",
+                    "required": [
+                        "id",
+                        "node_type",
+                        "payload"
+                    ],
+                    "properties": {
+                        "id": {
+                            "type": "string"
+                        },
+                        "name": {
+                            "type": "string"
+                        },
+                        "description": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "TriggerNodeData": {
+                    "description": "Entry-point metadata for the visual editor. SKIPPED at runtime \u2014 optional; run input arrives via the run request 'trigger' field ($.trigger), not through this node.",
+                    "allOf": [
+                        {
+                            "$ref": "#/components/schemas/NodeDataCommon"
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "node_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "trigger"
+                                    ]
+                                },
+                                "trigger_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "manual",
+                                        "schedule",
+                                        "webhook",
+                                        "embed"
+                                    ]
+                                },
+                                "payload": {
+                                    "type": "object",
+                                    "description": "Config varies by trigger_type; {} for manual"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "AgentNodeData": {
+                    "description": "Invoke an LLM agent. The inline definition MUST be nested under payload.agent \u2014 flat payloads (api_key/llm_provider/model at payload top level) are silently dropped at runtime and the node fails with 'a subject, node_subject or agent property is required'. IMPORTANT: the node output at $.{id}.result is a JSON-ENCODED STRING even when output_schema is set \u2014 add an eval node to JSON.parse it before branching on its fields.",
+                    "allOf": [
+                        {
+                            "$ref": "#/components/schemas/NodeDataCommon"
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "node_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "agent"
+                                    ]
+                                },
+                                "payload": {
+                                    "type": "object",
+                                    "description": "One of 'agent' (inline definition), 'subject' (saved agent subject) or 'node_subject' (agent node template) is required. prompt/await live at this level, NOT inside agent.",
+                                    "properties": {
+                                        "agent": {
+                                            "type": "object",
+                                            "required": [
+                                                "name",
+                                                "llm_provider",
+                                                "model"
+                                            ],
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string",
+                                                    "description": "Agent identifier, e.g. 'kyc_risk_assessment'"
+                                                },
+                                                "llm_provider": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "claude",
+                                                        "anthropic"
+                                                    ],
+                                                    "description": "The invoke handler only supports claude/anthropic"
+                                                },
+                                                "model": {
+                                                    "type": "string",
+                                                    "description": "Platform catalog alias, e.g. 'claude-sonnet-4-6', 'claude-haiku-4-5'"
+                                                },
+                                                "description": {
+                                                    "type": "string"
+                                                },
+                                                "behaviour": {
+                                                    "type": "string",
+                                                    "description": "System prompt"
+                                                },
+                                                "output_schema": {
+                                                    "type": "object",
+                                                    "description": "Flat map of field -> short description; forces structured JSON output (still delivered as a JSON string in result)",
+                                                    "additionalProperties": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "has_tools": {
+                                                    "type": "boolean"
+                                                },
+                                                "tools": {
+                                                    "type": "array",
+                                                    "description": "mcp://integration, fun://function, bit://tool (e.g. bit://web_search)",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "knowledge": {
+                                                    "type": "array",
+                                                    "description": "kv://bucket/doc, obj://bucket/doc, str://stream/start/end, sid://session_id, dta://data",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "timeout": {
+                                                    "type": "number",
+                                                    "description": "seconds"
+                                                }
+                                            }
+                                        },
+                                        "subject": {
+                                            "type": "string",
+                                            "description": "Saved agent subject (alternative to inline 'agent')"
+                                        },
+                                        "node_subject": {
+                                            "type": "string",
+                                            "description": "Agent node template subject (alternative to inline 'agent')"
+                                        },
+                                        "prompt": {
+                                            "description": "string or object; supports JSONPath, e.g. 'Summarise |$.trigger.text'. Empty = the raw trigger is used as the prompt.",
+                                            "oneOf": [
+                                                {
+                                                    "type": "string"
+                                                },
+                                                {
+                                                    "type": "object"
+                                                }
+                                            ]
+                                        },
+                                        "await": {
+                                            "type": "boolean"
+                                        },
+                                        "knowledge": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "FunctionNodeData": {
+                    "description": "Invoke a compute function. subject is REQUIRED and must exist \u2014 discover via GET /compute/functions.",
+                    "allOf": [
+                        {
+                            "$ref": "#/components/schemas/NodeDataCommon"
+                        },
+                        {
+                            "type": "object",
+                            "required": [
+                                "subject"
+                            ],
+                            "properties": {
+                                "node_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "function"
+                                    ]
+                                },
+                                "subject": {
+                                    "type": "string",
+                                    "pattern": "^ms\\.compute\\."
+                                },
+                                "payload": {
+                                    "description": "Function input (any JSON); JSONPath supported, e.g. '$.PREV_NODE'"
+                                },
+                                "response_map": {
+                                    "description": "Optional JSONPath mapping applied to the function output"
+                                },
+                                "options": {
+                                    "$ref": "#/components/schemas/NodeOptions"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "IntegrationNodeData": {
+                    "description": "HTTP request to a third-party API, optionally via an OAuth connection. Result shape: { status, statusText, headers, data }. 4xx/5xx responses become node errors (tolerate/retry via options).",
+                    "allOf": [
+                        {
+                            "$ref": "#/components/schemas/NodeDataCommon"
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "node_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "integration"
+                                    ]
+                                },
+                                "integration_id": {
+                                    "type": "string",
+                                    "description": "e.g. 'slack'"
+                                },
+                                "request_type_id": {
+                                    "type": "string",
+                                    "description": "e.g. 'post_chat_postMessage'"
+                                },
+                                "oauth": {
+                                    "type": "string",
+                                    "description": "OAuth connection identifier"
+                                },
+                                "payload": {
+                                    "$ref": "#/components/schemas/HttpPayload"
+                                },
+                                "options": {
+                                    "$ref": "#/components/schemas/NodeOptions"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "HttpNodeData": {
+                    "description": "Plain HTTP request (no OAuth metadata). Same payload and behaviour as integration.",
+                    "allOf": [
+                        {
+                            "$ref": "#/components/schemas/NodeDataCommon"
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "node_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "http"
+                                    ]
+                                },
+                                "payload": {
+                                    "$ref": "#/components/schemas/HttpPayload"
+                                },
+                                "options": {
+                                    "$ref": "#/components/schemas/NodeOptions"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "HttpPayload": {
+                    "type": "object",
+                    "required": [
+                        "url",
+                        "method"
+                    ],
+                    "description": "JSONPath supported in all fields. IMPORTANT: the base URL key is snake_case 'base_url' \u2014 a 'baseURL' key is silently ignored.",
+                    "properties": {
+                        "base_url": {
+                            "type": "string",
+                            "description": "Joined with url; snake_case, NOT baseURL"
+                        },
+                        "url": {
+                            "type": "string",
+                            "description": "Path or full URL"
+                        },
+                        "method": {
+                            "type": "string",
+                            "description": "GET/POST/PUT/DELETE/PATCH... (case-insensitive)"
+                        },
+                        "data": {
+                            "type": "object",
+                            "description": "Request body"
+                        },
+                        "params": {
+                            "type": "object"
+                        },
+                        "query": {
+                            "type": "object"
+                        },
+                        "headers": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        },
+                        "timeout": {
+                            "type": "integer",
+                            "description": "ms (default 30000)"
+                        }
+                    }
+                },
+                "FlowNodeData": {
+                    "description": "Invoke another published workflow as a sub-flow. subject is REQUIRED and must exist.",
+                    "allOf": [
+                        {
+                            "$ref": "#/components/schemas/NodeDataCommon"
+                        },
+                        {
+                            "type": "object",
+                            "required": [
+                                "subject"
+                            ],
+                            "properties": {
+                                "node_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "flow"
+                                    ]
+                                },
+                                "subject": {
+                                    "type": "string",
+                                    "pattern": "^ms\\.hub\\.config\\.workflow\\.",
+                                    "description": "Sub-workflow subject: ms.hub.config.workflow.{collection}.{flow} (published form, no 'published' segment); must exist"
+                                },
+                                "payload": {
+                                    "description": "Passed as the sub-flow trigger; JSONPath supported"
+                                },
+                                "await": {
+                                    "type": "boolean",
+                                    "description": "Wait for sub-flow completion"
+                                },
+                                "response_map": {
+                                    "description": "Optional JSONPath mapping over the sub-flow output"
+                                },
+                                "options": {
+                                    "$ref": "#/components/schemas/NodeOptions"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "EvalNodeData": {
+                    "description": "Run a JavaScript expression over named params.",
+                    "allOf": [
+                        {
+                            "$ref": "#/components/schemas/NodeDataCommon"
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "node_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "eval"
+                                    ]
+                                },
+                                "payload": {
+                                    "type": "object",
+                                    "required": [
+                                        "code",
+                                        "params"
+                                    ],
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "description": "Plain JavaScript expression \u2014 JSONPath is NOT resolved inside code"
+                                        },
+                                        "params": {
+                                            "type": "object",
+                                            "description": "Named params usable in code; each VALUE is JSONPath-resolved, e.g. { \"c\": \"$.AGENT.result\" }",
+                                            "additionalProperties": true
+                                        }
+                                    }
+                                },
+                                "options": {
+                                    "$ref": "#/components/schemas/NodeOptions"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "ConditionNodeData": {
+                    "description": "Branching. Evaluates rules and activates the listed node ids; non-selected branches are skipped. Reserved targets: RESOLVE_SUCCESS (end flow ok), RESOLVE_ERROR (fail flow). Any other target must be an existing node id, and you should also add edges from this node to each then/else target.",
+                    "allOf": [
+                        {
+                            "$ref": "#/components/schemas/NodeDataCommon"
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "node_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "condition"
+                                    ]
+                                },
+                                "payload": {
+                                    "type": "object",
+                                    "properties": {
+                                        "rules": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "if": {
+                                                        "type": "string",
+                                                        "description": "JSONPath boolean expression, e.g. \"$.FETCH.status == 200\""
+                                                    },
+                                                    "then": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "else": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "string"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "RulesNodeData": {
+                    "description": "Evaluate a rules object against facts/context; output is { <ruleKey>: outcome }.",
+                    "allOf": [
+                        {
+                            "$ref": "#/components/schemas/NodeDataCommon"
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "node_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "rules"
+                                    ]
+                                },
+                                "payload": {
+                                    "type": "object",
+                                    "required": [
+                                        "rules"
+                                    ],
+                                    "properties": {
+                                        "rules": {
+                                            "type": "object",
+                                            "description": "Rules map (same engine as condition nodes)"
+                                        },
+                                        "facts": {
+                                            "type": "object"
+                                        },
+                                        "context": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "MapNodeData": {
+                    "description": "Reshape data: the payload template is JSONPath-resolved and becomes the node output.",
+                    "allOf": [
+                        {
+                            "$ref": "#/components/schemas/NodeDataCommon"
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "node_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "map"
+                                    ]
+                                },
+                                "payload": {
+                                    "description": "Object or array template; string values may be JSONPath references",
+                                    "oneOf": [
+                                        {
+                                            "type": "object"
+                                        },
+                                        {
+                                            "type": "array",
+                                            "items": {}
+                                        }
+                                    ]
+                                },
+                                "options": {
+                                    "type": "object",
+                                    "properties": {
+                                        "flat_map": {
+                                            "type": "boolean",
+                                            "description": "Flatten array results"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "StaticNodeData": {
+                    "description": "Merge literal values into $.static. LITERALS ONLY \u2014 JSONPath is not resolved in this payload.",
+                    "allOf": [
+                        {
+                            "$ref": "#/components/schemas/NodeDataCommon"
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "node_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "static"
+                                    ]
+                                },
+                                "payload": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            }
+                        }
+                    ]
+                },
+                "DelayNodeData": {
+                    "description": "Pause the branch for time_ms milliseconds. The node type is 'delay' \u2014 'wait' is NOT a valid type (the engine silently ignores it).",
+                    "allOf": [
+                        {
+                            "$ref": "#/components/schemas/NodeDataCommon"
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "node_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "delay"
+                                    ]
+                                },
+                                "payload": {
+                                    "type": "object",
+                                    "required": [
+                                        "time_ms"
+                                    ],
+                                    "properties": {
+                                        "time_ms": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "description": "Milliseconds; supports JSONPath"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "ScheduleNodeData": {
+                    "description": "Schedule another workflow run for later.",
+                    "allOf": [
+                        {
+                            "$ref": "#/components/schemas/NodeDataCommon"
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "node_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "schedule"
+                                    ]
+                                },
+                                "payload": {
+                                    "type": "object",
+                                    "required": [
+                                        "flow_subject",
+                                        "trigger"
+                                    ],
+                                    "properties": {
+                                        "flow_subject": {
+                                            "type": "string",
+                                            "description": "Workflow subject to schedule; supports JSONPath"
+                                        },
+                                        "trigger": {
+                                            "description": "Trigger data for the scheduled run; supports JSONPath"
+                                        },
+                                        "trigger_in": {
+                                            "type": "string",
+                                            "description": "Relative delay, e.g. '5m', '1h', '2d'",
+                                            "pattern": "^\\d+[smhd]$"
+                                        },
+                                        "trigger_on": {
+                                            "type": "string",
+                                            "description": "Cron expression or ISO date"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "InputNodeData": {
+                    "description": "Pause the flow for human input: creates an escalation task (emailing assignees) and pauses. Resume via runWorkflow with the run_id and the human response as trigger \u2014 that response becomes this node's output.",
+                    "allOf": [
+                        {
+                            "$ref": "#/components/schemas/NodeDataCommon"
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "node_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "input"
+                                    ]
+                                },
+                                "payload": {
+                                    "$ref": "#/components/schemas/EscalationPayload"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "HumanInTheLoopNodeData": {
+                    "description": "Alias of 'input': pause for human approval/input via an escalation task.",
+                    "allOf": [
+                        {
+                            "$ref": "#/components/schemas/NodeDataCommon"
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "node_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "human-in-the-loop"
+                                    ]
+                                },
+                                "payload": {
+                                    "$ref": "#/components/schemas/EscalationPayload"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "EscalationPayload": {
+                    "type": "object",
+                    "required": [
+                        "message"
+                    ],
+                    "properties": {
+                        "message": {
+                            "type": "string",
+                            "description": "Prompt for the human; supports JSONPath"
+                        },
+                        "title": {
+                            "type": "string",
+                            "description": "Escalation task title"
+                        },
+                        "description": {
+                            "type": "string"
+                        },
+                        "priority": {
+                            "type": "string"
+                        },
+                        "assignees": {
+                            "type": "string",
+                            "description": "Comma-separated user ids; each is notified by email"
+                        }
+                    }
+                },
+                "QuivaEndpointNodeData": {
+                    "description": "Invoke a Quiva endpoint. subject is REQUIRED \u2014 discover via GET /hub/quiva-endpoints.",
+                    "allOf": [
+                        {
+                            "$ref": "#/components/schemas/NodeDataCommon"
+                        },
+                        {
+                            "type": "object",
+                            "required": [
+                                "subject"
+                            ],
+                            "properties": {
+                                "node_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "quiva-endpoint"
+                                    ]
+                                },
+                                "subject": {
+                                    "type": "string"
+                                },
+                                "payload": {
+                                    "description": "Passed to the endpoint; JSONPath supported"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "ErrorNodeData": {
+                    "description": "Terminate the flow with an error status code and message.",
+                    "allOf": [
+                        {
+                            "$ref": "#/components/schemas/NodeDataCommon"
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "node_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "error"
+                                    ]
+                                },
+                                "payload": {
+                                    "type": "object",
+                                    "required": [
+                                        "status_code"
+                                    ],
+                                    "properties": {
+                                        "status_code": {
+                                            "type": "integer"
+                                        },
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "NodeOptions": {
+                    "type": "object",
+                    "description": "Execution options for function/flow/integration/http nodes",
+                    "properties": {
+                        "flat_map": {
+                            "type": "boolean",
+                            "description": "Flatten array results"
+                        },
+                        "backoff_ms": {
+                            "type": "integer",
+                            "description": "Delay between retries (ms)"
+                        },
+                        "timeout": {
+                            "type": "integer",
+                            "description": "ms"
+                        },
+                        "attempts": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 10,
+                            "description": "Retry attempts on failure"
+                        },
+                        "ignore_response_codes": {
+                            "type": "array",
+                            "description": "HTTP status codes treated as success",
+                            "items": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                },
+                "Edge": {
+                    "type": "object",
+                    "required": [
+                        "id",
+                        "source",
+                        "target"
+                    ],
+                    "properties": {
+                        "id": {
+                            "type": "string"
+                        },
+                        "source": {
+                            "type": "string",
+                            "description": "Source node id"
+                        },
+                        "target": {
+                            "type": "string",
+                            "description": "Target node id"
+                        }
+                    }
+                },
+                "Error": {
+                    "type": "object",
+                    "properties": {
+                        "error": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "responses": {
+                "BadRequest": {
+                    "description": "Invalid request or validation failure, e.g. { \"error\": \"duplicate node id found: CODE_EXPERT\" }",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Error"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
