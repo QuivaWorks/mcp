@@ -8,19 +8,23 @@
   },
   "teaches": [
     "2 real tasks with server-generated ids ({SPACEID}-{n})",
-    "task fields in live use: priority, status, time_tracking, due_date, description",
+    "task fields in live use: priority, status, time_tracking, due_date, description, reporter",
     "status values reference the SPACE's status ids: in_review, awaiting_info",
     "priority values reference the SPACE's priority ids: urgent, routine",
     "url is server-built: /en/hub/spaces/{SPACE}/tasks?task={TASK-ID}"
   ],
   "tasks": [
     {
+      "assignees": [
+        "<<REDACTED:user-id>>"
+      ],
       "created_at": "2026-07-29T10:31:33Z",
       "created_by": "<<REDACTED:user-id>>",
       "description": "Expiring 2027-08-01. Confirm sum insured and re-rate before issuing terms.",
       "due_date": "2026-08-15T00:00:00Z",
       "id": "MCP_VERIFICATION_RENEWALS-1",
       "priority": "urgent",
+      "reporter": "<<REDACTED:user-id>>",
       "space_id": "MCP_VERIFICATION_RENEWALS",
       "status": "in_review",
       "tags": [
@@ -28,14 +32,14 @@
       ],
       "time_tracking": {
         "estimate": {
-          "time_in_seconds": 7200
+          "time_in_seconds": 14400
         },
         "logs": [
           {
-            "created_at": "2026-07-29T10:05:00Z",
-            "description": "Reviewed the expiring schedule and pulled last year's rating",
-            "id": "time_log_7c1f0e2a-2b44-4a1e-9f0d-3d5a6b8c1120",
-            "started_at": "2026-07-29T09:00:00Z",
+            "created_at": "2026-07-30T09:05:00Z",
+            "description": "probe A",
+            "id": "tl_x1",
+            "started_at": "2026-07-30T09:00:00Z",
             "time_spent": {
               "time_in_seconds": 3600
             },
@@ -45,10 +49,10 @@
             }
           },
           {
-            "created_at": "2026-07-29T13:35:00Z",
-            "description": "Called the broker to confirm the revised sum insured",
-            "id": "time_log_1d9b4f56-6c0e-4f7a-b2a1-8e4c7d905311",
-            "started_at": "2026-07-29T13:00:00Z",
+            "created_at": "2026-07-30T09:35:00Z",
+            "description": "probe B",
+            "id": "tl_x2",
+            "started_at": "2026-07-30T09:30:00Z",
             "time_spent": {
               "time_in_seconds": 1800
             },
@@ -57,10 +61,13 @@
               "name": "<<REDACTED:person-name>>"
             }
           }
-        ]
+        ],
+        "spent": {
+          "time_in_seconds": 5400
+        }
       },
       "title": "Renewal review — Ridgeline Constructions (POL-2026-0087)",
-      "updated_at": "2026-07-29T15:09:38Z",
+      "updated_at": "2026-07-30T10:25:15Z",
       "url": "https://app.microstrate.io/en/hub/spaces/MCP_VERIFICATION_RENEWALS/tasks?task=MCP_VERIFICATION_RENEWALS-1"
     },
     {

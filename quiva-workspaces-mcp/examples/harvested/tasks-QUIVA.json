@@ -4,11 +4,11 @@
   "source": {
     "environment": "https://api.microstrate.io",
     "space_id": "QUIVA",
-    "harvested_from": "GET /workspaces/space/QUIVA/tasks (4 of 7 kept)"
+    "harvested_from": "GET /workspaces/space/QUIVA/tasks (4 of 8 kept)"
   },
   "teaches": [
     "4 real tasks with server-generated ids ({SPACEID}-{n})",
-    "task fields in live use: priority, status, folder, order, due_date, description, reporter",
+    "task fields in live use: priority, status, folder, order, time_tracking, due_date, description, reporter",
     "status values reference the SPACE's status ids: done, review, in_progress, backlog",
     "priority values reference the SPACE's priority ids: highest, medium",
     "url is server-built: /en/hub/spaces/{SPACE}/tasks?task={TASK-ID}"
@@ -61,8 +61,28 @@
       "order": 2000,
       "space_id": "QUIVA",
       "status": "in_progress",
+      "time_tracking": {
+        "estimate": {
+          "time_in_seconds": 0
+        },
+        "logs": [
+          {
+            "created_at": "2026-07-30T09:13:53.022Z",
+            "id": "time_log_0bc44929-e7f3-4381-95e8-076f9cab5462",
+            "started_at": "2026-07-30T09:13:40.496Z",
+            "time_spent": {
+              "time_in_seconds": 144000
+            },
+            "updated_at": "2026-07-30T09:13:53.022Z",
+            "user": {
+              "id": "<<REDACTED:user-id>>",
+              "name": "<<REDACTED:person-name>>"
+            }
+          }
+        ]
+      },
       "title": "Rehouse the 2 little pigs in a house made of bricks",
-      "updated_at": "2026-07-20T12:08:40Z",
+      "updated_at": "2026-07-30T09:13:53Z",
       "url": "https://app.microstrate.io/en/hub/spaces/QUIVA/tasks?task=QUIVA-5"
     },
     {
@@ -75,8 +95,13 @@
       "priority": "medium",
       "space_id": "QUIVA",
       "status": "backlog",
+      "time_tracking": {
+        "estimate": {
+          "time_in_seconds": 18000
+        }
+      },
       "title": "test",
-      "updated_at": "2026-07-27T08:35:29Z",
+      "updated_at": "2026-07-30T09:51:18Z",
       "url": "https://app.microstrate.io/en/hub/spaces/QUIVA/tasks?task=QUIVA-11"
     }
   ]

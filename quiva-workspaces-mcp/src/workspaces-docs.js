@@ -38,6 +38,14 @@ export const GOTCHAS = [
   'list_spaces always includes a built-in space `{ id: "ESCALATE", name: "Escalations" }` that is injected by the engine. It cannot be updated or deleted (both return 403). Do not try to manage it.',
   // Auth reality.
   'Core space/task/comment CRUD works with an API key alone, and REACTIONS are attributed correctly with a key too (verified live 2026-07-30: the reaction came back keyed to the account the API key resolves to, contradicting an earlier note here). Attribution fields on other resources (space `owner`, task `created_by`, comment `author`) still appear to need a Bearer JWT. Prefer bearer/email auth. (The my-tasks / watch / mute / export endpoints are Bearer-only 401, but they are not exposed by this MCP.)',
+  // Files: dotted paths, and the marker rename that a source read gets wrong.
+  'Space FILES are addressed by a DOTTED path — `spaces.<SPACE_ID>.<folder>.<subfolder>.<name>.<ext>`. `.` is the hierarchy separator, so no single name segment may contain one. A FOLDER is not a directory: it is a marker object at `<path>.<marker>.json` holding only `{created_at, created_by}`, and the marker filename was RENAMED from `metadata.json` to `__meta__.json` (evari-olympus 3a7ab968b "Files refactor signature approvals metadata" #1291, 2026-07-31; the frontend agrees — folder-metadata.utils.ts FOLDER_METADATA_FILENAME). Watched happen live: VERTICAL markers read as `metadata.json` early on 2026-07-31 and as `__meta__.json` an hour later, so existing markers were MIGRATED in place, not left behind. Write `__meta__.json`, but keep accepting `metadata.json` — accounts-service still skips both suffixes, and an unmigrated space may still hold the old name. A checkout predating the rename gives the WRONG answer straight from the handler source, which is why this was caught by writing a folder and looking, not by reading files.go.',
+  // Files: an index entry's name can be blank. This one silently breaks polling.
+  'A file-index entry\'s `name` can be EMPTY while its `subject` is correct — observed live 2026-07-31 on ALL TWELVE folder markers in the VERTICAL space right after the #1291 rename migrated them, while markers created natively by the new code kept their name. THE SUBJECT IS THE AUTHORITATIVE KEY: it is `ms.workspace-files.` followed by one base64 RawStdEncoding segment per path segment, and the engine itself decodes it in exactly this situation (DeleteFolderHandler falls back to transform.ObjKeyUnsafe when Name is ""). Consequences: anything matching on `name` will not see those folders at all — a poll-until-indexed loop keyed on `name` waits forever for a key that is already present — and the `search` query param matches the stored name, so it cannot find them either. list_files therefore adds a resolved `key` to every entry; read `key`, not `name`. Deployment is NOT affected: an empty name fails both the marker-suffix and the vertical-prefix test in deployVerticals, so those entries are skipped, which is what should happen to a marker anyway.',
+  // Files: the two sinks, and the async index. This is the operational trap.
+  'A file write has TWO sinks: the object BUCKET and the file INDEX. `GET /workspaces/files` lists the INDEX, and so does the vertical deployer (accounts-service deployVerticals), so a file present in the bucket but missing from the index is readable by key and invisible to everything that matters. Writing an object DOES self-register — you do not need `/workspaces/files/file-record` (the UI never calls it; that route and `/sync-files` are repair paths). BUT INDEXING IS ASYNCHRONOUS: verified live twice, a config object was absent from the index at t+1s and present at t+16s, and a nested folder took minutes. create_folder also returns NO body at all (`response.Success(request)`). So "written" means "appears in the index" — poll for it; never write and immediately act on it.',
+  // Files: deletes are deliberately not exposed.
+  'DELETE of a file or folder is deliberately NOT exposed by this MCP, because it has never been exercised — and `delete_workflow` in the flows MCP silently orphaned every draft it "deleted" while returning success (docs/lessons.md). From the source only, therefore UNVERIFIED: params go in the QUERY STRING not the body (`?space_id=&folder=&subfolder=`), it is RECURSIVE over everything nested, it is a SOFT delete (each object is copied to a trash bucket, then removed, then unindexed), it hard-requires a Bearer JWT (`helper.GetAuthToken` failure is a 401, unlike create which tolerates its absence), and a partial failure returns 400 while KEEPING whatever it already deleted. Delete by hand if you must, then verify by re-listing rather than trusting the response.',
   // Foreign endpoint.
   'list_users hits /accounts/users/list — that is the ACCOUNTS service (microstrate.accounts.get.list-users-by-account), not workspaces. It is included only to resolve user ids for assignees/reporters. It returns `{ data: [ {id, email, first_name, last_name, role, ...} ] }`.',
 ];
@@ -117,6 +125,31 @@ const UPDATE_TASK_EXAMPLE = {
   status: 'in_progress',
   priority: 'high',
   assignees: ['user_123'],
+};
+
+// --- Files, folders, and the vertical template space ------------------------
+
+// The shared space holding per-vertical template configs.
+// accounts-service/data/const.go VerticalSpaceID.
+const VERTICAL_SPACE_ID = 'VERTICAL';
+
+// A folder marker object. `__meta__.json` is current (evari-olympus 3a7ab968b,
+// 2026-07-31); `metadata.json` is what folders created before that day carry.
+// Both are live in the same space, and accounts-service skips BOTH suffixes when
+// deploying (updateaccount.go), so neither is ever treated as a config.
+const FOLDER_MARKERS = ['__meta__.json', 'metadata.json'];
+
+// The ONLY six folder names accounts-service will deploy from, and the endpoint
+// each is forwarded to. Transcribed from accounts-service/accounts/updateaccount.go
+// (`configTypeToEndpointSubject`), so it is a WARNING not an error when a folder
+// name is not on this list — the list can grow upstream without us noticing.
+const VERTICAL_CONFIG_TYPES = {
+  assistants: 'microstrate.hub.post.agent',
+  flows: 'microstrate.hub.post.workflow',
+  record_configs: 'microstrate.records.post.config',
+  document_templates: 'microstrate.file-generator.post.template',
+  meeting_templates: 'microstrate.recall.post.summarization-template',
+  spaces: 'microstrate.workspaces.post.space',
 };
 
 const REFERENCE = {
@@ -267,6 +300,86 @@ const REFERENCE = {
       '  CLIENT FOLDERS — POST /workspaces/client. One call does three things: creates a folder object `spaces.{space_id}.{First Last - email}` in the microstrate-workspaces bucket, registers it in the file hierarchy index, and creates a record in the `Client` record config via the records service. Requires space_id + first_name + last_name + email; 409 "folder exists" if it is already there. Dots in the folder name (from the email) are rewritten to "·" because "." is the path separator. Not probed live — it writes into a real space AND a real record config, so exercising it needs a throwaway space.',
     ],
   },
+  'files': {
+    summary:
+      'Space files and folders: the dotted path scheme, how a folder is really stored, the two sinks a write lands in, and why you must poll after writing.',
+    path_scheme: {
+      shape: 'spaces.<SPACE_ID>.<folder>[.<subfolder>...].<name>.<ext>',
+      separator:
+        '`.` is the hierarchy separator, so NO single name segment may contain a dot. A vertical id, a category folder and a config name must all be dot-free; only the file extension adds one.',
+      space_id: 'Uppercased, like every space id (^\\w+$).',
+      note: 'Live keys DO contain spaces — `spaces.FAHUB.<Owner Name>.<file>.pdf` — so keys must be percent-encoded in a URL. This client does that.',
+    },
+    a_folder_is_a_marker_object: {
+      what:
+        'There are no directories. `create_folder` writes a single small object at `<path>.<marker>.json` containing only `{ created_at, created_by }`, and the UI derives the tree from the set of keys.',
+      current_marker: '__meta__.json',
+      legacy_marker: 'metadata.json',
+      why_both:
+        'Renamed in evari-olympus 3a7ab968b (#1291, 2026-07-31), and existing markers were MIGRATED in place — watched live, VERTICAL read as metadata.json and an hour later as __meta__.json. Write the new name; keep accepting the old one, since accounts-service skips both suffixes and an unmigrated space may still hold it.',
+      consequence:
+        'A newly created folder renders as EMPTY in the UI Files tab — correct, not a failure. The marker is filtered out of the tree.',
+      name_can_be_blank:
+        'A migrated marker\'s index entry has an EMPTY `name` while its `subject` is correct. The subject is `ms.workspace-files.` + one base64 RawStdEncoding segment per path segment, and the engine decodes it in this exact case (transform.ObjKeyUnsafe). list_files adds a resolved `key` to every entry — use it. Matching on `name` makes empty folders invisible and makes a poll-until-indexed loop hang forever.',
+    },
+    writing_a_file: {
+      route: 'POST {base}/api/default-storage/object/{bucket}/{key} with the raw bytes as the body',
+      bucket: 'microstrate-workspaces (workspaces-service/data/const.go WorkspacesObjectStoreBucketName)',
+      not_in_the_registry:
+        'This root is absent from specs/openapi/quiva-endpoints.json — it was found by reading what the UI calls (storage.api.ts uploadObjFileBinary). Read and write share the root and differ only by method.',
+      response:
+        '{ name, bucket, buid, size, mtime, chunks, digest }. `digest` is "SHA-256=<base64>" over the exact bytes sent — verified by recomputing locally — so integrity is checkable without a second read.',
+      auth: 'An API key is sufficient for both read and write (verified live 2026-07-31).',
+      self_registers:
+        'YES. You do NOT need to call /workspaces/files/file-record afterwards; the UI never does. That route and /workspaces/files/sync-files are repair paths for an index that has drifted.',
+    },
+    the_two_sinks: {
+      bucket: 'Holds the bytes. Readable by exact key.',
+      index:
+        'microstrate-workspace-files. This is what `GET /workspaces/files?space_id=…` lists AND what accounts-service deployVerticals iterates.',
+      rule:
+        'A file in the bucket but not the index is invisible to everything that matters. "Written" means "appears in the index".',
+      asynchronous:
+        'CRITICAL: indexing lags the write. Verified live twice — a config object was absent at t+1s and present at t+16s; a nested folder took minutes. POLL for the key; never write and immediately act. This is the difference between a vertical that deploys completely and one that silently deploys a subset.',
+    },
+    deleting: {
+      exposed: false,
+      why:
+        'Never exercised, and destructive. delete_workflow silently orphaned every draft it "deleted" while returning success (docs/lessons.md), so an unverified destructive tool is not shipped here.',
+      source_derived_UNVERIFIED: [
+        'Params go in the QUERY STRING, not the body: DELETE /workspaces/files/folder?space_id=&folder=&subfolder=',
+        'Recursive — it lists everything nested plus the target marker.',
+        'SOFT delete: each object is copied to a trash bucket, then removed, then unindexed. GET /workspaces/files/trash lists them; POST /workspaces/files/restore restores.',
+        'Hard-requires a Bearer JWT (401 without), unlike create which tolerates its absence and just records an empty created_by.',
+        'Partial failure returns 400 but KEEPS whatever it already deleted.',
+      ],
+      if_you_must: 'Do it by hand, then verify by re-listing — not by the response body.',
+    },
+  },
+
+  'verticals': {
+    summary:
+      'The VERTICAL space is a template library. Adding a vertical to an account copies its configs into that account. This is the contract that folder layout has to satisfy.',
+    the_space: VERTICAL_SPACE_ID,
+    layout: 'spaces.VERTICAL.<vertical_id>.<category>.<config_name>.json',
+    shared_folder:
+      'spaces.VERTICAL.SHARED.* is ALWAYS deployed alongside whichever vertical was requested (deployVerticals appends "SHARED" to the list). That is how every account with any vertical ends up with the `Client` record config.',
+    config_types: VERTICAL_CONFIG_TYPES,
+    how_deployment_is_triggered:
+      'Updating an account with a `verticals` array. accounts-service updateaccount.go then runs `go deployVerticals(...)` — a goroutine, so it is fire-and-forget and the account-update response tells you nothing about whether it worked.',
+    rules_that_bite: [
+      'THE CATEGORY FOLDER NAME IS THE ROUTING KEY. It is the first path segment after `spaces.VERTICAL.<vertical>.`, and an unrecognised name is silently skipped (`if !ok { continue }`) — no error, no log line. A folder named `record_config` instead of `record_configs` deploys nothing and says nothing.',
+      'DEPLOYMENT IS DELTA-ONLY. Only verticals NOT already on the account are deployed. Re-adding a vertical that is already listed deploys NOTHING — to redeploy you must remove it, save, and re-add.',
+      'THERE IS NO DEPENDENCY ORDER. Files deploy in index-listing order, so a space referencing the `Client` record config can be created before `Client` exists. Deploy SHARED first and confirm it landed.',
+      'MARKER FILES NEVER DEPLOY — both `.metadata.json` and `.__meta__.json` suffixes are skipped.',
+      'FLOWS get a collection created for them (name = the vertical id split on `_` and title-cased, e.g. insurance_broker -> "Insurance Broker") and have `collection` + `auto_publish: true` injected into the payload.',
+      'ASSISTANTS must be wrapped as `{ "config": { ... } }` and have `config.shared` FORCED to "team", whatever you wrote.',
+      'The only observability is a stream: microstrate.accounts.<account_id>.deploy-verticals, one message per file with { name, vertical, config_type, subject, status, error }.',
+    ],
+    space_configs_and_record_configs:
+      'A space config under `spaces/` may attach record configs. `record_configs: [{ id, form_id? }]` is the CURRENT shape and WINS on read; `record_config_ids: [string]` is LEGACY and is only read when `record_configs` is absent (microstrate/src/components/spaces/records/space-record-configs.utils.ts:12). Persisting from the UI writes `record_configs` and DELETES `record_config_ids`. So adding a config to `record_config_ids` alone, while `record_configs` is present, is silently ignored — write BOTH and keep them identical, and treat `record_configs` as authoritative.',
+  },
+
   'gotchas': { summary: 'Spec-vs-engine truths.', values: GOTCHAS },
 };
 
@@ -291,4 +404,7 @@ export {
   TIME_LOG_EXAMPLE,
   TIME_TRACKING_EXAMPLE,
   TASK_ACTION_EXAMPLE,
+  VERTICAL_SPACE_ID,
+  VERTICAL_CONFIG_TYPES,
+  FOLDER_MARKERS,
 };

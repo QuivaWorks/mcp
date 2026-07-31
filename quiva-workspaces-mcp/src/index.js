@@ -4,7 +4,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 
-import { QuivaClient } from './client.js';
+
+
+import { QuivaClient, WORKSPACES_BUCKET, fileKeyOf, digestMatches, expectedDigestString } from './client.js';
 import { GOTCHAS, listReferenceTopics, getReference } from './workspaces-docs.js';
 import { validate } from './validate.js';
 import { listExamples, getExample } from './examples.js';
@@ -24,6 +26,15 @@ Recipe:
 4. create_space -> create_task -> create_comment — build resources.
 5. update_task / update_multi_task / react_to_comment — collaborate; delete_* to clean up.
 6. set_task_action / delete_task_action — the per-task checklist (write-only; see below).
+
+Spaces also hold FILES, and the space "VERTICAL" is a template library whose
+folders are deployed into an account when a vertical is added to it:
+7. get_workspaces_reference("files") / ("verticals") — the dotted-path scheme, how
+   a folder is really stored, and the deployment contract.
+8. list_files -> create_folder -> write_file — build a vertical's folder tree and
+   drop configs into it. Both writes confirm against the FILE INDEX, because
+   indexing is asynchronous and the index is what deployment reads.
+   Deleting a file or folder is deliberately NOT exposed — see the gotcha.
 
 Top gotchas:
 ${GOTCHAS.map((g) => `- ${g}`).join('\n')}
@@ -102,7 +113,7 @@ const taskActionPayload = jsonValue.describe('The task action: { description, id
 
 tool(
   'list_reference_topics',
-  'List workspaces reference topics (spaces, tasks, comments, reactions, identifiers, auth, endpoints, gotchas) plus the known spec-vs-engine gotchas. Start here.',
+  'List workspaces reference topics (spaces, tasks, time-tracking, task-actions, comments, reactions, identifiers, auth, endpoints, files, verticals, gotchas) plus the known spec-vs-engine gotchas. Start here.',
   {},
   async () => ({ topics: listReferenceTopics(), gotchas: GOTCHAS })
 );
@@ -132,7 +143,7 @@ tool(
   'validate_payload',
   'Validate a workspaces payload locally (no API call). Encodes engine rules: space id ^\\w+$ + uppercasing, task title required + space_id existence/uppercasing, comment body-or-reply_id, reaction map shape, RFC3339 dates, time_tracking/TimeLog shape plus its replace-not-append warning, task-action requirements, and read-only-field lints. Run before create_*/update_*.',
   {
-    kind: z.enum(['space', 'task', 'multi_task', 'comment', 'reaction', 'task_action']).describe('Which payload shape to validate'),
+    kind: z.enum(['space', 'task', 'multi_task', 'comment', 'reaction', 'task_action', 'folder', 'file']).describe('Which payload shape to validate. "folder" = a create_folder body; "file" = { key, content } for write_file.'),
     payload: jsonValue.describe('The payload object to validate'),
     mode: z.enum(['create', 'update']).default('create').describe('create = required fields enforced; update = all optional'),
   },
@@ -377,6 +388,178 @@ tool(
     const payload = { reaction };
     return withValidation('reaction', payload, true, skip_local_validation, () => client.post(`/workspaces/task/${encodeURIComponent(task_id)}/comment/${encodeURIComponent(id)}/reaction`, payload), 'reacted');
   }
+);
+
+// ---------------------------------------------------------------------------
+// Files & folders (object store + file index)
+//
+// A write lands in TWO places: the object bucket and the file index. The INDEX is
+// what list_files reads and what the vertical deployer iterates, and indexing is
+// ASYNCHRONOUS — so every write here can wait for the key to actually appear
+// rather than trusting a 200. That is the whole reason these tools exist as more
+// than a fetch wrapper.
+// ---------------------------------------------------------------------------
+
+// Poll the file index until `key` shows up. Returns { indexed, waited_ms, entries }.
+async function waitForIndex(spaceId, key, timeoutMs = 60_000) {
+  const started = Date.now();
+  let entries = 0;
+  for (;;) {
+    const listed = await client.get('/workspaces/files', { space_id: spaceId });
+    // Resolve through the SUBJECT, not `name` — an index entry's name can be
+    // empty (every migrated folder marker in VERTICAL is, as of 2026-07-31) and
+    // matching on name alone would poll forever for a key that is already there.
+    const names = (listed?.results ?? []).map(fileKeyOf);
+    entries = names.length;
+    if (names.includes(key)) {
+      return { indexed: true, waited_ms: Date.now() - started, entries };
+    }
+    if (Date.now() - started >= timeoutMs) {
+      return { indexed: false, waited_ms: Date.now() - started, entries };
+    }
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+}
+
+// The space id is the second segment of every key: spaces.<SPACE_ID>....
+function spaceIdOfKey(key) {
+  return String(key).split('.')[1] ?? '';
+}
+
+function indexNote(verification, key) {
+  if (verification.indexed) {
+    return `Confirmed in the file index after ${verification.waited_ms}ms. It will now be listed by list_files and picked up by vertical deployment.`;
+  }
+  return (
+    `NOT YET in the file index after ${verification.waited_ms}ms. The bytes are stored (the write returned a digest), but indexing is asynchronous and can take minutes. ` +
+    `Until "${key}" appears in list_files it is invisible to vertical deployment — re-run list_files before deploying, and do NOT treat this as written.`
+  );
+}
+
+tool(
+  'list_files',
+  'List a space\'s files and folders from the FILE INDEX — the same source vertical deployment iterates, so this is the authoritative "what is actually there". Keys are dotted (spaces.<SPACE_ID>.<folder>...<name>.<ext>). Folder markers (__meta__.json) appear as entries; that is how folders are stored. IMPORTANT: an entry\'s `name` can be EMPTY while its `subject` is correct, so this tool adds a resolved `key` to every entry (decoded from the subject, the same fallback the engine\'s own delete path uses) — read `key`, not `name`. Indexing lags writes, so a file written seconds ago may not be here yet.',
+  {
+    space_id: z.string().describe('Space id, e.g. "VERTICAL" (uppercased server-side)'),
+    subfolder: z.string().optional().describe('Restrict to a dotted subfolder path, e.g. "financial_advisor.flows"'),
+    search: z.string().optional().describe('Case-insensitive substring match on the file name. NOTE the engine matches on the stored `name`, so an entry with an empty name cannot be found this way — omit `search` and filter on the resolved `key` instead.'),
+    exact: z.boolean().optional().describe('Treat `search` as an exact match rather than a substring'),
+  },
+  async ({ space_id, subfolder, search, exact }) => {
+    const listed = await client.get('/workspaces/files', { space_id, subfolder, search, exact });
+    const results = (listed?.results ?? []).map((entry) => ({
+      ...entry,
+      key: fileKeyOf(entry),
+      ...(entry?.name ? {} : { name_missing: true }),
+    }));
+    const nameless = results.filter((r) => r.name_missing).length;
+    return {
+      ...listed,
+      results,
+      ...(nameless
+        ? {
+            note: `${nameless} of ${results.length} entries have an EMPTY name; their \`key\` was decoded from the subject. Use \`key\`. This is a known state the engine handles the same way (transform.ObjKeyUnsafe), and it is why \`search\` cannot find these entries.`,
+          }
+        : {}),
+    };
+  }
+);
+
+tool(
+  'create_folder',
+  'Create a folder in a space. A folder is not a directory: this writes a single marker object at <path>.__meta__.json, and the UI derives the tree from the keys — so a new folder correctly renders EMPTY. Send space_id + folder (+ subfolder for a parent path), OR full_path. NOTE `subfolder` is the PARENT prefix, not a child: {space_id:"VERTICAL", subfolder:"my_vertical", folder:"flows"} creates spaces.VERTICAL.my_vertical.flows. The engine returns no body, so this reads the index back to confirm. Re-runnable: an existing folder returns 409 server-side and is reported here as `already_existed: true` rather than an error, so building a tree twice is safe.',
+  {
+    space_id: z.string().optional().describe('Space id, e.g. "VERTICAL". Required unless full_path is given.'),
+    folder: z.string().optional().describe('The folder name — a single dot-free segment. Required unless full_path is given.'),
+    subfolder: z.string().optional().describe('PARENT path under the space, dotted for depth, e.g. "my_vertical" or "my_vertical.sub"'),
+    full_path: z.string().optional().describe('Complete dotted path instead of space_id+folder, e.g. "spaces.VERTICAL.my_vertical.flows". Do not combine with space_id/folder.'),
+    metadata: jsonValue.optional().describe('Extra folder metadata. Values must all be STRINGS (engine field is map[string]string). created_at/created_by are set by the engine.'),
+    wait_for_index: z.boolean().optional().describe('Poll the file index until the marker appears (default true). Indexing is async; false returns as soon as the write succeeds.'),
+    skip_local_validation: z.boolean().optional().describe('Skip the local validator'),
+  },
+  async ({ space_id, folder, subfolder, full_path, metadata, wait_for_index = true, skip_local_validation }) => {
+    const payload = {};
+    if (space_id !== undefined) payload.space_id = space_id;
+    if (folder !== undefined) payload.folder = folder;
+    if (subfolder !== undefined) payload.subfolder = subfolder;
+    if (full_path !== undefined) payload.full_path = full_path;
+    if (metadata !== undefined) payload.metadata = metadata;
+
+    return withValidation('folder', payload, true, skip_local_validation, async () => {
+      // Rebuild the key the engine will have written, so we can look for it.
+      const base = full_path && full_path !== ''
+        ? full_path
+        : `spaces.${String(space_id).toUpperCase()}${subfolder ? '.' + subfolder : ''}.${folder}`;
+      const markerKey = `${base}.__meta__.json`;
+      const spaceId = spaceIdOfKey(base);
+
+      // 409 "folder exists" is treated as SUCCESS, not an error: building a
+      // vertical's tree is inherently re-runnable, and a push that dies on the
+      // second attempt is useless. The post-condition — the folder is there — is
+      // satisfied either way, and it is still confirmed against the index below.
+      let response;
+      let already_existed = false;
+      try {
+        response = await client.post('/workspaces/files/folder', payload);
+      } catch (err) {
+        if (err?.status !== 409) throw err;
+        already_existed = true;
+        response = { message: 'folder exists (409) — treated as success; nothing was changed' };
+      }
+
+      if (!wait_for_index) {
+        return { response, already_existed, folder_path: base, marker_key: markerKey, verified: false, note: 'wait_for_index was false — nothing has been confirmed. The engine returns no body, so this is the write response only.' };
+      }
+      const verification = await waitForIndex(spaceId, markerKey);
+      return { response, already_existed, folder_path: base, marker_key: markerKey, verified: verification.indexed, verification, note: indexNote(verification, markerKey) };
+    }, 'created');
+  }
+);
+
+tool(
+  'read_file',
+  'Read one file\'s CONTENT by its dotted key. Text for .json/.md/.txt/.yaml/.csv/.html/.svg keys, base64 otherwise (a vertical document_templates folder holds .docx). This hits the object store, which is a different URL root from /workspaces/* and is absent from the gateway route registry. Reading back is how you verify a write — never trust the write response alone.',
+  {
+    key: z.string().describe('Full dotted object key, e.g. "spaces.VERTICAL.financial_advisor.spaces.fahub.json"'),
+    bucket: z.string().optional().describe('Object bucket (default microstrate-workspaces — the space files bucket)'),
+  },
+  async ({ key, bucket }) => client.readObject(bucket || WORKSPACES_BUCKET, key)
+);
+
+tool(
+  'write_file',
+  'Write a config file into a space folder. Uploads the bytes, verifies the returned SHA-256 digest against the content locally, and then polls the FILE INDEX until the key appears — because a file present in the bucket but absent from the index is invisible to vertical deployment. Creating the containing folder first is not required for the write, but is needed for the tree to render. For a vertical config the validator also checks the category folder routes, that an assistants config is { config: {...} }-wrapped, and that record_configs/record_config_ids agree.',
+  {
+    key: z.string().describe('Full dotted object key, e.g. "spaces.VERTICAL.my_vertical.spaces.myhub.json". No dots inside a name segment.'),
+    content: z.string().describe('File content as a string. Stringify JSON before sending.'),
+    bucket: z.string().optional().describe('Object bucket (default microstrate-workspaces)'),
+    wait_for_index: z.boolean().optional().describe('Poll the file index until the key appears (default true). Indexing is async.'),
+    skip_local_validation: z.boolean().optional().describe('Skip the local validator'),
+  },
+  async ({ key, content, bucket, wait_for_index = true, skip_local_validation }) =>
+    withValidation('file', { key, content }, true, skip_local_validation, async () => {
+      const entry = await client.writeObject(bucket || WORKSPACES_BUCKET, key, content);
+
+      // The store returns a digest over the bytes it stored. digestMatches
+      // normalises both sides (base64url alphabet, padding stripped) — comparing
+      // raw strings passed for the wrong reason on the first file tested.
+      const digest_ok = digestMatches(content, entry?.digest);
+      const expected = expectedDigestString(content);
+
+      const result = {
+        entry,
+        digest_verified: digest_ok,
+        ...(digest_ok
+          ? {}
+          : { digest_mismatch: { expected, returned: entry?.digest ?? null }, warning: 'The stored digest does not match a SHA-256 of what was sent — the bytes on the platform are NOT what you wrote. Read the file back before doing anything else.' }),
+      };
+
+      if (!wait_for_index) {
+        return { ...result, verified: false, note: 'wait_for_index was false — the bytes are stored but nothing confirms the file is in the index yet.' };
+      }
+      const verification = await waitForIndex(spaceIdOfKey(key), key);
+      return { ...result, verified: verification.indexed && digest_ok, verification, note: indexNote(verification, key) };
+    }, 'written')
 );
 
 // ---------------------------------------------------------------------------
