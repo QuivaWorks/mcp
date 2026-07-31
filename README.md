@@ -86,6 +86,10 @@ verified. Re-read it, fix what moved, then `npm run engine:pin`.
 - `docs/quiva-*-playbook.md` — per-server working notes.
 - [specs/](specs/) — agent-instruction documents for platform features
   (form builder, form rules).
+- [specs/openapi/](specs/openapi/) — the platform's own OpenAPI specs, as Quiva
+  agent-tool definitions, plus the gateway route registry. **Do not trust them**:
+  most of the documentation above exists because they are wrong in ways that fail
+  silently. Good for shapes, and for deciding whether a route is routable at all.
 
 ## Known stale
 

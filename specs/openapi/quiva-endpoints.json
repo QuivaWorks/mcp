@@ -1,0 +1,3278 @@
+[
+    {
+        "path": "/accounts/oauth/login",
+        "method": "GET",
+        "is_public": true,
+        "resource": "microstrate.accounts.get.oauth-login",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/obj/sync",
+        "method": "PUT",
+        "is_public": false,
+        "resource": "microstrate.storage.put.obj-sync-entry",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/profile-image",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.accounts.delete.profile-image",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/email-code",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.email-code",
+        "resource_type": "service"
+    },
+    {
+        "path": "/file-generator/webhooks/hellosign/{account}",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.file-generator.post.hellosign-callback",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/functions",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.compute.get.functions",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/payment/subscription",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.accounts.patch.payment.subscription",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/confirm-email",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.accounts.post.confirm-email",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/collections",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.list-collections",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/mcp/{server_id}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.hub.patch.mcp-server",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/{gateway_topic}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.gateway.delete.item",
+        "resource_type": "service"
+    },
+    {
+        "path": "/deployment/stacks",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.deployment.post.deploy-stack",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/kv/{bucket}/entries/{key}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.storage.delete.kv-entry",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/dns-zone/{zone_id}/record",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.gateway.get.dns-records",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/calendar",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.recall.get.calendars",
+        "resource_type": "service"
+    },
+    {
+        "path": "/ai/questions",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.ai.post.ask",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/user",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.accounts.patch.update-user",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/begin-passkey-registration",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.accounts.post.begin-passkey-registration",
+        "resource_type": "service"
+    },
+    {
+        "path": "/integrations/{integration_id}/oauth-token/{connection_id}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.integrations.{integration_id}.oauth-token.{connection_id}",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/favorites/add",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.add-favorite-agent",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/import",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.accounts.delete.import",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/integrations/oauth-config",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.oauth-configs",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/cancel",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.cancel-agents",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/billing-events",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.billing-events",
+        "resource_type": "service"
+    },
+    {
+        "path": "/apple/emails",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.apple.post.email",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/all",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.gateway.get.all-gateways",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/resend-confirmation",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.accounts.post.resend-confirmation",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/task/{id}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.workspaces.patch.task",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/request-reset-password",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.accounts.post.request-reset-password",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/integrations/{integration_id}/oauth-refresh-token/{connection_id}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.integration-oauth-refresh",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/task/{task_id}/scheduled-events/{id}",
+        "method": "PUT",
+        "is_public": false,
+        "resource": "microstrate.workspaces.put.task-event-schedule",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/bot/{bot_id}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.recall.delete.bot",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/approvals/{id}/approve",
+        "method": "PATCH",
+        "is_public": true,
+        "resource": "microstrate.workspaces.patch.approval-approve",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/spaces",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.workspaces.get.spaces",
+        "resource_type": "service"
+    },
+    {
+        "path": "/secrets/user",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.secrets-manager.get.secret-user-list",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/user-context/{id}",
+        "method": "PUT",
+        "is_public": false,
+        "resource": "microstrate.hub.put.agent-user-context",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/approvals/{id}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.workspaces.get.approval",
+        "resource_type": "service"
+    },
+    {
+        "path": "/deployment/stacks/{name}/stages/{stage}/history",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.deployment.get.stack-history",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/payment/subscription",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.payment.subscription",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/payment/subscription",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.accounts.delete.payment.subscription",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/workflows/{collection_topic}/{flow_topic}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.hub.patch.workflow",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/task/{task_id}/comment/{id}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.workspaces.delete.comment",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/compute-assets/{collection_topic}/{resource_topic}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.compute.get.compute-assets",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/test-jpath",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.test-jpath",
+        "resource_type": "service"
+    },
+    {
+        "path": "/apple/mailboxes/{name}/emails/recent",
+        "method": "GET",
+        "is_public": true,
+        "resource": "microstrate.apple.get.mailbox-email-recent-list",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/marketplace/submissions/admin/submission",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.get-marketplace-submission-admin",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/request-client-magic-link",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.accounts.post.request-client-magic-link",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/containers/{collection_topic}/{container_topic}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.compute.get.compute-item",
+        "resource_type": "service"
+    },
+    {
+        "path": "/integrations/oauth-callback",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.integrations.oauth-callback",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/ai-budget-limits",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.accounts.patch.budget-limits",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/{gateway_topic}/mapping/details",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.gateway.get.mapping",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/list",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.list-accounts-by-user",
+        "resource_type": "service"
+    },
+    {
+        "path": "/trigger/triggers/{collection}/{topic}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.trigger.delete.item",
+        "resource_type": "service"
+    },
+    {
+        "path": "/file-generator/templates/{key}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.file-generator.patch.template",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/session-tokens",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.session-tokens",
+        "resource_type": "service"
+    },
+    {
+        "path": "/deployment/stacks",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.deployment.get.stack-list",
+        "resource_type": "service"
+    },
+    {
+        "path": "/deployment/stacks/{name}/stages/{stage}/attach",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.deployment.patch.attach-resources",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/set-agent-session-visibility",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.set-agent-session-visibility",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/{gateway_topic}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.gateway.patch.gateway",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/approvals/{id}/events",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.workspaces.get.approval-events",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/api-creds",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.api-creds",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/all-passkeys",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.accounts.delete.all-passkeys",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/workflows",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.workflow",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/index/{name}/query",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.storage.get.search-index",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/functions/{collection_topic}/{function_topic}/invoke",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.compute.invoke.function",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/auth-with-password",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.accounts.post.auth-with-password",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/obj/{bucket}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.storage.delete.obj",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/streams/{name}",
+        "method": "PUT",
+        "is_public": false,
+        "resource": "microstrate.storage.put.stream",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/kv/{bucket}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.storage.delete.kv",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/collections/{collection_topic}/containers",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.compute.get.containers-by-collection",
+        "resource_type": "service"
+    },
+    {
+        "path": "/sales-contact",
+        "method": "POST",
+        "is_public": true,
+        "resource": "ms.hub.config.workflow.draft.627541832.495926149",
+        "resource_type": "flow"
+    },
+    {
+        "path": "/hub/agent/learning/vote",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.agent.api.vote",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/bot/{bot_id}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.recall.get.bot",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/approvals",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.workspaces.post.approval",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/payment/checkout-url",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.accounts.post.payment.checkout-url",
+        "resource_type": "service"
+    },
+    {
+        "path": "/webhook",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.webhook",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/image/{id}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.hub.delete.agent-image",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/task/{task_id}/comment/{id}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.workspaces.patch.comment",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/dns-zone/{zone_id}/record/{id}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.gateway.delete.dns-record",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/functions/{collection_topic}/{function_topic}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.compute.get.compute-item",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/rename",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.accounts.patch.rename-account",
+        "resource_type": "service"
+    },
+    {
+        "path": "/records/config/{id}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.records.patch.config",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/recording/{id}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.recall.delete.recording",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/bot/{bot_id}/leave-call",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.recall.post.bot-leave-call",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/{gateway_topic}/mapping/details",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.gateway.patch.mapping",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/suspend-user",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.accounts.patch.suspend-user",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/kv",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.storage.post.kv",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/mcp",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.list-mcp-servers",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/scheduled",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.scheduled-flows",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/marketplace/download",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.download-marketplace-product",
+        "resource_type": "service"
+    },
+    {
+        "path": "/file-generator/documents",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.file-generator.get.documents",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/schedule",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.schedule-flow",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/task/{task_id}/scheduled-events/{id}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.workspaces.delete.task-event-schedule",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/task/{task_id}/watch",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.workspaces.post.task-watch",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/ai-budget",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.budget",
+        "resource_type": "service"
+    },
+    {
+        "path": "/secrets/{key}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.secrets-manager.delete.secret",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/integrations/{integration_id}/oauth-token/{connection_id}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.integration-oauth-token",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/marketplace/submissions/{topic}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.hub.delete.delete-marketplace-submission",
+        "resource_type": "service"
+    },
+    {
+        "path": "/trigger/triggers/{collection}/{topic}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.trigger.patch.trigger",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/payment/payment-methods",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.payment.payment-methods",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/collections/{collection_topic}/resources",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.compute.get.functions-by-collection",
+        "resource_type": "service"
+    },
+    {
+        "path": "/apple/events/{id}",
+        "method": "PUT",
+        "is_public": true,
+        "resource": "microstrate.apple.put.event",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/quiva-endpoints",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.quiva-endpoints",
+        "resource_type": "service"
+    },
+    {
+        "path": "/records/{config_id}/{id}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.records.delete.record",
+        "resource_type": "service"
+    },
+    {
+        "path": "/deployment/stacks/{name}/stages/{stage}/resources/{resource_id}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.deployment.delete.stack-resource",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/refresh-token",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.accounts.post.refresh-token",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/api-key",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.accounts.delete.api-key",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/marketplace/submissions/{topic}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.hub.patch.update-marketplace-submission",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/interaction",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.hub.delete.agent-interaction",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/list/team",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.agent-list-team",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/complete-passkey-registration",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.accounts.post.complete-passkey-registration",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/collections",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.collection",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/mcp-postman-collection",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.generate-mcp-server-from-postman-collection",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent-session-folder/{session_id}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.hub.patch.agent-session-folder",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/token-validate",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.accounts.post.token-validate",
+        "resource_type": "service"
+    },
+    {
+        "path": "/integrations/oauth-config",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.integrations.oauth-config",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/run-logs/search",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.search-logs",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/workflows/{collection_topic}/{flow_topic}/run",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.workflow-run",
+        "resource_type": "service"
+    },
+    {
+        "path": "/apple/events/{id}",
+        "method": "GET",
+        "is_public": true,
+        "resource": "microstrate.apple.get.event",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/summarize",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.recall.post.summarize-recording",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/approvals/{id}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.workspaces.delete.approval",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.accounts.patch.update-account",
+        "resource_type": "service"
+    },
+    {
+        "path": "/secrets",
+        "method": "PUT",
+        "is_public": false,
+        "resource": "microstrate.secrets-manager.put.secret",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/task/{task_id}/comment/{id}/reaction",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.workspaces.post.comment-reaction",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/tasks/my-tasks",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.workspaces.get.my-tasks",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/users/list",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.list-users-by-account",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/payment/subscription-items",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.payment.subscription-items",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/oauth/callback",
+        "method": "GET",
+        "is_public": true,
+        "resource": "microstrate.accounts.get.oauth-callback",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/user-mfa-info",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.user-mfa-info",
+        "resource_type": "service"
+    },
+    {
+        "path": "/ai/sessions/{session_id}/questions",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.ai.post.session",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/obj/{bucket}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.storage.get.obj",
+        "resource_type": "service"
+    },
+    {
+        "path": "/integrations/oauth-connections",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.integrations.oauth-connections",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/streams/{name}/messages",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.storage.post.message",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/marketplace/submissions/admin",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.list-marketplace-submissions-admin",
+        "resource_type": "service"
+    },
+    {
+        "path": "/apple/mailboxes/{name}/emails/{uid}",
+        "method": "GET",
+        "is_public": true,
+        "resource": "microstrate.apple.get.email",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/space/{space_id}/tasks",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.workspaces.get.tasks",
+        "resource_type": "service"
+    },
+    {
+        "path": "/deployment/stacks/{name}/stages/{stage}/resources/{resource_id}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.deployment.get.stack-resource",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/streams/{name}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.storage.delete.stream",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/obj",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.storage.post.obj",
+        "resource_type": "service"
+    },
+    {
+        "path": "/slackbot/message",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.slackbot.post.message",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/export",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.accounts.post.export",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/payment/free-subscription",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.accounts.post.payment.free-subscription",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/passkey",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.accounts.delete.passkey",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/{gateway_topic}/mapping/version",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.gateway.get.mapping-versions",
+        "resource_type": "service"
+    },
+    {
+        "path": "/integrations/{integration_id}/oauth-config",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.integrations.{integration_id}.oauth-config",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/marketplace/submissions/{topic}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.get-marketplace-submission",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/mcp/{server_id}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.hub.delete.mcp-server",
+        "resource_type": "service"
+    },
+    {
+        "path": "/apple/calendars/{id}/events",
+        "method": "GET",
+        "is_public": true,
+        "resource": "microstrate.apple.get.calendar-event-list",
+        "resource_type": "service"
+    },
+    {
+        "path": "/file-generator/documents/{key}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.file-generator.delete.document",
+        "resource_type": "service"
+    },
+    {
+        "path": "/records/{config_id}/{id}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.records.get.record",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/calendar",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.recall.patch.calendar",
+        "resource_type": "service"
+    },
+    {
+        "path": "/file-generator/templates/{key}/publish",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.file-generator.post.template-publish",
+        "resource_type": "service"
+    },
+    {
+        "path": "/deployment/openapi",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.deployment.post.deploy-openapi",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/payment/ai-budget",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.accounts.post.payment.budget-add",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/integrations/{integration_id}/oauth-connections/{connection_id}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.hub.delete.oauth-connection",
+        "resource_type": "service"
+    },
+    {
+        "path": "/records/{config_id}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.records.get.records",
+        "resource_type": "service"
+    },
+    {
+        "path": "/records/config/{id}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.records.delete.config",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/nodes/{collection_topic}/{node_topic}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.node",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/search/{index}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.storage.get.search-index",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/services",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.compute.get.services",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/learning/consolidate",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.agent.api.consolidate",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/space/{id}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.workspaces.patch.space",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/task/{task_id}/scheduled-events",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.workspaces.get.task-event-schedules",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/approvals",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.workspaces.get.approvals",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/machines",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.compute.get.machines",
+        "resource_type": "service"
+    },
+    {
+        "path": "/test/hellosign/{account}",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.file-generator.post.hellosign-callback",
+        "resource_type": "service"
+    },
+    {
+        "path": "/trigger/emails/search",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.trigger.post.emails-search",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/recording/{recording_id}/transcript",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.recall.get.transcript",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/{gateway_topic}/mapping",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.gateway.post.mapping",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/integrations/oauth-config/{integration_Id}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.oauth-config",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.gateway.post.gateway",
+        "resource_type": "service"
+    },
+    {
+        "path": "/deployment/stacks/{name}/stages/{stage}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.deployment.get.stack",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/nodes/{collection_topic}/{node_topic}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.hub.patch.node",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/space/{id}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.workspaces.get.space",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/auth-token",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.accounts.delete.auth-token",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/functions/{collection_topic}/{function_topic}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.compute.delete.function",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/rate",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.rate-agent-definition",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/workflows/errored",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.errored-workflows",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/usage",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.usage-summary",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/mesh-nodes",
+        "method": "PUT",
+        "is_public": false,
+        "resource": "microstrate.accounts.put.update-mesh-nodes",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/change-email-address-action",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.accounts.post.change-email-address-action",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/assets/functions/{collection_topic}/{function_topic}",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.compute.post.compute-asset",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/run-stats",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.run-stats",
+        "resource_type": "service"
+    },
+    {
+        "path": "/apple/mailboxes/{name}",
+        "method": "GET",
+        "is_public": true,
+        "resource": "microstrate.apple.get.mailbox",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/auth-with-magic-link",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.accounts.post.auth-with-magic-link",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/{gateway_topic}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.gateway.get.gateway",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/user",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.accounts.delete.user",
+        "resource_type": "service"
+    },
+    {
+        "path": "/website-contact",
+        "method": "POST",
+        "is_public": true,
+        "resource": "ms.hub.config.workflow.draft.627541832.363869106",
+        "resource_type": "flow"
+    },
+    {
+        "path": "/hub/workflows/paused",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.paused-workflows",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.list-agents",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/{id}",
+        "method": "PUT",
+        "is_public": false,
+        "resource": "microstrate.hub.put.agent",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/confirm-totp-registration",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.accounts.post.confirm-totp-registration",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/kv/{bucket}/search",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.storage.get.search-kv",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/marketplace/submissions/review",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.admin-review-submission",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent-sessions/fork/{session_id}",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.fork-agent-session",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/dns-zone/all",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.gateway.get.dns-zones",
+        "resource_type": "service"
+    },
+    {
+        "path": "/monitoring/metrics/{metric}/current",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.monitoring.get.metric-current",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/account",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.accounts.delete.account",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/obj/{bucket}/entries",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.storage.get.obj-entries",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/streams/{stream}/search-by-subject",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.storage.get.search-stream-by-subject",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/resolve-escalation",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.resolve-escalation",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/files",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.workspaces.delete.file",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/containers",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.compute.post.container",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/marketplace/product",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.marketplace-product",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/image",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.agent-image",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/marketplace/download-batch",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.batch-download-marketplace-products",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/admin/export-cost-events",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.accounts.post.internal-export-cost-events",
+        "resource_type": "service"
+    },
+    {
+        "path": "/records/config",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.records.post.config",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/bot",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.recall.patch.bot",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/streams/{stream}/messages",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.storage.delete.messages",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/test-eval",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.test-eval",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent-sessions/search",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.search-agent-sessions",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/favorites/remove",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.remove-favorite-agent",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/space/{space_id}/export-tasks",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.workspaces.get.tasks-export",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/interaction/agent/{subject}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.hub.delete.agent-interaction-agent",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/dns-zone",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.gateway.post.dns-zone",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/export",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.accounts.delete.export",
+        "resource_type": "service"
+    },
+    {
+        "path": "/trigger/stream",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.trigger.post.stream",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/payment/credit-packs",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.payment.list-credit-packs",
+        "resource_type": "service"
+    },
+    {
+        "path": "/apple/mailboxes/{name}/emails/{uid}",
+        "method": "DELETE",
+        "is_public": true,
+        "resource": "microstrate.apple.delete.email",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/dns-zone/{id}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.gateway.delete.dns-zone",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/compute-assets/{collection_topic}/{resource_topic}/history",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.compute.get.compute-asset-history",
+        "resource_type": "service"
+    },
+    {
+        "path": "/img",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate-profile-images",
+        "resource_type": "object"
+    },
+    {
+        "path": "/accounts/test-notification",
+        "method": "POST",
+        "is_public": false,
+        "resource": "ms.hub.config.workflow.draft.1389718614.756140219",
+        "resource_type": "flow"
+    },
+    {
+        "path": "/accounts/user-login-data",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.user-login-data",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/payment/prices",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.payment.prices",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/nodes/{collection_topic}/{node_topic}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.hub.delete.node",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/collections/{collection_type}/{collection_topic}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.hub.patch.collection",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/indexers",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.storage.get.indexer-list",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/marketplace/download-stats",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.marketplace-product-download-stats",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/mapping-version/{gateway_topic}/{version_number}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.gateway.patch.mapping-version",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/kv",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.storage.get.kv-list",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/favorites",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.list-favorite-agents",
+        "resource_type": "service"
+    },
+    {
+        "path": "/helpers/sync",
+        "method": "POST",
+        "is_public": false,
+        "resource": "ms.hub.config.workflow.draft.1389718614.1365955493",
+        "resource_type": "flow"
+    },
+    {
+        "path": "/workspaces/task/{task_id}/comment/{id}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.workspaces.get.comment",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/dns-zone/{zone_id}/record",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.gateway.post.dns-record",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/containers/{collection_topic}/{container_topic}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.compute.patch.container",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/api-key",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.accounts.post.api-key",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/role",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.accounts.patch.update-role",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/kv/{bucket}/entries/{key}",
+        "method": "PUT",
+        "is_public": false,
+        "resource": "microstrate.storage.put.kv-entry",
+        "resource_type": "service"
+    },
+    {
+        "path": "/trigger/triggers",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.trigger.get.triggers",
+        "resource_type": "service"
+    },
+    {
+        "path": "/records/{config_id}",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.records.post.record",
+        "resource_type": "service"
+    },
+    {
+        "path": "/deployment/stacks/{name}/stages/{stage}/resources",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.deployment.patch.attach-resources",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/obj/{bucket}/entries/{key}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.storage.delete.obj-entry",
+        "resource_type": "service"
+    },
+    {
+        "path": "/ipresolver/resolve",
+        "method": "GET",
+        "is_public": true,
+        "resource": "microstrate.ipresolver.get.resolve-ip",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/{id}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.agent",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/task/scheduled-events/notification/{id}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.workspaces.post.task-event-notify-read",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/runtimes",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.compute.get.runtimes",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/submit-contact-form",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.accounts.post.submit-contact-form",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/interaction/session/{id}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.hub.delete.agent-interaction-session",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent-sessions/{session_id}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.hub.delete.agent-session",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/task/{task_id}/watch",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.workspaces.delete.task-watch",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/{id}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.hub.delete.agent",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/calendar/{id}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.recall.get.calendar",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/calendar/{id}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.recall.delete.calendar",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/totp",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.accounts.delete.totp",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/set-emergency-credit",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.accounts.patch.set-emergency-credit",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/imports-exports",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.imports-exports",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/integrations/{integration_id}/oauth-config",
+        "method": "PUT",
+        "is_public": false,
+        "resource": "microstrate.hub.put.oauth-config",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/calendar/{id}/events",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.recall.get.calendar-events",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/recordings",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.recall.get.recordings",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/approvals/{id}/reject",
+        "method": "PATCH",
+        "is_public": true,
+        "resource": "microstrate.workspaces.patch.approval-reject",
+        "resource_type": "service"
+    },
+    {
+        "path": "/deployment/stacks/{name}/stages/{stage}/resources/{resource_id}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.deployment.patch.detach-stack-resource",
+        "resource_type": "service"
+    },
+    {
+        "path": "/file-generator/documents/{key}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.file-generator.get.document",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/approvals/{id}/events",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.workspaces.post.approval-event",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/integrations/oauth-connections",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.get.oauth-connections",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/integrations/oauth-connections",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.oauth-connections",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.agent",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/favicon",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.accounts.post.favicon",
+        "resource_type": "service"
+    },
+    {
+        "path": "/monitoring/metrics/current",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.monitoring.get.metrics-current",
+        "resource_type": "service"
+    },
+    {
+        "path": "/secrets/{key}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.secrets-manager.get.secret",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent-sessions/{session_id}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.hub.patch.agent-session",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/unassign-resources",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.accounts.post.unassign-resources",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/info",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.info",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/obj/{bucket}/entries",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.storage.delete.obj-entries",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/integrations/oauth-variables",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.integration-oauth-variables",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/workflows/{collection_topic}/{flow_topic}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.workflow",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/interaction",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.agent-interaction",
+        "resource_type": "service"
+    },
+    {
+        "path": "/records/{config_id}/{id}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.records.patch.record",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/{gateway_topic}/mapping",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.gateway.get.mappings",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/stream/{stream}/purge",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.storage.delete.stream-purge",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/marketplace",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.list-marketplace-flows",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/{gateway_topic}/dns-records",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.gateway.get.gateway-domains",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/summarize/template/{id}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.recall.delete.summarization-template",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/payment/products",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.payment.products",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/generate-totp-key",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.accounts.post.generate-totp-key",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/task/{task_id}/comment",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.workspaces.post.comment",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/integrations/oauth-callback",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.integration-oauth-callback",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/mapping-version/{gateway_topic}/{version_number}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.gateway.get.mapping-version",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/containers",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.compute.get.containers",
+        "resource_type": "service"
+    },
+    {
+        "path": "/records/config",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.records.get.configs",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/tasks",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.workspaces.patch.tasks",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/compute-assets/{collection_topic}/{resource_topic}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.compute.patch.compute-asset",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/tokens",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.accounts.delete.tokens",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/workflows/{collection_topic}/{flow_topic}/history",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.workflow-history",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/bots",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.recall.get.bots",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/complete-auth-with-passkey",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.accounts.post.complete-auth-with-passkey",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/collections/{collection_topic}/functions",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.compute.get.functions-by-collection",
+        "resource_type": "service"
+    },
+    {
+        "path": "/cdn",
+        "method": "GET",
+        "is_public": true,
+        "resource": "cdn",
+        "resource_type": "object"
+    },
+    {
+        "path": "/hub/test-http",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.test-http",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/task/{id}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.workspaces.delete.task",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/space/{id}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.workspaces.delete.space",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/remove-user",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.accounts.delete.user-from-account",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/streams",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.storage.post.stream",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/assigned-resources",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.assigned-resources",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/workflows/publish",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.workflow-publish",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/{id}/history",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.agent-history",
+        "resource_type": "service"
+    },
+    {
+        "path": "/annie",
+        "method": "POST",
+        "is_public": false,
+        "resource": "anniebelle.prompt",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/task/scheduled-events",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.workspaces.get.task-event-schedules",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/payment/webhook",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.accounts.post.payment.webhook",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/summarize/template",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.recall.get.summarization-templates",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/set-agent-session-unread",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.set-agent-session-unread",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/dns-zone/{id}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.gateway.patch.dns-zone",
+        "resource_type": "service"
+    },
+    {
+        "path": "/file-generator/templates",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.file-generator.post.template",
+        "resource_type": "service"
+    },
+    {
+        "path": "/deployment/stacks/{name}/stages/{stage}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.deployment.patch.stack",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/workflows/{collection_topic}/{flow_topic}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.hub.delete.workflow",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/task",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.workspaces.post.task",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/task/{id}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.workspaces.get.task",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/kv/{bucket}/entries/{key}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.storage.get.kv-entry",
+        "resource_type": "service"
+    },
+    {
+        "path": "/trigger/emails/{uid}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.trigger.delete.emails",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/bot",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.recall.post.bot",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/summarize/template/system",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.recall.get.summary-system-prompt",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/nodes",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.list-nodes",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/interaction",
+        "method": "PUT",
+        "is_public": false,
+        "resource": "microstrate.hub.put.agent-interaction",
+        "resource_type": "service"
+    },
+    {
+        "path": "/records",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.records.get.query-records",
+        "resource_type": "service"
+    },
+    {
+        "path": "/file-generator/documents/{key}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.file-generator.patch.document",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/kv/{bucket}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.storage.get.kv",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/mcp/postman-collection",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.generate-mcp-server-from-postman-collection",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/{gateway_topic}/mapping/version",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.gateway.post.mapping-version",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/mcp",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.mcp-server",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/marketplace/workflows/download",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.download-marketplace-product",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/mapping-version/{gateway_topic}/{version_number}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.gateway.delete.item",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/recovery-codes",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.recovery-codes",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/nodes/batch",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.hub.patch.nodes",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/task/{id}/change-log",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.workspaces.get.task-change-log",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/cancel-account-deletion",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.accounts.post.cancel-account-deletion",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/learning/{id}",
+        "method": "PUT",
+        "is_public": false,
+        "resource": "microstrate.hub.put.agent-learning",
+        "resource_type": "service"
+    },
+    {
+        "path": "/deployment/stacks/{name}/stages/{stage}/redeploy",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.deployment.post.redeploy-stack",
+        "resource_type": "service"
+    },
+    {
+        "path": "/secrets",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.secrets-manager.get.secret-list",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/ai-budget-limits",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.budget-limits",
+        "resource_type": "service"
+    },
+    {
+        "path": "/apple/events",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.apple.post.event",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/space",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.workspaces.post.space",
+        "resource_type": "service"
+    },
+    {
+        "path": "/file-generator/templates/{key}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.file-generator.get.template",
+        "resource_type": "service"
+    },
+    {
+        "path": "/trigger/object-store",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.trigger.post.obj",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/transcript",
+        "method": "PUT",
+        "is_public": false,
+        "resource": "microstrate.recall.put.transcript",
+        "resource_type": "service"
+    },
+    {
+        "path": "/trigger/triggers/{collection}/{topic}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.trigger.get.trigger",
+        "resource_type": "service"
+    },
+    {
+        "path": "/trigger/email",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.trigger.post.email",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/marketplace/buy",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.obtain-marketplace-product",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/summarize/template",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.recall.post.summarization-template",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/files/trash",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.workspaces.get.trash-files",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/functions/{collection_topic}/{function_topic}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.compute.patch.function",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/auth-with-api-key",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.accounts.post.auth-with-api-key",
+        "resource_type": "service"
+    },
+    {
+        "path": "/deployment/stacks/{name}/stages/{stage}/resources/{resource_id}/redeploy",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.deployment.post.redeploy-stack-resource",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/profile-image",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.accounts.post.profile-image",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/image/{slug}",
+        "method": "GET",
+        "is_public": true,
+        "resource": "profile-images",
+        "resource_type": "object"
+    },
+    {
+        "path": "/hub/agent/interaction",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.agent-interaction",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/list/private",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.agent-list-private",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/recording",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.recall.get.recording",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/summarize/template/{id}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.recall.patch.summarization-template",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.accounts.post.create-account",
+        "resource_type": "service"
+    },
+    {
+        "path": "/records/config/{id}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.records.get.config",
+        "resource_type": "service"
+    },
+    {
+        "path": "/trigger/emails/{uid}/trigger",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.trigger.post.emails-trigger",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/files/folder",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.workspaces.post.folder",
+        "resource_type": "service"
+    },
+    {
+        "path": "/deployment/stacks/{name}/stages/{stage}/resources/{resource_id}/history",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.deployment.get.stack-resource-history",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/payment/dashboard-url",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.payment.dashboard-url",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/imports-exports",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.imports-exports",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/marketplace/workflows/buy",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.obtain-marketplace-product",
+        "resource_type": "service"
+    },
+    {
+        "path": "/file-generator/templates",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.file-generator.get.templates",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/collections/{collection_topic}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.compute.get.collection",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/collections/{collection_type}/{collection_topic}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.hub.delete.collection",
+        "resource_type": "service"
+    },
+    {
+        "path": "/trigger/gateway",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.trigger.post.gateway",
+        "resource_type": "service"
+    },
+    {
+        "path": "/apple/events/{id}",
+        "method": "DELETE",
+        "is_public": true,
+        "resource": "microstrate.apple.delete.event",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/cert/{zone_id}/{id}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.gateway.get.dns-cert",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/transcript-correction",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.recall.post.transcript-correction",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/workflows/run",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.workflow-run",
+        "resource_type": "service"
+    },
+    {
+        "path": "/apple/calendars",
+        "method": "GET",
+        "is_public": true,
+        "resource": "microstrate.apple.get.calendar-list",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/task/{task_id}/comments",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.workspaces.get.comments",
+        "resource_type": "service"
+    },
+    {
+        "path": "/trigger/emails/{uid}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.trigger.get.emails",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/files/folder",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.workspaces.delete.folder",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/functions",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.compute.post.function",
+        "resource_type": "service"
+    },
+    {
+        "path": "/integrations/{integration_id}/oauth-login/{connection_id}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.integrations.{integration_id}.oauth-login.{connection_id}",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/workflows",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.list-workflows",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/kv/{bucket}",
+        "method": "PUT",
+        "is_public": false,
+        "resource": "microstrate.storage.put.kv",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/obj/{bucket}/purge",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.storage.delete.obj-purge",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/streams",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.storage.get.stream-list",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/kv/{bucket}/search-by-key",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.storage.get.search-kv-by-key",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/marketplace/rate-product",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.marketplace-rate-product",
+        "resource_type": "service"
+    },
+    {
+        "path": "/monitoring/metrics/{metric}/stats",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.monitoring.get.metric-stats",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/refresh-token",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.accounts.delete.refresh-token",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/auth-with-recovery-code",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.accounts.post.auth-with-recovery-code",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/kv/{bucket}/entries",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.storage.delete.kv-entries",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/integrations/oauth-variables",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.integration-oauth-variables",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/user-context/{id}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.agent-user-context",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/cert/{zone_id}/{id}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.gateway.patch.dns-cert-renew",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/collections",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.compute.post.collection",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/marketplace/workflows",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.list-marketplace-flows",
+        "resource_type": "service"
+    },
+    {
+        "path": "/file-generator/templates/{key}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.file-generator.delete.template",
+        "resource_type": "service"
+    },
+    {
+        "path": "/profile-image/{slug}",
+        "method": "GET",
+        "is_public": true,
+        "resource": "profile-images",
+        "resource_type": "object"
+    },
+    {
+        "path": "/accounts/recovery-codes",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.accounts.post.recovery-codes",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/nodes",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.node",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/streams/{name}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.storage.get.stream",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/workflows/{collection_topic}/{flow_topic}/node/{node_topic}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.workflow-node",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/share",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.recall.post.share-recording",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/obj",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.storage.get.obj-list",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/request-email-address-change",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.accounts.post.request-email-address-change",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/invoke",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.invoke-agent",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/query",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.agent-query",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/mcp-json-schema",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.mcp-to-json-schema",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/files/restore",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.workspaces.post.restore-trash",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/marketplace/submissions",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.create-marketplace-submission",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/add-agent-session-members",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.add-agent-session-members",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/cert/{zone_id}/{id}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.gateway.delete.dns-cert-revoke",
+        "resource_type": "service"
+    },
+    {
+        "path": "/records/count",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.records.get.records-count-by-config",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/import",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.accounts.post.import",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/obj/{bucket}",
+        "method": "PUT",
+        "is_public": false,
+        "resource": "microstrate.storage.put.obj",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/cost-events",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.cost-events",
+        "resource_type": "service"
+    },
+    {
+        "path": "/file-generator/templates/validate",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.file-generator.post.template-validate",
+        "resource_type": "service"
+    },
+    {
+        "path": "/file-generator/templates/{key}/unset",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.file-generator.patch.template-unset",
+        "resource_type": "service"
+    },
+    {
+        "path": "/file-generator/documents/{key}/signature-url",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.file-generator.get.document-signature-url",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/collections/{collection_topic}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.compute.patch.collection",
+        "resource_type": "service"
+    },
+    {
+        "path": "/deployment/attach",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.deployment.patch.attach-resources",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/assets/functions/{collection_topic}/{function_topic}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.compute.get.compute-asset-history",
+        "resource_type": "service"
+    },
+    {
+        "path": "/apple/calendars/{id}",
+        "method": "GET",
+        "is_public": true,
+        "resource": "microstrate.apple.get.calendar",
+        "resource_type": "service"
+    },
+    {
+        "path": "/records/config/{id}",
+        "method": "PUT",
+        "is_public": false,
+        "resource": "microstrate.records.put.config",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/dns-zone/{zone_id}/record/{id}",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.gateway.patch.dns-record",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/task/{task_id}/scheduled-events",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.workspaces.post.task-event-schedule",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/users",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.accounts.post.create-user",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/mcp/validate-schema",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.validate-openapi-schema",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/unschedule/{topic}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.hub.delete.unschedule-flow",
+        "resource_type": "service"
+    },
+    {
+        "path": "/file-generator/templates/trigger",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.file-generator.post.template-trigger",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/assign-resources",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.accounts.post.assign-resources",
+        "resource_type": "service"
+    },
+    {
+        "path": "/deployment/stacks/{name}/stages/{stage}",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.deployment.delete.stack",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/reset-password",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.accounts.post.reset-password",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/kv/{bucket}/purge",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.storage.delete.kv-purge",
+        "resource_type": "service"
+    },
+    {
+        "path": "/apple/mailboxes/{name}/emails",
+        "method": "GET",
+        "is_public": true,
+        "resource": "microstrate.apple.get.mailbox-email-list",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/meetings",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.workspaces.get.meetings",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/mapping/all",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.gateway.get.all-mappings",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/api-keys",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.accounts.get.api-keys",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/kv/{bucket}/entries",
+        "method": "PUT",
+        "is_public": false,
+        "resource": "microstrate.storage.put.kv-entries",
+        "resource_type": "service"
+    },
+    {
+        "path": "/favicon/{slug}",
+        "method": "GET",
+        "is_public": true,
+        "resource": "profile-images",
+        "resource_type": "object"
+    },
+    {
+        "path": "/accounts/mfa-settings",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.accounts.patch.mfa-settings",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/begin-auth-with-passkey",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.accounts.post.begin-auth-with-passkey",
+        "resource_type": "service"
+    },
+    {
+        "path": "/integrations/{integration_id}/oauth-refresh-token/{connection_id}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.integrations.{integration_id}.oauth-refresh-token.{connection_id}",
+        "resource_type": "service"
+    },
+    {
+        "path": "/storage/kv/{bucket}/entries",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.storage.get.kv-entries",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent-sessions/{session_id}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.agent-session",
+        "resource_type": "service"
+    },
+    {
+        "path": "/records/{config_id}/{id}",
+        "method": "PUT",
+        "is_public": false,
+        "resource": "microstrate.records.put.record",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/mcp/{server_id}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.mcp-server",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/calendar",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.recall.post.calendar",
+        "resource_type": "service"
+    },
+    {
+        "path": "/workspaces/files",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.workspaces.get.files",
+        "resource_type": "service"
+    },
+    {
+        "path": "/file-generator/documents/{key}/unset",
+        "method": "PATCH",
+        "is_public": false,
+        "resource": "microstrate.file-generator.patch.document-unset",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/learning",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.agent.api.learning",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/favicon",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.accounts.delete.favicon",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/set-password",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.accounts.post.set-password",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/marketplace/submissions",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.hub.get.list-marketplace-submissions",
+        "resource_type": "service"
+    },
+    {
+        "path": "/hub/agent/user-context/{id}",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.hub.post.agent-user-context",
+        "resource_type": "service"
+    },
+    {
+        "path": "/fontawesome/token",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.accounts.post.fontawesome-access-token",
+        "resource_type": "service"
+    },
+    {
+        "path": "/compute/collections",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.compute.get.collections",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/bot/{bot_id}/consolidate-transcript",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.recall.post.transcript-consolidate",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/dns-zone/{id}",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.gateway.get.dns-zone",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/cert/{zone_id}/{id}",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.gateway.post.dns-cert-request",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/transcript-note",
+        "method": "POST",
+        "is_public": false,
+        "resource": "microstrate.recall.post.transcript-note",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/{gateway_topic}/mapping/details",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.gateway.delete.item",
+        "resource_type": "service"
+    },
+    {
+        "path": "/cdn/{slug}",
+        "method": "GET",
+        "is_public": true,
+        "resource": "cdn",
+        "resource_type": "object"
+    },
+    {
+        "path": "/apple/mailboxes",
+        "method": "GET",
+        "is_public": true,
+        "resource": "microstrate.apple.get.mailbox-list",
+        "resource_type": "service"
+    },
+    {
+        "path": "/recall/webhook",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.recall.post.webhook",
+        "resource_type": "service"
+    },
+    {
+        "path": "/gateway/mapping-version/all",
+        "method": "GET",
+        "is_public": false,
+        "resource": "microstrate.gateway.get.all-mapping-versions",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/auth-with-totp",
+        "method": "POST",
+        "is_public": true,
+        "resource": "microstrate.accounts.post.auth-with-totp",
+        "resource_type": "service"
+    },
+    {
+        "path": "/accounts/payment/subscription-schedule",
+        "method": "DELETE",
+        "is_public": false,
+        "resource": "microstrate.accounts.delete.payment.subscription-schedule",
+        "resource_type": "service"
+    }
+]
