@@ -1,0 +1,37 @@
+{
+  "slug": "agent-with-context-management",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "subject": "ms.hub.config.agent.2e59357c-80e8-33dd-b00b-db10958255e3",
+    "path_id": "2e59357c-80e8-33dd-b00b-db10958255e3",
+    "name": "Bucket Updater",
+    "harvested_from": "GET /hub/agent"
+  },
+  "teaches": [
+    "the context-window knobs: context_limit, message_history_limit, ai_summary_threshold, ai_summary_model, preserve_most_recent, ai_smart_context"
+  ],
+  "facts": [
+    "llm_provider \"claude\" / model \"claude-sonnet-4-20250514\"",
+    "shared: \"\""
+  ],
+  "config": {
+    "name": "Bucket Updater",
+    "description": "Takes the MCP definition and ensures the bucket is updated correctly",
+    "behaviour": "Update",
+    "llm_provider": "claude",
+    "model": "claude-sonnet-4-20250514",
+    "has_tools": true,
+    "timeout": 300,
+    "context_limit": 50000,
+    "message_history_limit": 200,
+    "prompt": "$.ID.result",
+    "ai_summary_threshold": 0.7,
+    "ai_summary_model": "claude-3-5-sonnet-20241022",
+    "preserve_most_recent": 5,
+    "ai_prompt": false,
+    "api_key": "CLAUDE_API_KEY",
+    "await": true,
+    "shared": "",
+    "owner": ""
+  }
+}

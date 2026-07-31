@@ -1,0 +1,175 @@
+{
+  "slug": "insurance_client",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "config_id": "insurance_client",
+    "harvested": "live record config (configs only — no record data)"
+  },
+  "featured": false,
+  "teaches": [
+    "required fields",
+    "format: date",
+    "format: email",
+    "schema types: object, string"
+  ],
+  "form_node_count": 0,
+  "config": {
+    "id": "insurance_client",
+    "name": "Insurance Client",
+    "description": "Client information for insurance broker including contact details",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "address": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Address"
+            }
+          },
+          "description": "Full residential address",
+          "type": "string"
+        },
+        "dob": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Date of Birth"
+            }
+          },
+          "description": "Client's date of birth (YYYY-MM-DD)",
+          "type": "string",
+          "format": "date"
+        },
+        "email": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Email Address",
+              "placeholder": "client@example.com"
+            }
+          },
+          "description": "Primary email address",
+          "type": "string",
+          "format": "email"
+        },
+        "name": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Full Name",
+              "placeholder": "Enter client's full legal name"
+            }
+          },
+          "description": "Client's full legal name",
+          "type": "string"
+        },
+        "phone": {
+          "ui": {
+            "inputType": "phone",
+            "props": {
+              "label": "Phone Number",
+              "placeholder": "(555) 123-4567"
+            }
+          },
+          "description": "Primary contact phone number",
+          "type": "string"
+        }
+      },
+      "required": [
+        "email",
+        "name"
+      ]
+    },
+    "views": {
+      "form": {
+        "type": "grid",
+        "props": {
+          "gridTemplateColumns": "1fr"
+        },
+        "children": [
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "name"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "email"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "phone"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "address"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "dob"
+              }
+            ]
+          }
+        ]
+      },
+      "table": {
+        "type": "table",
+        "columns": [
+          {
+            "field": "name",
+            "order": 0
+          },
+          {
+            "field": "email",
+            "order": 1
+          },
+          {
+            "field": "phone",
+            "order": 2
+          }
+        ]
+      }
+    },
+    "created_at": "2026-07-07T14:05:45Z",
+    "updated_at": "2026-07-07T14:25:24Z"
+  }
+}

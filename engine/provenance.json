@@ -1,0 +1,198 @@
+{
+  "repo": "myevari/evari-olympus",
+  "branch": "main",
+  "why": "Every engine-truth claim in this repo was established by reading one of these files. The sha records the exact revision it was read at, so a claim that has quietly gone stale is detectable. Verify with `node engine/sync.mjs`; re-baseline with `--pin` only after actually re-reading what changed.",
+  "pinned_at": "794851054723c4416ccd98d5ac6c8048a92ad3c7",
+  "ignore": {
+    "microstrate/src/components/schema-builder/type-key-roundtrip.test.ts": "Not engine source — a regression test DRAFTED in docs/quiva-mcp-handoff.md for the schema-builder `type`-field data-loss bug, deliberately not added pending approval. Delete this entry if the test ever lands."
+  },
+  "files": {
+    "file-generator-service/src/consumer/template-trigger.ts": {
+      "sha": "58dea3574c5a4b58b6426ad8eb79068e1b09a68b",
+      "cited_by": [
+        "docs/quiva-mcp-handoff.md",
+        "docs/quiva-mcp-treatment-scope.md",
+        "quiva-documents-mcp/examples/authored/certificate-of-currency.json",
+        "quiva-documents-mcp/src/validate.js"
+      ]
+    },
+    "file-generator-service/src/type/template.ts": {
+      "sha": "31775bc6eee8a70737723c104769c24ffed2d870",
+      "cited_by": [
+        "quiva-documents-mcp/src/validate.js"
+      ]
+    },
+    "file-generator-service/src/utils/rule-engine/calculating-operations.ts": {
+      "sha": "2f179628a1d567f97db62e61ca9435925c537340",
+      "cited_by": [
+        "docs/quiva-mcp-handoff.md",
+        "quiva-documents-mcp/src/validate.js"
+      ]
+    },
+    "hub-service/agents/agents.go": {
+      "sha": "50acbf028820178d067ef5cf3ece8531397f2380",
+      "cited_by": [
+        "docs/quiva-mcp-handoff.md",
+        "quiva-agents-mcp/tools/harvest-examples.mjs",
+        "quiva-workspaces-mcp/examples/authored/renewal-review-board.json"
+      ]
+    },
+    "hub-service/data/demo-flow.go": {
+      "sha": "d7dc8041e319ff302ea8518477db50587c2c066b",
+      "cited_by": [
+        "docs/lessons.md"
+      ]
+    },
+    "hub-service/handler/agents.go": {
+      "sha": "d72af7607fdf75b9c3cf77d29e16bc554d10c72b",
+      "cited_by": [
+        "docs/lessons.md",
+        "quiva-agents-mcp/examples/authored/submission-triage-agent.json",
+        "quiva-agents-mcp/src/agents-docs.js"
+      ]
+    },
+    "hub-service/handler/create-workflow.go": {
+      "sha": "867726f77ba668481ad855e21a64002a898852cf",
+      "cited_by": [
+        "docs/quiva-flows-mcp-playbook.md",
+        "quiva-flows-mcp/src/validate.js"
+      ]
+    },
+    "hub-service/jseval/rules.go": {
+      "sha": "caaa035830848250cba6f5107b1c4f2599f100ab",
+      "cited_by": [
+        "docs/lessons.md",
+        "docs/quiva-mcp-handoff.md",
+        "docs/quiva-mcp-hardening-plan.md",
+        "docs/quiva-mcp-treatment-scope.md",
+        "quiva-flows-mcp/src/rules-docs.js"
+      ]
+    },
+    "hub-service/model/agents.go": {
+      "sha": "db891592b2b06b001e7ff48b4deea272a7603151",
+      "cited_by": [
+        "docs/quiva-mcp-treatment-scope.md",
+        "quiva-agents-mcp/src/agents-docs.js"
+      ]
+    },
+    "hub-service/model/request.go": {
+      "sha": "a9f0b677d48bb579688a8cdc6f20750844f48246",
+      "cited_by": [
+        "docs/quiva-flows-mcp-playbook.md",
+        "quiva-flows-mcp/src/node-docs.js"
+      ]
+    },
+    "hub-service/runner/graph.go": {
+      "sha": "f42c59371adcb051b7757ce173478834b8e9aa12",
+      "cited_by": [
+        "docs/quiva-flows-mcp-playbook.md",
+        "quiva-flows-mcp/src/node-docs.js",
+        "quiva-flows-mcp/src/rules-docs.js"
+      ]
+    },
+    "hub-service/service/service.go": {
+      "sha": "0e12540914e877319ca3cb3359ea2f0e3a28b07e",
+      "cited_by": [
+        "quiva-agents-mcp/src/agents-docs.js",
+        "quiva-records-mcp/src/records-docs.js"
+      ]
+    },
+    "microstrate/src/components/records/form/record-view-renderer.component.svelte": {
+      "sha": "31e95e1760274762b66fd0c3102b4b8c03a14684",
+      "cited_by": [
+        "docs/quiva-mcp-handoff.md"
+      ]
+    },
+    "microstrate/src/components/records/form/views-repeater.test.ts": {
+      "sha": "d0924186c571e16d9bade5e3d0d5fda931880c49",
+      "cited_by": [
+        "docs/quiva-mcp-handoff.md"
+      ]
+    },
+    "microstrate/src/components/records/records.utils.ts": {
+      "sha": "d99c6f54e26f512525f6c9378b2603dd7ee802fb",
+      "cited_by": [
+        "docs/quiva-mcp-handoff.md"
+      ]
+    },
+    "microstrate/src/components/spaces/tasks/task-time-tracking.utils.ts": {
+      "sha": "77a4600361bb8e2c046a9b2a982cfbed90d5b6f9",
+      "cited_by": [
+        "quiva-workspaces-mcp/src/validate.js"
+      ]
+    },
+    "microstrate/src/services/api/records/records.services.ts": {
+      "sha": "84c56adf90cf1bd7ea1211af7a68b2e7ec60f439",
+      "cited_by": [
+        "docs/quiva-records-mcp-playbook.md"
+      ]
+    },
+    "microstrate/src/types/records.types.ts": {
+      "sha": "7933a57e993ce61bf2fa222604fca9d62fc8e36c",
+      "cited_by": [
+        "docs/quiva-records-mcp-playbook.md"
+      ]
+    },
+    "microstrate/src/types/rule.types.ts": {
+      "sha": "ac41a23cd59e7839001363fd272c7cae978ccb7f",
+      "cited_by": [
+        "quiva-flows-mcp/src/rules-docs.js"
+      ]
+    },
+    "microstrate/src/utils/json-schema.utilts.ts": {
+      "sha": "4d78f304fbd49f0a0747fe3c9bad9660919afde6",
+      "cited_by": [
+        "docs/lessons.md",
+        "docs/quiva-flows-mcp-playbook.md",
+        "quiva-flows-mcp/src/rules-docs.js"
+      ]
+    },
+    "microstrate/src/utils/transform.utils.ts": {
+      "sha": "f353a2c6d9dcbe7efad744d6ab424607889cfa52",
+      "cited_by": [
+        "docs/quiva-mcp-handoff.md",
+        "quiva-agents-mcp/tools/push-example.mjs"
+      ]
+    },
+    "records-service/handler/config.go": {
+      "sha": "68749e7dca57224ed0bba70054cf0640349fc560",
+      "cited_by": [
+        "quiva-records-mcp/src/validate.js"
+      ]
+    },
+    "records-service/handler/records.go": {
+      "sha": "8d0b9ba9344648a38b8c9bd80bb5dfca9622f924",
+      "cited_by": [
+        "quiva-records-mcp/src/records-docs.js"
+      ]
+    },
+    "records-service/model/api.go": {
+      "sha": "d34bd01f22a930557cf3278dcd3d6aa8cfd81cfd",
+      "cited_by": [
+        "docs/quiva-records-mcp-playbook.md",
+        "quiva-records-mcp/src/records-docs.js"
+      ]
+    },
+    "workspaces-service/handler/task_actions.go": {
+      "sha": "70b8374a279f1b0d8665239e1c455a0ade736157",
+      "cited_by": [
+        "docs/quiva-mcp-handoff.md",
+        "quiva-workspaces-mcp/examples/authored/renewal-review-board.json",
+        "quiva-workspaces-mcp/src/index.js",
+        "quiva-workspaces-mcp/src/workspaces-docs.js"
+      ]
+    },
+    "workspaces-service/handler/tasks.go": {
+      "sha": "b0467519bf54709ecff30645dbfb5f637b649e77",
+      "cited_by": [
+        "quiva-workspaces-mcp/examples/authored/renewal-review-board.json"
+      ]
+    },
+    "workspaces-service/model/api.go": {
+      "sha": "f90933a6b168c1a5cf9bb9ed5325d53b43bcb0a0",
+      "cited_by": [
+        "quiva-workspaces-mcp/src/validate.js"
+      ]
+    }
+  }
+}

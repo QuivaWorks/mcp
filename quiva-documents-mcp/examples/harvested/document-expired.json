@@ -1,0 +1,49 @@
+{
+  "slug": "document-expired",
+  "kind": "document",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "subject": "ms.document.document.spaces.FAHUB.<<REDACTED:name>>.alex-new-test-3.pdf",
+    "key": "alex-new-test-3.pdf",
+    "harvested_from": "generated document (PII scrubbed — shape only)"
+  },
+  "teaches": [
+    "the generated-document record shape (what get_document returns)",
+    "signature status(es) present: EXPIRED",
+    "a SENT/EXPIRED signature carries extra fields (request, error, signed_at) that a DRAFT one does not",
+    "output.key is a storage URI (obj://bucket/dot.separated.path)",
+    "errors: null on a successful generation"
+  ],
+  "redactions": 6,
+  "config": {
+    "created_at": "2026-07-21T16:19:18.630Z",
+    "errors": null,
+    "modified": 1784650811,
+    "name": "alex-new-test-3.pdf",
+    "output": {
+      "key": "obj://microstrate-workspaces/spaces.FAHUB.<<REDACTED:name>>.alex-new-test-3.pdf"
+    },
+    "sequence": 67,
+    "signatures": [
+      {
+        "email": "<<REDACTED:email>>",
+        "error": "Text tags error: No signers in text tags",
+        "expiry": "2026-07-21T16:19:22.188Z",
+        "name": "<<REDACTED:name>>",
+        "order": null,
+        "request": {
+          "id": "<<REDACTED:id>>",
+          "is_embedded": true,
+          "signature_id": "<<REDACTED:id>>"
+        },
+        "signed_at": null,
+        "status": "EXPIRED"
+      }
+    ],
+    "subject": "ms.document.document.spaces.FAHUB.<<REDACTED:name>>.alex-new-test-3.pdf",
+    "template": {
+      "key": "alex-test"
+    },
+    "type": "upserted"
+  }
+}

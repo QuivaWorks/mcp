@@ -1,0 +1,477 @@
+{
+  "slug": "strategy",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "config_id": "strategy",
+    "harvested": "live record config (configs only — no record data)"
+  },
+  "featured": false,
+  "teaches": [
+    "required fields",
+    "format: date",
+    "schema types: array, number, object, string"
+  ],
+  "form_node_count": 0,
+  "config": {
+    "id": "strategy",
+    "name": "Strategy",
+    "description": "Financial strategies for client goals and objectives",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "asset_allocation": {
+          "ui": {
+            "inputType": "key-value",
+            "props": {
+              "label": "Asset Allocation"
+            }
+          },
+          "description": "Recommended asset allocation breakdown",
+          "type": "object",
+          "properties": {
+            "breakdown": {
+              "ui": {
+                "inputType": "array",
+                "props": {
+                  "label": "Asset Breakdown"
+                }
+              },
+              "description": "Detailed breakdown by asset class",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "asset_class": {
+                    "ui": {
+                      "inputType": "text",
+                      "props": {
+                        "helpText": {
+                          "markdown": "Asset class name"
+                        },
+                        "label": "Asset Class"
+                      }
+                    },
+                    "description": "Asset class name",
+                    "type": "string"
+                  },
+                  "percentage": {
+                    "ui": {
+                      "inputType": "number",
+                      "props": {
+                        "helpText": {
+                          "markdown": "Percentage allocation"
+                        },
+                        "label": "Percentage"
+                      }
+                    },
+                    "description": "Percentage allocation",
+                    "type": "number"
+                  },
+                  "rationale": {
+                    "ui": {
+                      "inputType": "textarea",
+                      "props": {
+                        "helpText": {
+                          "markdown": "Why this allocation"
+                        },
+                        "label": "Rationale"
+                      }
+                    },
+                    "description": "Why this allocation",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "asset_class",
+                  "percentage"
+                ]
+              }
+            },
+            "cash_percentage": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "helpText": {
+                    "markdown": "Percentage allocated to cash"
+                  },
+                  "label": "Cash %",
+                  "max": 100,
+                  "min": 0
+                }
+              },
+              "description": "Percentage allocated to cash",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "defensive_assets_percentage": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "helpText": {
+                    "markdown": "Percentage allocated to defensive assets"
+                  },
+                  "label": "Defensive Assets %",
+                  "max": 100,
+                  "min": 0
+                }
+              },
+              "description": "Percentage allocated to defensive assets",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "growth_assets_percentage": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "helpText": {
+                    "markdown": "Percentage allocated to growth assets"
+                  },
+                  "label": "Growth Assets %",
+                  "max": 100,
+                  "min": 0
+                }
+              },
+              "description": "Percentage allocated to growth assets",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "growth_assets_percentage",
+            "defensive_assets_percentage",
+            "cash_percentage"
+          ]
+        },
+        "client_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Client ID"
+            }
+          },
+          "type": "string"
+        },
+        "created_by": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Created By"
+            }
+          },
+          "type": "string"
+        },
+        "created_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Created Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "expected_return": {
+          "ui": {
+            "inputType": "number",
+            "props": {
+              "label": "Expected Return (%)"
+            }
+          },
+          "type": "number"
+        },
+        "goal_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Goal ID"
+            }
+          },
+          "type": "string"
+        },
+        "implementation_timeline": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Implementation Timeline"
+            }
+          },
+          "type": "string"
+        },
+        "last_modified_by": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Last Modified By"
+            }
+          },
+          "type": "string"
+        },
+        "last_modified_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Last Modified Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "review_frequency": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Review Frequency",
+              "options": [
+                {
+                  "text": "Quarterly",
+                  "value": "quarterly"
+                },
+                {
+                  "text": "Semi-Annual",
+                  "value": "semi_annual"
+                },
+                {
+                  "text": "Annual",
+                  "value": "annual"
+                },
+                {
+                  "text": "As Needed",
+                  "value": "as_needed"
+                }
+              ]
+            }
+          },
+          "default": "annual",
+          "type": "string"
+        },
+        "risk_level": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Risk Level",
+              "options": [
+                {
+                  "text": "Low",
+                  "value": "low"
+                },
+                {
+                  "text": "Moderate",
+                  "value": "moderate"
+                },
+                {
+                  "text": "High",
+                  "value": "high"
+                }
+              ]
+            }
+          },
+          "type": "string"
+        },
+        "status": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Status",
+              "options": [
+                {
+                  "text": "Draft",
+                  "value": "draft"
+                },
+                {
+                  "text": "Active",
+                  "value": "active"
+                },
+                {
+                  "text": "Paused",
+                  "value": "paused"
+                },
+                {
+                  "text": "Completed",
+                  "value": "completed"
+                },
+                {
+                  "text": "Superseded",
+                  "value": "superseded"
+                }
+              ]
+            }
+          },
+          "default": "draft",
+          "type": "string"
+        },
+        "strategy_description": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Strategy Description"
+            }
+          },
+          "type": "string"
+        },
+        "strategy_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Strategy ID"
+            }
+          },
+          "type": "string"
+        },
+        "strategy_name": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Strategy Name"
+            }
+          },
+          "type": "string"
+        },
+        "strategy_type": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Strategy Type",
+              "options": [
+                {
+                  "text": "Investment",
+                  "value": "investment"
+                },
+                {
+                  "text": "Tax Planning",
+                  "value": "tax_planning"
+                },
+                {
+                  "text": "Debt Management",
+                  "value": "debt_management"
+                },
+                {
+                  "text": "Insurance",
+                  "value": "insurance"
+                },
+                {
+                  "text": "Superannuation",
+                  "value": "superannuation"
+                },
+                {
+                  "text": "Estate Planning",
+                  "value": "estate_planning"
+                },
+                {
+                  "text": "Other",
+                  "value": "other"
+                }
+              ]
+            }
+          },
+          "type": "string"
+        }
+      },
+      "required": [
+        "strategy_id",
+        "client_id",
+        "goal_id",
+        "strategy_name",
+        "strategy_description",
+        "strategy_type",
+        "risk_level",
+        "review_frequency",
+        "status",
+        "created_date",
+        "created_by",
+        "last_modified_date",
+        "last_modified_by"
+      ]
+    },
+    "views": {
+      "form": {
+        "type": "grid",
+        "props": {
+          "gridTemplateColumns": "1fr 1fr",
+          "gap": 16
+        },
+        "children": [
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr",
+              "gap": 16
+            },
+            "children": [
+              {
+                "type": "",
+                "field": "strategy_id"
+              },
+              {
+                "type": "",
+                "field": "client_id"
+              },
+              {
+                "type": "",
+                "field": "goal_id"
+              },
+              {
+                "type": "",
+                "field": "strategy_name"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr",
+              "gap": 16
+            },
+            "children": [
+              {
+                "type": "",
+                "field": "strategy_type"
+              },
+              {
+                "type": "",
+                "field": "risk_level"
+              },
+              {
+                "type": "",
+                "field": "review_frequency"
+              },
+              {
+                "type": "",
+                "field": "status"
+              }
+            ]
+          }
+        ]
+      },
+      "table": {
+        "type": "table",
+        "columns": [
+          {
+            "field": "strategy_id",
+            "order": 1
+          },
+          {
+            "field": "client_id",
+            "order": 2
+          },
+          {
+            "field": "strategy_type",
+            "order": 3
+          },
+          {
+            "field": "risk_level",
+            "order": 4
+          },
+          {
+            "field": "status",
+            "order": 5
+          }
+        ]
+      }
+    },
+    "created_at": "2026-07-10T14:48:34Z",
+    "updated_at": "2026-07-10T15:22:11Z"
+  }
+}

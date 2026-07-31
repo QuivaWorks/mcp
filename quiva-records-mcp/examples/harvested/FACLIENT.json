@@ -1,0 +1,432 @@
+{
+  "slug": "FACLIENT",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "config_id": "FACLIENT",
+    "harvested": "live record config (configs only — no record data)"
+  },
+  "featured": false,
+  "teaches": [
+    "required fields",
+    "format: date",
+    "enums",
+    "schema types: object, string"
+  ],
+  "form_node_count": 0,
+  "config": {
+    "id": "FACLIENT",
+    "name": "Advisor Client",
+    "description": "Client information including personal, family, employment, financial, and investment details",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "address": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Address"
+            }
+          },
+          "title": "Address",
+          "description": "Full residential address",
+          "type": "string"
+        },
+        "assets": {
+          "ui": {
+            "inputType": "currency",
+            "props": {
+              "decimalPlace": 2,
+              "label": "Total Assets"
+            }
+          },
+          "title": "Total Assets",
+          "description": "Estimated total liquid and illiquid assets",
+          "type": "string"
+        },
+        "dependents": {
+          "ui": {
+            "inputType": "number",
+            "props": {
+              "label": "Number of Dependents",
+              "min": 0
+            }
+          },
+          "title": "Number of Dependents",
+          "description": "Number of financial dependents",
+          "type": "string"
+        },
+        "dob": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Date of Birth"
+            }
+          },
+          "title": "Date of Birth",
+          "description": "Client's date of birth (YYYY-MM-DD)",
+          "type": "string",
+          "format": "date"
+        },
+        "email": {
+          "ui": {
+            "inputType": "text"
+          },
+          "title": "Email",
+          "description": "Clients contact email address",
+          "type": "string"
+        },
+        "employment": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Employment Status",
+              "placeholder": "Enter employment details"
+            }
+          },
+          "title": "Employment Status",
+          "description": "Current employment details or status",
+          "type": "string"
+        },
+        "income": {
+          "ui": {
+            "inputType": "currency",
+            "props": {
+              "decimalPlace": 2,
+              "label": "Annual Income"
+            }
+          },
+          "title": "Annual Income",
+          "description": "Estimated annual income",
+          "type": "string"
+        },
+        "investmentExperience": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Investment Experience",
+              "options": [
+                {
+                  "text": "Beginner",
+                  "value": "Beginner"
+                },
+                {
+                  "text": "Intermediate",
+                  "value": "Intermediate"
+                },
+                {
+                  "text": "Advanced",
+                  "value": "Advanced"
+                }
+              ]
+            }
+          },
+          "title": "Investment Experience",
+          "description": "Level of investment knowledge and experience",
+          "type": "string",
+          "enum": [
+            "Beginner",
+            "Intermediate",
+            "Advanced"
+          ]
+        },
+        "liabilities": {
+          "ui": {
+            "inputType": "currency",
+            "props": {
+              "decimalPlace": 2,
+              "label": "Total Liabilities"
+            }
+          },
+          "title": "Total Liabilities",
+          "description": "Estimated total debts and liabilities",
+          "type": "string"
+        },
+        "maritalStatus": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Marital Status",
+              "options": [
+                {
+                  "text": "Single",
+                  "value": "Single"
+                },
+                {
+                  "text": "Married",
+                  "value": "Married"
+                },
+                {
+                  "text": "Divorced",
+                  "value": "Divorced"
+                },
+                {
+                  "text": "Widowed",
+                  "value": "Widowed"
+                },
+                {
+                  "text": "Domestic Partnership",
+                  "value": "Domestic Partnership"
+                }
+              ]
+            }
+          },
+          "title": "Marital Status",
+          "description": "Client's current marital status",
+          "type": "string",
+          "enum": [
+            "Single",
+            "Married",
+            "Divorced",
+            "Widowed",
+            "Domestic Partnership"
+          ]
+        },
+        "name": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Full Name",
+              "placeholder": "Enter client's full legal name"
+            }
+          },
+          "title": "Full Name",
+          "description": "Client's full legal name",
+          "type": "string"
+        },
+        "phone": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Contact Number",
+              "placeholder": "Phone number or email"
+            }
+          },
+          "title": "Contact Number",
+          "description": "Primary contact phone number or email",
+          "type": "string"
+        },
+        "riskProfile": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Risk Profile",
+              "options": [
+                {
+                  "text": "Conservative",
+                  "value": "Conservative"
+                },
+                {
+                  "text": "Moderate",
+                  "value": "Moderate"
+                },
+                {
+                  "text": "Aggressive",
+                  "value": "Aggressive"
+                }
+              ]
+            }
+          },
+          "title": "Risk Profile",
+          "description": "Client's investment risk tolerance",
+          "type": "string",
+          "enum": [
+            "Conservative",
+            "Moderate",
+            "Aggressive"
+          ]
+        }
+      },
+      "required": [
+        "email",
+        "name",
+        "phone"
+      ]
+    },
+    "views": {
+      "form": {
+        "type": "grid",
+        "props": {
+          "gridTemplateColumns": "1fr"
+        },
+        "children": [
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "name"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "email"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "phone"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "address"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "dob"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "assets"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "dependents"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "employment"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "income"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "investmentExperience"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "liabilities"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "maritalStatus"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "riskProfile"
+              }
+            ]
+          }
+        ]
+      },
+      "table": {
+        "type": "table",
+        "columns": [
+          {
+            "field": "name",
+            "order": 1
+          },
+          {
+            "field": "email",
+            "order": 5
+          },
+          {
+            "field": "phone",
+            "order": 6
+          }
+        ]
+      }
+    },
+    "created_at": "2026-07-10T08:10:36Z",
+    "updated_at": "2026-07-10T08:10:36Z"
+  }
+}

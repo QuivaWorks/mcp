@@ -1,0 +1,696 @@
+{
+  "slug": "portfolio",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "config_id": "portfolio",
+    "harvested": "live record config (configs only — no record data)"
+  },
+  "featured": false,
+  "teaches": [
+    "required fields",
+    "format: date",
+    "schema types: array, number, number|null, object, string, string|null"
+  ],
+  "form_node_count": 0,
+  "config": {
+    "id": "portfolio",
+    "name": "Portfolio",
+    "description": "Client portfolios and holdings",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "asset_allocation": {
+          "ui": {
+            "inputType": "key-value",
+            "props": {
+              "helpText": {
+                "markdown": "Current asset allocation"
+              },
+              "label": "Asset Allocation"
+            }
+          },
+          "description": "Current asset allocation",
+          "type": "object",
+          "properties": {
+            "cash_percentage": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "label": "Cash %",
+                  "max": 100,
+                  "min": 0
+                }
+              },
+              "description": "Cash percentage",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "defensive_assets_percentage": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "label": "Defensive Assets %",
+                  "max": 100,
+                  "min": 0
+                }
+              },
+              "description": "Defensive assets percentage",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "growth_assets_percentage": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "label": "Growth Assets %",
+                  "max": 100,
+                  "min": 0
+                }
+              },
+              "description": "Growth assets percentage",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "growth_assets_percentage",
+            "defensive_assets_percentage",
+            "cash_percentage"
+          ]
+        },
+        "client_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Client ID"
+            }
+          },
+          "type": "string"
+        },
+        "created_by": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Created By"
+            }
+          },
+          "type": "string"
+        },
+        "created_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Created Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "custodian": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Custodian"
+            }
+          },
+          "type": "string"
+        },
+        "custodian_account_number": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Custodian Account Number"
+            }
+          },
+          "type": "string"
+        },
+        "last_modified_by": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Last Modified By"
+            }
+          },
+          "type": "string"
+        },
+        "last_modified_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Last Modified Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "last_rebalance_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Last Rebalance Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "last_valuation_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Last Valuation Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "next_review_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Next Review Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "performance": {
+          "ui": {
+            "inputType": "key-value",
+            "props": {
+              "helpText": {
+                "markdown": "Portfolio performance metrics"
+              },
+              "label": "Performance Metrics"
+            }
+          },
+          "description": "Portfolio performance metrics",
+          "type": "object",
+          "properties": {
+            "five_year_return_percentage": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "helpText": {
+                    "markdown": "Five year annualised return"
+                  },
+                  "label": "5-Year Return %"
+                }
+              },
+              "description": "Five year annualised return",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "one_year_return_percentage": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "helpText": {
+                    "markdown": "One year return percentage"
+                  },
+                  "label": "1-Year Return %"
+                }
+              },
+              "description": "One year return percentage",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "three_year_return_percentage": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "helpText": {
+                    "markdown": "Three year annualised return"
+                  },
+                  "label": "3-Year Return %"
+                }
+              },
+              "description": "Three year annualised return",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "ytd_return_percentage": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "helpText": {
+                    "markdown": "Year-to-date return percentage"
+                  },
+                  "label": "YTD Return %"
+                }
+              },
+              "description": "Year-to-date return percentage",
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          }
+        },
+        "portfolio_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Portfolio ID"
+            }
+          },
+          "type": "string"
+        },
+        "portfolio_name": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Portfolio Name"
+            }
+          },
+          "type": "string"
+        },
+        "portfolio_type": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Portfolio Type",
+              "options": [
+                {
+                  "text": "Investment",
+                  "value": "investment"
+                },
+                {
+                  "text": "Superannuation",
+                  "value": "superannuation"
+                },
+                {
+                  "text": "Property",
+                  "value": "property"
+                },
+                {
+                  "text": "Business",
+                  "value": "business"
+                },
+                {
+                  "text": "Mixed",
+                  "value": "mixed"
+                }
+              ]
+            }
+          },
+          "type": "string"
+        },
+        "positions": {
+          "ui": {
+            "inputType": "array",
+            "props": {
+              "helpText": {
+                "markdown": "Portfolio holdings and positions"
+              },
+              "label": "Portfolio Positions"
+            }
+          },
+          "description": "Portfolio holdings and positions",
+          "type": "array",
+          "items": {
+            "ui": {
+              "inputType": "array",
+              "props": {
+                "label": "Positions"
+              }
+            },
+            "type": "object",
+            "properties": {
+              "acquisition_date": {
+                "ui": {
+                  "inputType": "date",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Date position was acquired"
+                    },
+                    "label": "Acquisition Date"
+                  }
+                },
+                "description": "Date position was acquired",
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date"
+              },
+              "asset_class": {
+                "ui": {
+                  "inputType": "text",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Asset class (e.g., Equities, Fixed Income)"
+                    },
+                    "label": "Asset Class"
+                  }
+                },
+                "description": "Asset class (e.g., Equities, Fixed Income)",
+                "type": "string"
+              },
+              "cost_basis": {
+                "ui": {
+                  "inputType": "currency",
+                  "props": {
+                    "decimalPlace": 2,
+                    "helpText": {
+                      "markdown": "Original purchase cost"
+                    },
+                    "label": "Cost Basis"
+                  }
+                },
+                "description": "Original purchase cost",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "current_value": {
+                "ui": {
+                  "inputType": "currency",
+                  "props": {
+                    "decimalPlace": 2,
+                    "helpText": {
+                      "markdown": "Current market value"
+                    },
+                    "label": "Current Value"
+                  }
+                },
+                "description": "Current market value",
+                "type": "number"
+              },
+              "percentage_of_portfolio": {
+                "ui": {
+                  "inputType": "number",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Percentage of total portfolio"
+                    },
+                    "label": "Percentage of Portfolio"
+                  }
+                },
+                "description": "Percentage of total portfolio",
+                "type": "number"
+              },
+              "position_id": {
+                "ui": {
+                  "inputType": "text",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Unique position identifier"
+                    },
+                    "label": "Position ID"
+                  }
+                },
+                "description": "Unique position identifier",
+                "type": "string"
+              },
+              "product_code": {
+                "ui": {
+                  "inputType": "text",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Product code or ISIN"
+                    },
+                    "label": "Product Code"
+                  }
+                },
+                "description": "Product code or ISIN",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "product_name": {
+                "ui": {
+                  "inputType": "text",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Name of investment product"
+                    },
+                    "label": "Product Name"
+                  }
+                },
+                "description": "Name of investment product",
+                "type": "string"
+              },
+              "quantity": {
+                "ui": {
+                  "inputType": "number",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Number of units/shares held"
+                    },
+                    "label": "Quantity"
+                  }
+                },
+                "description": "Number of units/shares held",
+                "type": "number"
+              },
+              "sector": {
+                "ui": {
+                  "inputType": "text",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Sector classification"
+                    },
+                    "label": "Sector"
+                  }
+                },
+                "description": "Sector classification",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "unit_price": {
+                "ui": {
+                  "inputType": "currency",
+                  "props": {
+                    "decimalPlace": 2,
+                    "helpText": {
+                      "markdown": "Current price per unit"
+                    },
+                    "label": "Unit Price"
+                  }
+                },
+                "description": "Current price per unit",
+                "type": "number"
+              },
+              "unrealised_gain_loss": {
+                "ui": {
+                  "inputType": "currency",
+                  "props": {
+                    "decimalPlace": 2,
+                    "helpText": {
+                      "markdown": "Unrealised gain or loss"
+                    },
+                    "label": "Unrealised Gain/Loss"
+                  }
+                },
+                "description": "Unrealised gain or loss",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "position_id",
+              "product_name",
+              "quantity",
+              "unit_price",
+              "current_value",
+              "percentage_of_portfolio",
+              "asset_class"
+            ]
+          }
+        },
+        "rebalancing_status": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Rebalancing Status",
+              "options": [
+                {
+                  "text": "On Target",
+                  "value": "on_target"
+                },
+                {
+                  "text": "Needs Rebalancing",
+                  "value": "needs_rebalancing"
+                },
+                {
+                  "text": "Rebalancing In Progress",
+                  "value": "rebalancing_in_progress"
+                }
+              ]
+            }
+          },
+          "type": "string"
+        },
+        "total_value": {
+          "ui": {
+            "inputType": "currency",
+            "props": {
+              "decimalPlace": 2,
+              "label": "Total Value"
+            }
+          },
+          "type": "number"
+        }
+      },
+      "required": [
+        "portfolio_id",
+        "client_id",
+        "portfolio_name",
+        "portfolio_type",
+        "custodian",
+        "total_value",
+        "last_valuation_date",
+        "rebalancing_status",
+        "created_date",
+        "created_by",
+        "last_modified_date",
+        "last_modified_by",
+        "positions",
+        "asset_allocation"
+      ]
+    },
+    "views": {
+      "form": {
+        "type": "grid",
+        "props": {
+          "gridTemplateColumns": "1fr 1fr",
+          "gap": 16
+        },
+        "children": [
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr",
+              "gap": 16
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "portfolio_id"
+              },
+              {
+                "type": "field",
+                "field": "client_id"
+              },
+              {
+                "type": "field",
+                "field": "portfolio_name"
+              },
+              {
+                "type": "field",
+                "field": "portfolio_type"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr",
+              "gap": 16
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "custodian"
+              },
+              {
+                "type": "field",
+                "field": "custodian_account_number"
+              },
+              {
+                "type": "field",
+                "field": "total_value"
+              },
+              {
+                "type": "field",
+                "field": "last_valuation_date"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr",
+              "gap": 16
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "positions"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr",
+              "gap": 16
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "asset_allocation"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr",
+              "gap": 16
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "performance"
+              }
+            ]
+          }
+        ]
+      },
+      "table": {
+        "type": "table",
+        "columns": [
+          {
+            "field": "portfolio_id",
+            "order": 1
+          },
+          {
+            "field": "portfolio_name",
+            "order": 2
+          },
+          {
+            "field": "portfolio_type",
+            "order": 3
+          },
+          {
+            "field": "total_value",
+            "order": 4
+          },
+          {
+            "field": "rebalancing_status",
+            "order": 5
+          }
+        ]
+      }
+    },
+    "created_at": "2026-07-10T14:48:34Z",
+    "updated_at": "2026-07-10T15:24:14Z"
+  }
+}

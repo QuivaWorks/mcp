@@ -1,0 +1,41 @@
+{
+  "slug": "document-draft",
+  "kind": "document",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "subject": "ms.document.document.spaces.FAHUB.<<REDACTED:name>>.alex-new-test.pdf",
+    "key": "alex-new-test.pdf",
+    "harvested_from": "generated document (PII scrubbed — shape only)"
+  },
+  "teaches": [
+    "the generated-document record shape (what get_document returns)",
+    "signature status(es) present: DRAFT",
+    "output.key is a storage URI (obj://bucket/dot.separated.path)",
+    "errors: null on a successful generation"
+  ],
+  "redactions": 4,
+  "config": {
+    "created_at": "2026-07-21T16:11:12.912Z",
+    "errors": null,
+    "modified": 1784650275,
+    "name": "alex-new-test.pdf",
+    "output": {
+      "key": "obj://microstrate-workspaces/spaces.FAHUB.<<REDACTED:name>>.alex-new-test.pdf"
+    },
+    "sequence": 57,
+    "signatures": [
+      {
+        "email": "<<REDACTED:email>>",
+        "expiry": "2026-07-21T16:11:15.516Z",
+        "name": "<<REDACTED:name>>",
+        "order": 1,
+        "status": "DRAFT"
+      }
+    ],
+    "subject": "ms.document.document.spaces.FAHUB.<<REDACTED:name>>.alex-new-test.pdf",
+    "template": {
+      "key": "alex-test"
+    },
+    "type": "upserted"
+  }
+}

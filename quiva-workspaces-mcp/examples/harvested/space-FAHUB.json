@@ -1,0 +1,66 @@
+{
+  "slug": "space-FAHUB",
+  "kind": "space",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "id": "FAHUB",
+    "url": "https://app.microstrate.io/en/hub/spaces/FAHUB/tasks",
+    "harvested_from": "GET /workspaces/spaces"
+  },
+  "teaches": [
+    "4 custom board statuses (columns)",
+    "statuses carry the board's presentation fields (color, complete) — the API does not require them, the board reads them",
+    "record_config_ids linking the space to records configs (Client, KYC)",
+    "read-only fields a create/update body must NOT echo back: owner, created_at, updated_at, url"
+  ],
+  "config": {
+    "name": "Advisor Hub",
+    "id": "FAHUB",
+    "description": "House financial advisor folders, tasks and other resources related to financial advisor clients",
+    "statuses": [
+      {
+        "id": "to_do",
+        "name": "To Do",
+        "color": "#6B7280",
+        "complete": false
+      },
+      {
+        "id": "in_progress",
+        "name": "In Progress",
+        "color": "#3B82F6",
+        "complete": false
+      },
+      {
+        "id": "in_review",
+        "name": "In Review",
+        "color": "#F59E0B",
+        "complete": false
+      },
+      {
+        "id": "completed",
+        "name": "Completed",
+        "color": "#10B981",
+        "complete": false
+      }
+    ],
+    "owner": "<<REDACTED:user-id>>",
+    "created_at": "2026-07-07T10:04:21Z",
+    "updated_at": "2026-07-29T10:47:00Z",
+    "record_config_ids": [
+      "Client",
+      "KYC"
+    ],
+    "record_configs": [
+      {
+        "id": "IBCLIENT"
+      },
+      {
+        "id": "Client"
+      },
+      {
+        "id": "_5igeJIqDdsbU1j-GfcKb"
+      }
+    ],
+    "url": "https://app.microstrate.io/en/hub/spaces/FAHUB/tasks"
+  }
+}

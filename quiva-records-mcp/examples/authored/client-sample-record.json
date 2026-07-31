@@ -1,0 +1,18 @@
+{
+  "config_id": "Client",
+  "data": {
+    "name": "Morgan Elise Rivera",
+    "email": "morgan.rivera@example.com",
+    "phone": "+61 400 111 222",
+    "dob": "1990-06-22",
+    "address": "18 Harbour View Terrace, Fremantle WA 6160, Australia",
+    "employment": "Registered Nurse, WA Health",
+    "maritalStatus": "Married",
+    "dependents": "2",
+    "income": "145000",
+    "assets": "620000",
+    "liabilities": "310000",
+    "investmentExperience": "Intermediate",
+    "riskProfile": "Moderate"
+  }
+}

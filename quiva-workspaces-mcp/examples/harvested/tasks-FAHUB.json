@@ -1,0 +1,86 @@
+{
+  "slug": "tasks-FAHUB",
+  "kind": "tasks",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "space_id": "FAHUB",
+    "harvested_from": "GET /workspaces/space/FAHUB/tasks (4 of 4 kept)"
+  },
+  "teaches": [
+    "4 real tasks with server-generated ids ({SPACEID}-{n})",
+    "task fields in live use: priority, status, folder, reporter",
+    "status values reference the SPACE's status ids: to_do",
+    "priority values reference the SPACE's priority ids: medium",
+    "url is server-built: /en/hub/spaces/{SPACE}/tasks?task={TASK-ID}"
+  ],
+  "tasks": [
+    {
+      "assignees": [
+        "<<REDACTED:user-id>>"
+      ],
+      "attachments": [],
+      "created_at": "2026-07-29T08:38:26Z",
+      "created_by": "<<REDACTED:user-id>>",
+      "folder": "Chris Humboldt - chris·humboldt+other@evari·tech",
+      "id": "FAHUB-10",
+      "priority": "medium",
+      "reporter": "<<REDACTED:user-id>>",
+      "space_id": "FAHUB",
+      "status": "to_do",
+      "title": "Test Three",
+      "updated_at": "2026-07-29T08:38:26Z",
+      "url": "https://app.microstrate.io/en/hub/spaces/FAHUB/tasks?task=FAHUB-10"
+    },
+    {
+      "assignees": [
+        "<<REDACTED:user-id>>"
+      ],
+      "attachments": [],
+      "created_at": "2026-07-29T08:48:53Z",
+      "created_by": "<<REDACTED:user-id>>",
+      "folder": "Chris Humboldt - chris·humboldt+other@evari·tech",
+      "id": "FAHUB-11",
+      "priority": "medium",
+      "reporter": "<<REDACTED:user-id>>",
+      "space_id": "FAHUB",
+      "status": "to_do",
+      "title": "Test Four",
+      "updated_at": "2026-07-29T08:48:53Z",
+      "url": "https://app.microstrate.io/en/hub/spaces/FAHUB/tasks?task=FAHUB-11"
+    },
+    {
+      "assignees": [
+        "<<REDACTED:user-id>>"
+      ],
+      "attachments": [],
+      "created_at": "2026-07-29T08:49:51Z",
+      "created_by": "<<REDACTED:user-id>>",
+      "folder": "Chris Humboldt - chris·humboldt+other@evari·tech",
+      "id": "FAHUB-12",
+      "priority": "medium",
+      "reporter": "<<REDACTED:user-id>>",
+      "space_id": "FAHUB",
+      "status": "to_do",
+      "title": "Test Five",
+      "updated_at": "2026-07-29T08:49:51Z",
+      "url": "https://app.microstrate.io/en/hub/spaces/FAHUB/tasks?task=FAHUB-12"
+    },
+    {
+      "assignees": [
+        "<<REDACTED:user-id>>"
+      ],
+      "attachments": [],
+      "created_at": "2026-07-29T10:00:58Z",
+      "created_by": "<<REDACTED:user-id>>",
+      "folder": "Chris Humboldt - chris·humboldt+other@evari·tech",
+      "id": "FAHUB-13",
+      "priority": "medium",
+      "reporter": "<<REDACTED:user-id>>",
+      "space_id": "FAHUB",
+      "status": "to_do",
+      "title": "Test Five",
+      "updated_at": "2026-07-29T10:00:58Z",
+      "url": "https://app.microstrate.io/en/hub/spaces/FAHUB/tasks?task=FAHUB-13"
+    }
+  ]
+}

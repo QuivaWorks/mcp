@@ -1,0 +1,160 @@
+{
+  "slug": "space-VERTICAL",
+  "kind": "space",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "id": "VERTICAL",
+    "url": "https://app.microstrate.io/en/hub/spaces/VERTICAL/tasks",
+    "harvested_from": "GET /workspaces/spaces"
+  },
+  "teaches": [
+    "6 custom board statuses (columns)",
+    "statuses carry the board's presentation fields (color, order, complete, is_visible) — the API does not require them, the board reads them",
+    "a status flagged `complete: true` (the done state)",
+    "default_status naming the column new tasks land in",
+    "5 custom task priorities with icon presentation (icon, icon_type, icon_color)",
+    "record_config_ids linking the space to records configs (Client, insurance_client, financial_situation, goal, strategy, recommendation, advice, modelling_scenario, portfolio, review)",
+    "read-only fields a create/update body must NOT echo back: owner, created_at, updated_at, url"
+  ],
+  "config": {
+    "name": "Vertical",
+    "id": "VERTICAL",
+    "default_status": "backlog",
+    "statuses": [
+      {
+        "id": "backlog",
+        "name": "Backlog",
+        "color": "#9ca3af",
+        "order": 10,
+        "complete": false,
+        "is_visible": true
+      },
+      {
+        "id": "in_progress",
+        "name": "In Progress",
+        "color": "#3b82f6",
+        "order": 20,
+        "complete": false,
+        "is_visible": true
+      },
+      {
+        "id": "blocked",
+        "name": "Blocked",
+        "color": "#ef4444",
+        "order": 30,
+        "complete": false,
+        "is_visible": true
+      },
+      {
+        "id": "testing",
+        "name": "Testing",
+        "color": "#eab308",
+        "order": 40,
+        "complete": false,
+        "is_visible": true
+      },
+      {
+        "id": "review",
+        "name": "Review",
+        "color": "#a855f7",
+        "order": 50,
+        "complete": false,
+        "is_visible": true
+      },
+      {
+        "id": "completed",
+        "name": "Completed",
+        "color": "#22c55e",
+        "order": 60,
+        "complete": true,
+        "is_visible": true
+      }
+    ],
+    "owner": "<<REDACTED:user-id>>",
+    "created_at": "2026-06-30T21:22:41Z",
+    "updated_at": "2026-07-10T14:48:57Z",
+    "record_config_ids": [
+      "Client",
+      "insurance_client",
+      "financial_situation",
+      "goal",
+      "strategy",
+      "recommendation",
+      "advice",
+      "modelling_scenario",
+      "portfolio",
+      "review"
+    ],
+    "record_configs": [
+      {
+        "id": "Client"
+      },
+      {
+        "id": "insurance_client"
+      },
+      {
+        "id": "financial_situation"
+      },
+      {
+        "id": "goal"
+      },
+      {
+        "id": "strategy"
+      },
+      {
+        "id": "recommendation"
+      },
+      {
+        "id": "advice"
+      },
+      {
+        "id": "modelling_scenario"
+      },
+      {
+        "id": "portfolio"
+      },
+      {
+        "id": "review"
+      }
+    ],
+    "url": "https://app.microstrate.io/en/hub/spaces/VERTICAL/tasks",
+    "priorities": [
+      {
+        "id": "lowest",
+        "name": "Lowest",
+        "icon": "angles-down",
+        "icon_type": "light",
+        "icon_color": "#3B82F6"
+      },
+      {
+        "id": "low",
+        "name": "Low",
+        "icon": "angle-down",
+        "icon_type": "light",
+        "icon_color": "#1E3A8A"
+      },
+      {
+        "id": "medium",
+        "default": true,
+        "name": "Medium",
+        "icon": "equals",
+        "icon_type": "light",
+        "icon_color": "#e8b800"
+      },
+      {
+        "id": "high",
+        "name": "High",
+        "icon": "angle-up",
+        "icon_type": "light",
+        "icon_color": "#ff6600"
+      },
+      {
+        "id": "highest",
+        "name": "Highest",
+        "icon": "angles-up",
+        "icon_type": "light",
+        "icon_color": "#DC2626"
+      }
+    ]
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "quiva-mcp",
+  "private": true,
+  "description": "MCP servers for the Quiva platform: flows, records, documents, workspaces, agents",
+  "type": "module",
+  "workspaces": [
+    "quiva-flows-mcp",
+    "quiva-records-mcp",
+    "quiva-documents-mcp",
+    "quiva-workspaces-mcp",
+    "quiva-agents-mcp"
+  ],
+  "scripts": {
+    "test": "npm run test --workspaces --if-present",
+    "engine:check": "node engine/sync.mjs",
+    "engine:list": "node engine/sync.mjs --list",
+    "engine:pin": "node engine/sync.mjs --pin",
+    "harvest": "npm run harvest --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

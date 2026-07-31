@@ -1,0 +1,831 @@
+{
+  "slug": "sc8DhU6CEXh4gkJPnS_Le",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "config_id": "sc8DhU6CEXh4gkJPnS_Le",
+    "harvested": "live record config (configs only — no record data)"
+  },
+  "featured": true,
+  "teaches": [
+    "required fields",
+    "schema types: array, boolean, number, object, string",
+    "grid containers",
+    "field nodes bound by dotted path",
+    "array-field repeater (arrays of objects)",
+    "node-level inputType: dropdown, number, phone, text",
+    "json-logic form rules on properties: required, value, visible"
+  ],
+  "form_node_count": 59,
+  "config": {
+    "id": "sc8DhU6CEXh4gkJPnS_Le",
+    "name": "ALEX-USER",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "Address": {
+          "title": "Address",
+          "type": "object",
+          "properties": {
+            "City": {
+              "title": "City",
+              "type": "string"
+            },
+            "Country": {
+              "title": "Country",
+              "type": "string"
+            },
+            "PostalCode": {
+              "title": "Postal code",
+              "type": "string"
+            },
+            "Street": {
+              "title": "Street",
+              "type": "string"
+            }
+          }
+        },
+        "Age": {
+          "type": "number"
+        },
+        "AvatarUrl": {
+          "title": "Avatar URL",
+          "type": "string"
+        },
+        "CreatedAt": {
+          "title": "Created at",
+          "type": "string"
+        },
+        "Email": {
+          "title": "Email",
+          "type": "string"
+        },
+        "EmailVerified": {
+          "title": "Email verified",
+          "type": "boolean"
+        },
+        "FirstName": {
+          "title": "First name",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "IsActive": {
+          "title": "Active",
+          "type": "boolean"
+        },
+        "Items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "Name": {
+                "type": "string"
+              },
+              "Price": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "LastLoginAt": {
+          "title": "Last sign-in",
+          "type": "string"
+        },
+        "LastName": {
+          "title": "Last name",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "Phone": {
+          "title": "Phone number",
+          "type": "string"
+        },
+        "Role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "Tags": {
+          "title": "Tags",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "Email",
+        "FirstName",
+        "LastName"
+      ]
+    },
+    "views": {
+      "form": {
+        "type": "grid",
+        "props": {
+          "gridTemplateColumns": "1fr"
+        },
+        "children": [
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "Age"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "AvatarUrl",
+                "rules": [
+                  {
+                    "description": "The element is required only if the user's age is 18 or older.",
+                    "id": "rule_1_41824",
+                    "logic": {
+                      ">=": [
+                        {
+                          "var": "Age"
+                        },
+                        18
+                      ]
+                    },
+                    "property": "required"
+                  },
+                  {
+                    "description": "The element value is set to 'https' when Age is greater than or equal to 18.",
+                    "id": "rule_2_100213",
+                    "logic": {
+                      "if": [
+                        {
+                          ">=": [
+                            {
+                              "var": "Age"
+                            },
+                            18
+                          ]
+                        },
+                        "https"
+                      ]
+                    },
+                    "property": "value"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "CreatedAt"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "Email"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "EmailVerified"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "FirstName"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "IsActive"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "LastLoginAt"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "LastName"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "Phone"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "Role"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "Tags"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr 1fr"
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "Email"
+              },
+              {
+                "type": "field",
+                "field": "FirstName"
+              }
+            ]
+          }
+        ]
+      },
+      "table": {
+        "type": "table",
+        "columns": [
+          {
+            "field": "Email",
+            "order": 0
+          },
+          {
+            "field": "FirstName",
+            "order": 1
+          }
+        ]
+      },
+      "forms": [
+        {
+          "id": "default",
+          "layout": {
+            "children": [
+              {
+                "children": [
+                  {
+                    "field": "Age",
+                    "inputType": "number",
+                    "props": {
+                      "label": "Age",
+                      "min": 14,
+                      "placeholder": "Enter age"
+                    },
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "AvatarUrl",
+                    "rules": [
+                      {
+                        "description": "The element is required only if the user's age is 18 or older.",
+                        "id": "rule_1_41824",
+                        "logic": {
+                          ">=": [
+                            {
+                              "var": "Age"
+                            },
+                            18
+                          ]
+                        },
+                        "property": "required"
+                      },
+                      {
+                        "description": "The element value is set to 'https' when Age is greater than or equal to 18.",
+                        "id": "rule_2_100213",
+                        "logic": {
+                          "if": [
+                            {
+                              ">=": [
+                                {
+                                  "var": "Age"
+                                },
+                                18
+                              ]
+                            },
+                            "https"
+                          ]
+                        },
+                        "property": "value"
+                      }
+                    ],
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "CreatedAt",
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "Email",
+                    "inputType": "text",
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "EmailVerified",
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "FirstName",
+                    "inputType": "text",
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "IsActive",
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "LastLoginAt",
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "LastName",
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "Phone",
+                    "inputType": "phone",
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "Role",
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "Tags",
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "Email",
+                    "inputType": "text",
+                    "type": "field"
+                  },
+                  {
+                    "field": "FirstName",
+                    "inputType": "text",
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr 1fr"
+                },
+                "type": "grid"
+              }
+            ],
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "type": "grid"
+          },
+          "title": "Default"
+        },
+        {
+          "id": "create_as_client",
+          "layout": {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "field": "AvatarUrl",
+                            "inputType": "text",
+                            "type": "field"
+                          }
+                        ],
+                        "props": {
+                          "gridTemplateColumns": "1fr"
+                        },
+                        "type": "grid"
+                      },
+                      {
+                        "children": [
+                          {
+                            "field": "Age",
+                            "inputType": "number",
+                            "type": "field"
+                          }
+                        ],
+                        "props": {
+                          "gridTemplateColumns": "1fr"
+                        },
+                        "type": "grid"
+                      }
+                    ],
+                    "element": "card",
+                    "props": {
+                      "accent": "none",
+                      "border": "all",
+                      "borderRadius": "all"
+                    },
+                    "type": "element"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "Age",
+                    "inputType": "number",
+                    "type": "field"
+                  },
+                  {
+                    "field": "Address.Country",
+                    "inputType": "text",
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr 1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "FirstName",
+                    "inputType": "text",
+                    "props": {
+                      "label": "First name"
+                    },
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "AvatarUrl",
+                    "inputType": "dropdown",
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "Age",
+                    "inputType": "number",
+                    "props": {
+                      "decimalPlace": 0,
+                      "label": "Age!!",
+                      "max": 3,
+                      "min": 2
+                    },
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "field": "Name",
+                            "inputType": "text",
+                            "props": {
+                              "label": "Name!"
+                            },
+                            "type": "field"
+                          },
+                          {
+                            "field": "Price",
+                            "inputType": "number",
+                            "props": {
+                              "decimalPlace": 2,
+                              "label": "Price!",
+                              "showControls": true
+                            },
+                            "type": "field"
+                          }
+                        ],
+                        "props": {
+                          "gridTemplateColumns": "1fr 1fr"
+                        },
+                        "type": "grid"
+                      }
+                    ],
+                    "field": "Items",
+                    "props": {},
+                    "type": "array-field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              }
+            ],
+            "props": {
+              "gap": 16,
+              "gridTemplateColumns": "1fr"
+            },
+            "type": "grid"
+          },
+          "title": "Create as Client"
+        },
+        {
+          "id": "new_form",
+          "layout": {
+            "children": [
+              {
+                "children": [
+                  {
+                    "field": "FirstName",
+                    "inputType": "text",
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "Email",
+                    "inputType": "text",
+                    "rules": [
+                      {
+                        "description": "The element is visible only if the first name is 'alex'.",
+                        "id": "Email.visible",
+                        "logic": {
+                          "==": [
+                            {
+                              "var": "FirstName"
+                            },
+                            "alex"
+                          ]
+                        },
+                        "property": "visible"
+                      }
+                    ],
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              },
+              {
+                "children": [
+                  {
+                    "field": "Address.Country",
+                    "inputType": "text",
+                    "rules": [
+                      {
+                        "description": "The element is visible only if the first name equals 'alex'.",
+                        "id": "Address.Country.visible",
+                        "logic": {
+                          "==": [
+                            {
+                              "var": "FirstName"
+                            },
+                            "alex"
+                          ]
+                        },
+                        "property": "visible"
+                      }
+                    ],
+                    "type": "field"
+                  }
+                ],
+                "props": {
+                  "gridTemplateColumns": "1fr"
+                },
+                "type": "grid"
+              }
+            ],
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "type": "grid"
+          },
+          "title": "New form"
+        },
+        {
+          "id": "new_form_2",
+          "layout": {
+            "children": [],
+            "props": {
+              "gridTemplateColumns": "1fr"
+            },
+            "type": "grid"
+          },
+          "title": "New form"
+        }
+      ]
+    },
+    "created_at": "2026-05-27T19:13:25Z",
+    "updated_at": "2026-07-27T16:57:08Z"
+  }
+}

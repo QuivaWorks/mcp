@@ -1,0 +1,562 @@
+{
+  "slug": "modelling_scenario",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "config_id": "modelling_scenario",
+    "harvested": "live record config (configs only — no record data)"
+  },
+  "featured": false,
+  "teaches": [
+    "required fields",
+    "format: date",
+    "schema types: array, number, object, string"
+  ],
+  "form_node_count": 0,
+  "config": {
+    "id": "modelling_scenario",
+    "name": "Modelling Scenario",
+    "description": "Financial modelling scenarios and projections",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "advice_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Advice ID"
+            }
+          },
+          "type": "string"
+        },
+        "client_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Client ID"
+            }
+          },
+          "type": "string"
+        },
+        "created_by": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Created By"
+            }
+          },
+          "type": "string"
+        },
+        "created_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Created Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "key_assumptions": {
+          "ui": {
+            "inputType": "key-value",
+            "props": {
+              "label": "Key Assumptions"
+            }
+          },
+          "type": "object",
+          "properties": {
+            "annual_contribution": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "label": "Annual Contribution"
+                }
+              },
+              "type": "number"
+            },
+            "custom_assumptions": {
+              "ui": {
+                "inputType": "key-value",
+                "props": {
+                  "label": "Custom Assumptions"
+                }
+              },
+              "type": "object"
+            },
+            "inflation_rate": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "label": "Inflation Rate"
+                }
+              },
+              "type": "number"
+            },
+            "investment_return_percentage": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "label": "Investment Return Percentage"
+                }
+              },
+              "type": "number"
+            },
+            "starting_balance": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "label": "Starting Balance"
+                }
+              },
+              "type": "number"
+            },
+            "target_amount": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "label": "Target Amount"
+                }
+              },
+              "type": "number"
+            },
+            "time_horizon_years": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "label": "Time Horizon (Years)"
+                }
+              },
+              "type": "number"
+            }
+          }
+        },
+        "last_modified_by": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Last Modified By"
+            }
+          },
+          "type": "string"
+        },
+        "last_modified_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Last Modified Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "modelling_type": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Modelling Type",
+              "options": [
+                {
+                  "text": "Retirement",
+                  "value": "retirement"
+                },
+                {
+                  "text": "Cashflow",
+                  "value": "cashflow"
+                },
+                {
+                  "text": "Debt Management",
+                  "value": "debt_management"
+                },
+                {
+                  "text": "Savings Goal",
+                  "value": "savings_goal"
+                },
+                {
+                  "text": "Education Funding",
+                  "value": "education_funding"
+                }
+              ]
+            }
+          },
+          "type": "string"
+        },
+        "projected_outcomes": {
+          "ui": {
+            "inputType": "key-value",
+            "props": {
+              "label": "Projected Outcomes"
+            }
+          },
+          "type": "object",
+          "properties": {
+            "annual_income_in_retirement": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "label": "Annual Income in Retirement"
+                }
+              },
+              "type": "number"
+            },
+            "final_amount": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "label": "Final Amount"
+                }
+              },
+              "type": "number"
+            },
+            "goal_achievement_percentage": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "label": "Goal Achievement Percentage"
+                }
+              },
+              "type": "number"
+            },
+            "shortfall_or_surplus": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "label": "Shortfall or Surplus"
+                }
+              },
+              "type": "number"
+            },
+            "total_contributions": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "label": "Total Contributions"
+                }
+              },
+              "type": "number"
+            },
+            "total_investment_returns": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "label": "Total Investment Returns"
+                }
+              },
+              "type": "number"
+            },
+            "years_to_goal": {
+              "ui": {
+                "inputType": "number",
+                "props": {
+                  "label": "Years to Goal"
+                }
+              },
+              "type": "number"
+            }
+          },
+          "required": [
+            "final_amount"
+          ]
+        },
+        "scenario_description": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Scenario Description"
+            }
+          },
+          "type": "string"
+        },
+        "scenario_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Scenario ID"
+            }
+          },
+          "type": "string"
+        },
+        "scenario_name": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Scenario Name"
+            }
+          },
+          "type": "string"
+        },
+        "scenario_type": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Scenario Type",
+              "options": [
+                {
+                  "text": "Base Case",
+                  "value": "base_case"
+                },
+                {
+                  "text": "Optimistic",
+                  "value": "optimistic"
+                },
+                {
+                  "text": "Pessimistic",
+                  "value": "pessimistic"
+                },
+                {
+                  "text": "What If",
+                  "value": "what_if"
+                },
+                {
+                  "text": "Custom",
+                  "value": "custom"
+                }
+              ]
+            }
+          },
+          "type": "string"
+        },
+        "sensitivity_analysis": {
+          "ui": {
+            "inputType": "array",
+            "props": {
+              "helpText": {
+                "markdown": "Sensitivity analysis results"
+              },
+              "label": "Sensitivity Analysis"
+            }
+          },
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "change_percentage": {
+                "ui": {
+                  "inputType": "number",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Percentage change in variable"
+                    },
+                    "label": "Change Percentage"
+                  }
+                },
+                "type": "number"
+              },
+              "impact_on_outcome": {
+                "ui": {
+                  "inputType": "text",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Impact on projected outcome"
+                    },
+                    "label": "Impact on Outcome"
+                  }
+                },
+                "type": "string"
+              },
+              "variable": {
+                "ui": {
+                  "inputType": "text",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Variable being tested"
+                    },
+                    "label": "Variable"
+                  }
+                },
+                "type": "string"
+              }
+            },
+            "required": [
+              "variable",
+              "change_percentage",
+              "impact_on_outcome"
+            ]
+          }
+        },
+        "visual_representation": {
+          "ui": {
+            "inputType": "key-value",
+            "props": {
+              "helpText": {
+                "markdown": "Visual representations of scenario"
+              },
+              "label": "Visual Representation"
+            }
+          },
+          "type": "object",
+          "properties": {
+            "chart_data_url": {
+              "ui": {
+                "inputType": "text",
+                "props": {
+                  "helpText": {
+                    "markdown": "URL to chart data"
+                  },
+                  "label": "Chart Data URL"
+                }
+              },
+              "type": "string"
+            },
+            "chart_image_url": {
+              "ui": {
+                "inputType": "text",
+                "props": {
+                  "helpText": {
+                    "markdown": "URL to chart image"
+                  },
+                  "label": "Chart Image URL"
+                }
+              },
+              "type": "string"
+            },
+            "chart_type": {
+              "ui": {
+                "inputType": "dropdown",
+                "props": {
+                  "label": "Chart Type",
+                  "options": [
+                    {
+                      "text": "Line",
+                      "value": "line"
+                    },
+                    {
+                      "text": "Bar",
+                      "value": "bar"
+                    },
+                    {
+                      "text": "Pie",
+                      "value": "pie"
+                    },
+                    {
+                      "text": "Area",
+                      "value": "area"
+                    }
+                  ]
+                }
+              },
+              "type": "string"
+            }
+          }
+        }
+      },
+      "required": [
+        "scenario_id",
+        "advice_id",
+        "client_id",
+        "scenario_name",
+        "scenario_type",
+        "scenario_description",
+        "modelling_type",
+        "created_date",
+        "created_by",
+        "last_modified_date",
+        "last_modified_by"
+      ]
+    },
+    "views": {
+      "form": {
+        "type": "grid",
+        "props": {
+          "gridTemplateColumns": "1fr 1fr",
+          "gap": 16
+        },
+        "children": [
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr",
+              "gap": 16
+            },
+            "children": [
+              {
+                "type": "",
+                "field": "scenario_id"
+              },
+              {
+                "type": "",
+                "field": "advice_id"
+              },
+              {
+                "type": "",
+                "field": "client_id"
+              },
+              {
+                "type": "",
+                "field": "scenario_name"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr",
+              "gap": 16
+            },
+            "children": [
+              {
+                "type": "",
+                "field": "scenario_type"
+              },
+              {
+                "type": "",
+                "field": "modelling_type"
+              },
+              {
+                "type": "",
+                "field": "scenario_description"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr",
+              "gap": 16
+            },
+            "children": [
+              {
+                "type": "",
+                "field": "key_assumptions"
+              },
+              {
+                "type": "",
+                "field": "projected_outcomes"
+              },
+              {
+                "type": "",
+                "field": "sensitivity_analysis"
+              },
+              {
+                "type": "",
+                "field": "visual_representation"
+              }
+            ]
+          }
+        ]
+      },
+      "table": {
+        "type": "table",
+        "columns": [
+          {
+            "field": "scenario_id",
+            "order": 1
+          },
+          {
+            "field": "scenario_name",
+            "order": 2
+          },
+          {
+            "field": "scenario_type",
+            "order": 3
+          },
+          {
+            "field": "modelling_type",
+            "order": 4
+          }
+        ]
+      }
+    },
+    "created_at": "2026-07-10T14:48:34Z",
+    "updated_at": "2026-07-10T15:23:38Z"
+  }
+}
