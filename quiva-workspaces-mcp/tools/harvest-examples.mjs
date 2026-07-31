@@ -23,7 +23,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { QuivaClient } from '../src/client.js';
+import { QuivaClient, WORKSPACES_BUCKET, fileKeyOf } from '../src/client.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(HERE, '..', 'examples', 'harvested');
@@ -156,6 +156,114 @@ function describeComments(comments) {
 function write(slug, doc) {
   writeFileSync(join(OUT_DIR, `${slug}.json`), `${JSON.stringify(doc, null, 2)}\n`);
   console.error(`  ${slug}`);
+}
+
+// Harvest the VERTICAL template library: the real folder tree, plus the space
+// configs that are the shape an authored vertical has to match.
+//
+// Why this is a separate harvest: the tree is the evidence for the folder/file
+// path rules and the six deployable category names. Those names are the ROUTING
+// KEY for accounts-service deployVerticals, and an unrecognised one is skipped
+// silently — so "which category names really exist" must come from the platform,
+// not from a list someone typed. The golden gate then asserts the validator
+// accepts every key that is live.
+//
+// Only the two space configs are embedded in full. They are small, contain no
+// person, and carry the record_configs/record_config_ids pair the validator lints.
+// Assistant and flow configs are left out: they are large and their prompts could
+// carry a name.
+async function harvestVerticalLibrary(client) {
+  const spaceId = 'VERTICAL';
+  let listed;
+  try {
+    listed = await client.get('/workspaces/files', { space_id: spaceId });
+  } catch (err) {
+    console.error(`  (skipped VERTICAL library: ${err.message})`);
+    return;
+  }
+
+  // Resolve through the subject: every migrated folder marker has an EMPTY name,
+  // so mapping `f.name` loses all twelve of them and the tree comes out looking
+  // like the marker-only folders (uig, meeting_templates, record_configs) do not
+  // exist. That is how the first run of this harvest reported 9 keys instead of 21.
+  const names = [...new Set((listed?.results ?? []).map(fileKeyOf))].filter(Boolean).sort();
+  if (names.length === 0) {
+    console.error('  (skipped VERTICAL library: no files)');
+    return;
+  }
+
+  const MARKERS = ['__meta__.json', 'metadata.json'];
+  const markerOf = (n) => MARKERS.find((m) => n.endsWith('.' + m)) ?? null;
+
+  // Group by vertical -> category the way deployVerticals parses a key: the
+  // category is the first segment after `spaces.VERTICAL.<vertical>.`.
+  //
+  // Strip the marker suffix BEFORE counting segments. A marker is TWO segments
+  // (`__meta__` + `json`), so a vertical-root marker has five and a category
+  // marker has six — counting the raw segments put "__meta__" in the category
+  // list on the first attempt.
+  const verticals = {};
+  for (const name of names) {
+    const marker = markerOf(name);
+    const path = marker ? name.slice(0, -(marker.length + 1)) : name;
+    const segs = path.split('.');
+    const vertical = segs[2];
+    if (!vertical) continue;
+    verticals[vertical] ??= { categories: {}, marker_style: null };
+
+    if (marker && segs.length === 3) {
+      verticals[vertical].marker_style = marker; // the vertical's own folder
+      continue;
+    }
+    const category = segs[3];
+    if (!category) continue;
+    verticals[vertical].categories[category] ??= { configs: [], folder_marker: null };
+    if (marker) {
+      verticals[vertical].categories[category].folder_marker = marker;
+    } else {
+      verticals[vertical].categories[category].configs.push(name);
+    }
+  }
+
+  // Pull the space configs in full — the shape an authored vertical must match.
+  const space_configs = {};
+  for (const name of names) {
+    if (markerOf(name) || !/\.spaces\.[^.]+\.json$/.test(name)) continue;
+    try {
+      const file = await client.readObject(WORKSPACES_BUCKET, name);
+      space_configs[name] = redact(JSON.parse(file.content));
+    } catch (err) {
+      console.error(`  (could not read ${name}: ${err.message})`);
+    }
+  }
+
+  const markerStyles = [...new Set(names.map(markerOf).filter(Boolean))];
+
+  write('vertical-template-library', {
+    slug: 'vertical-template-library',
+    kind: 'vertical template library (real folder tree)',
+    source: { space_id: spaceId, harvested_from: client.baseUrl },
+    teaches:
+      'The real layout of the VERTICAL space: which verticals exist, which category folders each has, and which marker filename each folder carries. ' +
+      'This is the evidence behind the file/folder path rules and the six deployable category names — see get_workspaces_reference("verticals").',
+    file_count: names.length,
+    marker_styles_present: markerStyles,
+    marker_note:
+      markerStyles.length > 1
+        ? 'BOTH marker filenames are live in this one space: folders created before 2026-07-31 carry metadata.json, ones created after carry __meta__.json (evari-olympus 3a7ab968b). Anything walking the tree must accept either.'
+        : 'One marker style present. If you expected two, folders may predate or postdate the 2026-07-31 rename.',
+    verticals,
+    space_configs,
+    all_keys: names,
+  });
+
+  const cats = new Set();
+  for (const v of Object.values(verticals)) for (const c of Object.keys(v.categories)) cats.add(c);
+  console.error(
+    `\n  VERTICAL library: ${Object.keys(verticals).length} vertical(s), ${names.length} key(s), ` +
+      `categories seen: ${[...cats].sort().join(', ')}`
+  );
+  console.error(`    marker filename(s) in use: ${markerStyles.join(', ')}`);
 }
 
 async function main() {
@@ -292,6 +400,8 @@ async function main() {
       break; // one comment thread per space is enough
     }
   }
+
+  await harvestVerticalLibrary(client);
 
   console.error(`\n  ${coverage.spaces} space(s) harvested, ${redactions} value(s) redacted -> examples/harvested/`);
   console.error('\n  Board presentation-field coverage across live spaces (per field):');
