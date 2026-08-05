@@ -1,0 +1,691 @@
+{
+  "id": "UWPolicy",
+  "name": "Builders Risk Policy",
+  "description": "A bound Builders Risk policy, created from an accepted quote by the quote-acceptance flow.",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "policy_reference": {
+        "type": "string",
+        "title": "Policy reference"
+      },
+      "status": {
+        "type": "string",
+        "title": "Policy status",
+        "enum": [
+          "Active",
+          "Expired",
+          "Cancelled",
+          "Renewed"
+        ],
+        "default": "Active"
+      },
+      "originating_quote_id": {
+        "type": "string",
+        "title": "Originating quote record id"
+      },
+      "underwriter_id": {
+        "type": "string",
+        "title": "Underwriter (user id)"
+      },
+      "issue_date": {
+        "type": "string",
+        "title": "Issue date",
+        "format": "date"
+      },
+      "inception_date": {
+        "type": "string",
+        "title": "Inception date",
+        "format": "date"
+      },
+      "expiration_date": {
+        "type": "string",
+        "title": "Expiration date",
+        "format": "date"
+      },
+      "renewal_policy_id": {
+        "type": "string",
+        "title": "Renewed into policy record id"
+      },
+      "insured_name": {
+        "type": "string",
+        "title": "Insured name"
+      },
+      "insured_contact": {
+        "type": "string",
+        "title": "Contact person"
+      },
+      "insured_address": {
+        "type": "string",
+        "title": "Business address"
+      },
+      "insured_phone": {
+        "type": "string",
+        "title": "Contact phone"
+      },
+      "insured_email": {
+        "type": "string",
+        "title": "Contact email",
+        "format": "email"
+      },
+      "project_name": {
+        "type": "string",
+        "title": "Project name"
+      },
+      "project_type": {
+        "type": "string",
+        "title": "Project type",
+        "enum": [
+          "New Construction",
+          "Renovation",
+          "Demolition"
+        ]
+      },
+      "project_address": {
+        "type": "string",
+        "title": "Project address"
+      },
+      "construction_type": {
+        "type": "string",
+        "title": "Construction type",
+        "enum": [
+          "Wood Frame",
+          "Masonry/Concrete",
+          "Steel Frame"
+        ]
+      },
+      "square_footage": {
+        "type": "number",
+        "title": "Square footage",
+        "minimum": 0
+      },
+      "stories": {
+        "type": "integer",
+        "title": "Number of stories",
+        "minimum": 1
+      },
+      "tiv": {
+        "type": "number",
+        "title": "Total Insurable Value (TIV)",
+        "minimum": 0
+      },
+      "premium": {
+        "type": "number",
+        "title": "Premium",
+        "minimum": 0
+      },
+      "coverage_limits": {
+        "type": "number",
+        "title": "Coverage limit",
+        "minimum": 0
+      },
+      "deductible": {
+        "type": "number",
+        "title": "Deductible",
+        "minimum": 0
+      },
+      "special_conditions": {
+        "type": "string",
+        "title": "Special conditions or exclusions"
+      },
+      "payment_status": {
+        "type": "string",
+        "title": "Payment status",
+        "enum": [
+          "Pending",
+          "Paid",
+          "Overdue",
+          "Cancelled"
+        ]
+      },
+      "payment_method": {
+        "type": "string",
+        "title": "Payment method"
+      },
+      "payment_terms": {
+        "type": "string",
+        "title": "Payment terms"
+      },
+      "payment_due_date": {
+        "type": "string",
+        "title": "Payment due date",
+        "format": "date"
+      },
+      "policy_schedule_key": {
+        "type": "string",
+        "title": "Policy schedule (object-store key)"
+      }
+    },
+    "required": [
+      "status",
+      "originating_quote_id",
+      "issue_date",
+      "inception_date",
+      "expiration_date",
+      "insured_name",
+      "insured_address",
+      "project_name",
+      "project_type",
+      "project_address",
+      "tiv",
+      "premium"
+    ]
+  },
+  "views": {
+    "forms": [
+      {
+        "id": "default",
+        "title": "Policy",
+        "layout": {
+          "type": "grid",
+          "props": {
+            "gridTemplateColumns": "1fr",
+            "gap": 16
+          },
+          "children": [
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "policy_reference",
+                  "props": {
+                    "label": "Policy reference",
+                    "helpText": {
+                      "markdown": "Written by the acceptance flow as `BR-<year>-<record id>`. Not sequential."
+                    }
+                  },
+                  "rules": [
+                    {
+                      "id": "policy_reference.readonly",
+                      "property": "readonly",
+                      "logic": true,
+                      "description": "Written by a flow, never edited by hand."
+                    }
+                  ]
+                },
+                {
+                  "type": "field",
+                  "field": "status",
+                  "props": {
+                    "label": "Policy status",
+                    "options": [
+                      {
+                        "value": "Active",
+                        "text": "Active"
+                      },
+                      {
+                        "value": "Expired",
+                        "text": "Expired"
+                      },
+                      {
+                        "value": "Cancelled",
+                        "text": "Cancelled"
+                      },
+                      {
+                        "value": "Renewed",
+                        "text": "Renewed"
+                      }
+                    ]
+                  },
+                  "inputType": "dropdown"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "originating_quote_id",
+                  "props": {
+                    "label": "Originating quote record id",
+                    "helpText": {
+                      "markdown": "Normally set by the acceptance flow. Not locked: that flow does not fire on a UI save, so this must be fillable by hand."
+                    }
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "underwriter_id",
+                  "props": {
+                    "label": "Underwriter (user id)"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "issue_date",
+                  "props": {
+                    "label": "Issue date"
+                  },
+                  "inputType": "date"
+                },
+                {
+                  "type": "field",
+                  "field": "inception_date",
+                  "props": {
+                    "label": "Inception date"
+                  },
+                  "inputType": "date"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "expiration_date",
+                  "props": {
+                    "label": "Expiration date"
+                  },
+                  "inputType": "date"
+                },
+                {
+                  "type": "field",
+                  "field": "renewal_policy_id",
+                  "props": {
+                    "label": "Renewed into policy record id"
+                  },
+                  "rules": [
+                    {
+                      "id": "renewal_policy_id.readonly",
+                      "property": "readonly",
+                      "logic": true,
+                      "description": "Written by a flow, never edited by hand."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "insured_name",
+                  "props": {
+                    "label": "Insured name"
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "insured_contact",
+                  "props": {
+                    "label": "Contact person"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "insured_address",
+                  "props": {
+                    "label": "Business address"
+                  },
+                  "inputType": "textarea"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "insured_phone",
+                  "props": {
+                    "label": "Contact phone"
+                  },
+                  "inputType": "phone"
+                },
+                {
+                  "type": "field",
+                  "field": "insured_email",
+                  "props": {
+                    "label": "Contact email"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "project_name",
+                  "props": {
+                    "label": "Project name"
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "project_type",
+                  "props": {
+                    "label": "Project type",
+                    "options": [
+                      {
+                        "value": "New Construction",
+                        "text": "New Construction"
+                      },
+                      {
+                        "value": "Renovation",
+                        "text": "Renovation"
+                      },
+                      {
+                        "value": "Demolition",
+                        "text": "Demolition"
+                      }
+                    ]
+                  },
+                  "inputType": "dropdown"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "project_address",
+                  "props": {
+                    "label": "Project address"
+                  },
+                  "inputType": "textarea"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "construction_type",
+                  "props": {
+                    "label": "Construction type",
+                    "options": [
+                      {
+                        "value": "Wood Frame",
+                        "text": "Wood Frame"
+                      },
+                      {
+                        "value": "Masonry/Concrete",
+                        "text": "Masonry/Concrete"
+                      },
+                      {
+                        "value": "Steel Frame",
+                        "text": "Steel Frame"
+                      }
+                    ]
+                  },
+                  "inputType": "dropdown"
+                },
+                {
+                  "type": "field",
+                  "field": "square_footage",
+                  "props": {
+                    "label": "Square footage",
+                    "min": 0
+                  },
+                  "inputType": "number"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "stories",
+                  "props": {
+                    "label": "Number of stories",
+                    "min": 1,
+                    "showControls": true
+                  },
+                  "inputType": "number"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "tiv",
+                  "props": {
+                    "label": "Total Insurable Value (TIV)",
+                    "min": 0,
+                    "decimalPlace": 2
+                  },
+                  "inputType": "currency"
+                },
+                {
+                  "type": "field",
+                  "field": "premium",
+                  "props": {
+                    "label": "Premium",
+                    "min": 0,
+                    "decimalPlace": 2
+                  },
+                  "inputType": "currency"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "coverage_limits",
+                  "props": {
+                    "label": "Coverage limit",
+                    "min": 0,
+                    "decimalPlace": 2
+                  },
+                  "inputType": "currency"
+                },
+                {
+                  "type": "field",
+                  "field": "deductible",
+                  "props": {
+                    "label": "Deductible",
+                    "min": 0,
+                    "decimalPlace": 2
+                  },
+                  "inputType": "currency"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "special_conditions",
+                  "props": {
+                    "label": "Special conditions or exclusions"
+                  },
+                  "inputType": "textarea"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "payment_status",
+                  "props": {
+                    "label": "Payment status",
+                    "options": [
+                      {
+                        "value": "Pending",
+                        "text": "Pending"
+                      },
+                      {
+                        "value": "Paid",
+                        "text": "Paid"
+                      },
+                      {
+                        "value": "Overdue",
+                        "text": "Overdue"
+                      },
+                      {
+                        "value": "Cancelled",
+                        "text": "Cancelled"
+                      }
+                    ]
+                  },
+                  "inputType": "dropdown"
+                },
+                {
+                  "type": "field",
+                  "field": "payment_method",
+                  "props": {
+                    "label": "Payment method"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "payment_terms",
+                  "props": {
+                    "label": "Payment terms"
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "payment_due_date",
+                  "props": {
+                    "label": "Payment due date"
+                  },
+                  "inputType": "date"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "policy_schedule_key",
+                  "props": {
+                    "label": "Policy schedule (object-store key)"
+                  },
+                  "rules": [
+                    {
+                      "id": "policy_schedule_key.readonly",
+                      "property": "readonly",
+                      "logic": true,
+                      "description": "Written by a flow, never edited by hand."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "table": {
+      "type": "table",
+      "columns": [
+        {
+          "field": "policy_reference",
+          "order": 1
+        },
+        {
+          "field": "insured_name",
+          "order": 2
+        },
+        {
+          "field": "project_name",
+          "order": 3
+        },
+        {
+          "field": "inception_date",
+          "order": 4
+        },
+        {
+          "field": "expiration_date",
+          "order": 5
+        },
+        {
+          "field": "premium",
+          "order": 6
+        },
+        {
+          "field": "payment_status",
+          "order": 7
+        },
+        {
+          "field": "status",
+          "order": 8
+        }
+      ]
+    }
+  }
+}

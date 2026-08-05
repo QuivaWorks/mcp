@@ -51,7 +51,7 @@ Fill in **one** auth option per `.env`. Precedence is `QUIVA_API_KEY`, then
 Verify with `claude mcp list`.
 
 ```sh
-npm test                # 296 local checks, no network
+npm test                # 356 local checks, no network
 npm run engine:check    # is our engine documentation still current?
 ```
 
@@ -90,6 +90,20 @@ verified. Re-read it, fix what moved, then `npm run engine:pin`.
   agent-tool definitions, plus the gateway route registry. **Do not trust them**:
   most of the documentation above exists because they are wrong in ways that fail
   silently. Good for shapes, and for deciding whether a route is routable at all.
+
+## Verticals
+
+[verticals/](verticals/) is where vertical templates are authored and reviewed
+before being pushed to the platform's `VERTICAL` space and deployed into accounts.
+`quiva-workspaces-mcp` carries the tools (`list_files`, `create_folder`,
+`read_file`, `write_file`) and the contract
+(`get_workspaces_reference("files")` and `("verticals")`).
+
+Two things to internalise before touching it: a folder's category name is a
+**routing key** and an unrecognised one deploys nothing silently; and a write is
+not done when the API returns 200 — indexing is asynchronous, and an index entry
+whose `name` comes back empty is invisible to both the deployer and the UI. See
+[docs/quiva-mcp-handoff.md](docs/quiva-mcp-handoff.md) §13.
 
 ## Known stale
 

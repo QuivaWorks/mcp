@@ -1,0 +1,415 @@
+{
+  "id": "Deal",
+  "name": "Deal",
+  "description": "A sales opportunity against a company and contact. Line items live in DealLine; stage progression and health are maintained by flows.",
+  "schema": {
+    "type": "object",
+    "required": ["deal_name", "company_id", "primary_contact_id", "deal_value", "deal_stage", "close_date"],
+    "properties": {
+      "deal_name": { "type": "string", "title": "Deal name" },
+      "company_id": { "type": "string", "title": "Company" },
+      "primary_contact_id": { "type": "string", "title": "Primary contact" },
+      "deal_value": { "type": "number", "title": "Deal value", "minimum": 0 },
+      "currency": { "type": "string", "title": "Currency", "enum": ["USD", "EUR", "GBP", "AUD"] },
+      "deal_stage": {
+        "type": "string",
+        "title": "Stage",
+        "enum": ["Prospect", "Qualified", "Proposal", "Negotiation", "Closed Won", "Closed Lost"]
+      },
+      "probability_percent": { "type": "number", "title": "Probability %", "minimum": 0, "maximum": 100 },
+      "expected_revenue": { "type": "number", "title": "Expected revenue", "minimum": 0 },
+      "close_date": { "type": "string", "title": "Close date", "format": "date" },
+      "deal_category": {
+        "type": "string",
+        "title": "Category",
+        "enum": ["New Business", "Expansion", "Renewal", "Upsell"]
+      },
+      "deal_owner_user_id": { "type": "string", "title": "Deal owner" },
+      "discount_percent": { "type": "number", "title": "Discount %", "minimum": 0, "maximum": 100 },
+      "requires_approval": { "type": "boolean", "title": "Requires approval" },
+      "approval_status": {
+        "type": "string",
+        "title": "Approval status",
+        "enum": ["Not Needed", "Pending", "Approved", "Rejected"]
+      },
+      "lost_reason": {
+        "type": "string",
+        "title": "Lost reason",
+        "enum": ["Budget", "Competitor", "Not a Fit", "Delayed", "Stalled", "Other"]
+      },
+      "lost_reason_details": { "type": "string", "title": "Lost reason detail" },
+      "stage_change_date": { "type": "string", "title": "Stage changed", "format": "date" },
+      "days_in_current_stage": { "type": "number", "title": "Days in stage" },
+      "deal_health_status": {
+        "type": "string",
+        "title": "Health",
+        "enum": ["Healthy", "At Risk", "Stalled"]
+      },
+      "last_activity_date": { "type": "string", "title": "Last activity", "format": "date" },
+      "activity_count": { "type": "number", "title": "Activities" },
+      "notes": { "type": "string", "title": "Notes" }
+    }
+  },
+  "views": {
+    "forms": [
+      {
+        "id": "default",
+        "title": "Deal",
+        "description": "Create or edit a sales opportunity.",
+        "layout": {
+          "type": "grid",
+          "props": { "gridTemplateColumns": "1fr", "gap": 16 },
+          "children": [
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "2fr 1fr 1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "deal_name",
+                  "inputType": "text",
+                  "props": { "label": "Deal name", "placeholder": "Acme Corp - Enterprise Plan" }
+                },
+                {
+                  "type": "field",
+                  "field": "company_id",
+                  "inputType": "text",
+                  "props": { "label": "Company", "helpText": { "markdown": "Record id of the Company." } }
+                },
+                {
+                  "type": "field",
+                  "field": "primary_contact_id",
+                  "inputType": "text",
+                  "props": { "label": "Primary contact", "helpText": { "markdown": "Record id of the Client." } }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr 1fr 1fr 1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "deal_value",
+                  "inputType": "currency",
+                  "props": { "label": "Deal value", "min": 0, "decimalPlace": 2 },
+                  "rules": [
+                    {
+                      "id": "deal_value.readonly",
+                      "property": "readonly",
+                      "logic": { "in": [{ "var": "deal_stage" }, ["Closed Won", "Closed Lost"]] },
+                      "description": "Deal value is locked once the deal is Closed Won or Closed Lost."
+                    }
+                  ]
+                },
+                {
+                  "type": "field",
+                  "field": "currency",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "Currency",
+                    "options": [
+                      { "value": "USD", "text": "USD" },
+                      { "value": "EUR", "text": "EUR" },
+                      { "value": "GBP", "text": "GBP" },
+                      { "value": "AUD", "text": "AUD" }
+                    ],
+                    "defaultValue": "USD"
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "close_date",
+                  "inputType": "date",
+                  "props": { "label": "Close date" }
+                },
+                {
+                  "type": "field",
+                  "field": "deal_category",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "Category",
+                    "options": [
+                      { "value": "New Business", "text": "New Business" },
+                      { "value": "Expansion", "text": "Expansion" },
+                      { "value": "Renewal", "text": "Renewal" },
+                      { "value": "Upsell", "text": "Upsell" }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr 1fr 1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "deal_stage",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "Stage",
+                    "options": [
+                      { "value": "Prospect", "text": "Prospect" },
+                      { "value": "Qualified", "text": "Qualified" },
+                      { "value": "Proposal", "text": "Proposal" },
+                      { "value": "Negotiation", "text": "Negotiation" },
+                      { "value": "Closed Won", "text": "Closed Won" },
+                      { "value": "Closed Lost", "text": "Closed Lost" }
+                    ],
+                    "defaultValue": "Prospect"
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "probability_percent",
+                  "inputType": "slider",
+                  "props": { "label": "Probability %", "min": 0, "max": 100, "showIndicatorMin": true, "showIndicatorMax": true },
+                  "rules": [
+                    {
+                      "id": "probability_percent.value",
+                      "property": "value",
+                      "logic": {
+                        "if": [
+                          { "==": [{ "var": "deal_stage" }, "Prospect"] }, 10,
+                          { "==": [{ "var": "deal_stage" }, "Qualified"] }, 25,
+                          { "==": [{ "var": "deal_stage" }, "Proposal"] }, 50,
+                          { "==": [{ "var": "deal_stage" }, "Negotiation"] }, 75,
+                          { "==": [{ "var": "deal_stage" }, "Closed Won"] }, 100,
+                          { "==": [{ "var": "deal_stage" }, "Closed Lost"] }, 0,
+                          0
+                        ]
+                      },
+                      "description": "Probability is derived from the stage: Prospect 10, Qualified 25, Proposal 50, Negotiation 75, Closed Won 100, Closed Lost 0."
+                    },
+                    {
+                      "id": "probability_percent.readonly",
+                      "property": "readonly",
+                      "logic": true,
+                      "description": "Probability always follows the stage and cannot be typed over."
+                    }
+                  ]
+                },
+                {
+                  "type": "field",
+                  "field": "expected_revenue",
+                  "inputType": "currency",
+                  "props": { "label": "Expected revenue", "min": 0, "decimalPlace": 2 },
+                  "rules": [
+                    {
+                      "id": "expected_revenue.value",
+                      "property": "value",
+                      "logic": { "*": [{ "var": "deal_value" }, { "/": [{ "var": "probability_percent" }, 100] }] },
+                      "description": "Expected revenue is the deal value multiplied by the probability percentage."
+                    },
+                    {
+                      "id": "expected_revenue.readonly",
+                      "property": "readonly",
+                      "logic": true,
+                      "description": "Expected revenue is always computed."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr 1fr 1fr" },
+              "rules": [
+                {
+                  "id": "discount_row.visible",
+                  "property": "visible",
+                  "logic": { "in": [{ "var": "deal_stage" }, ["Negotiation", "Closed Won", "Closed Lost"]] },
+                  "description": "Discount and approval are shown only from Negotiation onwards."
+                }
+              ],
+              "children": [
+                {
+                  "type": "field",
+                  "field": "discount_percent",
+                  "inputType": "slider",
+                  "props": { "label": "Discount %", "min": 0, "max": 100, "showIndicatorMin": true, "showIndicatorMax": true }
+                },
+                {
+                  "type": "field",
+                  "field": "requires_approval",
+                  "inputType": "toggle",
+                  "props": { "label": "Requires approval" },
+                  "rules": [
+                    {
+                      "id": "requires_approval.value",
+                      "property": "value",
+                      "logic": { ">": [{ "var": "discount_percent" }, 20] },
+                      "description": "Approval is required when the discount exceeds 20 percent."
+                    },
+                    {
+                      "id": "requires_approval.readonly",
+                      "property": "readonly",
+                      "logic": true,
+                      "description": "Derived from the discount percentage."
+                    }
+                  ]
+                },
+                {
+                  "type": "field",
+                  "field": "approval_status",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "Approval status",
+                    "options": [
+                      { "value": "Not Needed", "text": "Not Needed" },
+                      { "value": "Pending", "text": "Pending" },
+                      { "value": "Approved", "text": "Approved" },
+                      { "value": "Rejected", "text": "Rejected" }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr 2fr" },
+              "rules": [
+                {
+                  "id": "lost_row.visible",
+                  "property": "visible",
+                  "logic": { "==": [{ "var": "deal_stage" }, "Closed Lost"] },
+                  "description": "The lost-reason row is shown only when the stage is Closed Lost."
+                }
+              ],
+              "children": [
+                {
+                  "type": "field",
+                  "field": "lost_reason",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "Lost reason",
+                    "options": [
+                      { "value": "Budget", "text": "Budget" },
+                      { "value": "Competitor", "text": "Competitor" },
+                      { "value": "Not a Fit", "text": "Not a Fit" },
+                      { "value": "Delayed", "text": "Delayed" },
+                      { "value": "Stalled", "text": "Stalled" },
+                      { "value": "Other", "text": "Other" }
+                    ]
+                  },
+                  "rules": [
+                    {
+                      "id": "lost_reason.required",
+                      "property": "required",
+                      "logic": { "==": [{ "var": "deal_stage" }, "Closed Lost"] },
+                      "description": "A lost reason is required when the stage is Closed Lost."
+                    }
+                  ]
+                },
+                {
+                  "type": "field",
+                  "field": "lost_reason_details",
+                  "inputType": "text",
+                  "props": { "label": "Lost reason detail" }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr 1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "deal_owner_user_id",
+                  "inputType": "text",
+                  "props": { "label": "Deal owner" }
+                },
+                {
+                  "type": "field",
+                  "field": "deal_health_status",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "Health",
+                    "options": [
+                      { "value": "Healthy", "text": "Healthy" },
+                      { "value": "At Risk", "text": "At Risk" },
+                      { "value": "Stalled", "text": "Stalled" }
+                    ]
+                  },
+                  "rules": [
+                    { "id": "deal_health_status.readonly", "property": "readonly", "logic": true, "description": "Written by the deal-health-check flow." }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "notes",
+                  "inputType": "textarea",
+                  "props": { "label": "Notes" }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr 1fr 1fr 1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "stage_change_date",
+                  "inputType": "date",
+                  "props": { "label": "Stage changed" },
+                  "rules": [
+                    { "id": "stage_change_date.readonly", "property": "readonly", "logic": true, "description": "Written by the deal-stage-change flow." }
+                  ]
+                },
+                {
+                  "type": "field",
+                  "field": "days_in_current_stage",
+                  "inputType": "number",
+                  "props": { "label": "Days in stage" },
+                  "rules": [
+                    { "id": "days_in_current_stage.readonly", "property": "readonly", "logic": true, "description": "Written by the deal-health-check flow." }
+                  ]
+                },
+                {
+                  "type": "field",
+                  "field": "last_activity_date",
+                  "inputType": "date",
+                  "props": { "label": "Last activity" },
+                  "rules": [
+                    { "id": "last_activity_date.readonly", "property": "readonly", "logic": true, "description": "Written by the activity-completion flow." }
+                  ]
+                },
+                {
+                  "type": "field",
+                  "field": "activity_count",
+                  "inputType": "number",
+                  "props": { "label": "Activities" },
+                  "rules": [
+                    { "id": "activity_count.readonly", "property": "readonly", "logic": true, "description": "Written by the activity-completion flow." }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "table": {
+      "type": "table",
+      "columns": [
+        { "field": "deal_name", "order": 1 },
+        { "field": "company_id", "order": 2 },
+        { "field": "deal_value", "order": 3 },
+        { "field": "deal_stage", "order": 4 },
+        { "field": "probability_percent", "order": 5 },
+        { "field": "expected_revenue", "order": 6 },
+        { "field": "close_date", "order": 7 },
+        { "field": "days_in_current_stage", "order": 8 },
+        { "field": "deal_health_status", "order": 9 },
+        { "field": "deal_owner_user_id", "order": 10 }
+      ]
+    }
+  }
+}

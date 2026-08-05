@@ -549,8 +549,10 @@ export const NODE_TYPES = {
   'quiva-endpoint': {
     summary: 'Invoke a Quiva endpoint by subject. (Not in the OpenAPI spec; use list_quiva_endpoints to discover subjects.)',
     required: ['id', 'node_type', 'subject', 'payload'],
+    subject_is_allowlisted:
+      'THE SUBJECT IS A CLOSED ALLOWLIST, not an arbitrary bus subject. providers.InvokeEndpoint (hub-service/providers/endpoint.go:22) checks the subject against data.AllowedEndpoints and returns "endpoint not allowed: <subject>" for anything else. list_quiva_endpoints returns that exact list (32 subjects: microstrate.storage.* KV/object/stream operations, plus microstrate.hub.post.workflow-run). A flow therefore CANNOT reach an arbitrary platform service this way. Worked example of the consequence, 2026-08-04: numbergen-service provides atomic counters (microstrate.numbergen.put.increment, with compare-and-swap and 10 retries — exactly what generating a gap-free sequential reference number needs) and it is unreachable from a flow BOTH ways: not in the allowlist, and not exposed through the API gateway either — PUT https://api.microstrate.io/numbergen/increment returns 404 while known routes such as /records/{config} and /workspaces/task return 401 unauthenticated, so the 404 is absence of a route and not an auth failure. For a counter from a flow, use microstrate.storage.get.kv-entry + microstrate.storage.put.kv-entry, which ARE allowlisted — but that is read-modify-write with no compare-and-swap, so two concurrent runs can produce the same number. If a reference must be collision-free, derive it from something already unique (a record id) rather than a counter.',
     nodeLevelProps: {
-      subject: 'REQUIRED — endpoint subject',
+      subject: 'REQUIRED — endpoint subject, and it MUST be one of the allowlisted subjects from list_quiva_endpoints',
     },
     payload: {
       required: {

@@ -1,0 +1,220 @@
+{
+  "name": "Activity Completion",
+  "description": "When an Activity is marked Completed, stamp the completion date, raise a follow-up task if a next action was given, and refresh the deal activity counters.",
+  "config": {
+    "nodes": [
+      {
+        "id": "record.Activity",
+        "data": {
+          "id": "record.Activity",
+          "node_type": "trigger",
+          "payload": {
+            "record_config_id": "Activity",
+            "event_type": [
+              "record-updated"
+            ]
+          },
+          "name": "On Activity record-updated",
+          "trigger_type": "record"
+        }
+      },
+      {
+        "id": "CHECK_COMPLETED",
+        "data": {
+          "id": "CHECK_COMPLETED",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.trigger.data.status",
+                  "Completed"
+                ]
+              },
+              "outcome": "BUILD"
+            },
+            {
+              "outcome": "RESOLVE_SUCCESS"
+            }
+          ]
+        }
+      },
+      {
+        "id": "BUILD",
+        "data": {
+          "id": "BUILD",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function(){var a=assignee?[assignee]:[];var due=new Date();due.setDate(due.getDate()+2);return{next:String(nextAction||''),hasNext:!!(nextAction&&String(nextAction).length),deal:String(dealId||''),hasDeal:!!(dealId&&String(dealId).length),due:due.toISOString(),today:new Date().toISOString().slice(0,10),assignees:a};})();",
+            "params": {
+              "nextAction": "$.trigger.data.next_action",
+              "dealId": "$.trigger.data.related_deal_id",
+              "assignee": "$.trigger.data.assigned_to_user_id"
+            }
+          }
+        }
+      },
+      {
+        "id": "STAMP_COMPLETED",
+        "data": {
+          "id": "STAMP_COMPLETED",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/records/Activity/|$.trigger.id",
+            "method": "PUT",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "data": {
+                "completed_at": "$.BUILD.today"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "ROUTE",
+        "data": {
+          "id": "ROUTE",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": "and",
+                "input": [
+                  {
+                    "operator": "=",
+                    "input": [
+                      "$.BUILD.hasNext",
+                      true
+                    ]
+                  },
+                  {
+                    "operator": "=",
+                    "input": [
+                      "$.BUILD.hasDeal",
+                      true
+                    ]
+                  }
+                ]
+              },
+              "outcome": [
+                "CREATE_FOLLOWUP",
+                "TOUCH_DEAL"
+              ]
+            },
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.BUILD.hasNext",
+                  true
+                ]
+              },
+              "outcome": "CREATE_FOLLOWUP"
+            },
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.BUILD.hasDeal",
+                  true
+                ]
+              },
+              "outcome": "TOUCH_DEAL"
+            },
+            {
+              "outcome": "RESOLVE_SUCCESS"
+            }
+          ]
+        }
+      },
+      {
+        "id": "CREATE_FOLLOWUP",
+        "data": {
+          "id": "CREATE_FOLLOWUP",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/workspaces/task",
+            "method": "POST",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "space_id": "CRM_ACTIVITIES",
+              "title": "$.BUILD.next",
+              "description": "Raised automatically from a completed activity.",
+              "status": "to_do",
+              "priority": "medium",
+              "due_date": "$.BUILD.due",
+              "assignees": "$.BUILD.assignees",
+              "tags": [
+                "crm",
+                "follow-up"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": "TOUCH_DEAL",
+        "data": {
+          "id": "TOUCH_DEAL",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/records/Deal/|$.BUILD.deal",
+            "method": "PUT",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "data": {
+                "last_activity_date": "$.BUILD.today"
+              }
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_record_Activity_CHECK_COMPLETED",
+        "source": "record.Activity",
+        "target": "CHECK_COMPLETED"
+      },
+      {
+        "id": "e_CHECK_COMPLETED_BUILD",
+        "source": "CHECK_COMPLETED",
+        "target": "BUILD"
+      },
+      {
+        "id": "e_BUILD_STAMP_COMPLETED",
+        "source": "BUILD",
+        "target": "STAMP_COMPLETED"
+      },
+      {
+        "id": "e_STAMP_COMPLETED_ROUTE",
+        "source": "STAMP_COMPLETED",
+        "target": "ROUTE"
+      },
+      {
+        "id": "e_ROUTE_CREATE_FOLLOWUP",
+        "source": "ROUTE",
+        "target": "CREATE_FOLLOWUP"
+      },
+      {
+        "id": "e_ROUTE_TOUCH_DEAL",
+        "source": "ROUTE",
+        "target": "TOUCH_DEAL"
+      }
+    ],
+    "result": {
+      "status": "success"
+    }
+  }
+}

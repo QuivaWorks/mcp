@@ -7,7 +7,7 @@
 //   'space' | 'task' | 'multi_task' | 'comment' | 'reaction' | 'task_action'
 // requireRequired defaults to true (create). Pass false for update payloads.
 
-import { VERTICAL_SPACE_ID, VERTICAL_CONFIG_TYPES, FOLDER_MARKERS } from './workspaces-docs.js';
+import { VERTICAL_SPACE_ID, VERTICAL_CONFIG_TYPES, FOLDER_MARKERS, VERTICAL_NON_DEPLOYING_FOLDERS } from './workspaces-docs.js';
 
 const SPACE_ID_REGEX = /^\w+$/; // letters, numbers, underscore only
 const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -369,17 +369,67 @@ function lintDottedPath(label, value, errors) {
   return true;
 }
 
+// Would deployVerticals actually forward this key to an endpoint?
+//
+// It matches the prefix `spaces.VERTICAL.<vertical>.`, takes the FIRST path segment
+// after it as the config type, looks that up in configTypeToEndpointSubject, and
+// `continue`s when the lookup misses — no error, no log line, nothing deployed
+// (accounts-service/accounts/updateaccount.go).
+//
+// write_file's `will_deploy` used to report only whether the index entry had a name.
+// That made a file in a MISSPELLED category folder — `flow/`, `record_config/` —
+// come back will_deploy=true and then deploy nothing, silently, which is precisely
+// the failure the field exists to catch. It also claimed true for specs/, which
+// never deploys by design, so the pusher's own summary contradicted itself.
+//
+// Only VERTICAL-space keys are judged: a file written elsewhere is not a vertical
+// config and the question does not apply.
+export function verticalRouting(key) {
+  const parts = String(key).split('.');
+  if (parts[0] !== 'spaces' || parts[1] !== VERTICAL_SPACE_ID) {
+    return { deploys: true, reason: null };
+  }
+  const category = parts[3];
+  if (!category) {
+    return {
+      deploys: false,
+      reason: `"${key}" has no category segment — expected spaces.${VERTICAL_SPACE_ID}.<vertical>.<category>.<name>.<ext>.`,
+    };
+  }
+  if (Object.prototype.hasOwnProperty.call(VERTICAL_CONFIG_TYPES, category)) {
+    return { deploys: true, reason: null };
+  }
+  if (VERTICAL_NON_DEPLOYING_FOLDERS.includes(category)) {
+    return {
+      deploys: false,
+      reason: `"${category}" never deploys by design — a notes folder, not a routing key. The file is stored and indexed; deployVerticals skips it.`,
+    };
+  }
+  return {
+    deploys: false,
+    reason:
+      `"${category}" is NOT a recognised config type, so deployVerticals will SILENTLY skip this file — ` +
+      'it looks the category up in configTypeToEndpointSubject and `continue`s on a miss, with no error anywhere. ' +
+      `Expected one of: ${Object.keys(VERTICAL_CONFIG_TYPES).sort().join(', ')} ` +
+      `(or ${VERTICAL_NON_DEPLOYING_FOLDERS.join(', ')} for notes). Check for a typo or a singular/plural slip.`,
+  };
+}
+
 // Warn when a VERTICAL category folder is not one of the six accounts-service
 // will route. A WARNING and not an error: the list is transcribed from
 // accounts-service/accounts/updateaccount.go and can grow upstream without us
 // noticing, and a non-deploying folder may well be deliberate.
 function lintVerticalCategory(category, warnings) {
-  if (category && !Object.prototype.hasOwnProperty.call(VERTICAL_CONFIG_TYPES, category)) {
-    warnings.push(
-      `"${category}" is not one of the six folder names accounts-service deploys from (${Object.keys(VERTICAL_CONFIG_TYPES).join(', ')}). ` +
-        'The category folder is the ROUTING KEY, and an unrecognised name is skipped SILENTLY — no error, no log entry, nothing deploys from it.'
-    );
-  }
+  if (!category) return;
+  if (Object.prototype.hasOwnProperty.call(VERTICAL_CONFIG_TYPES, category)) return;
+  // Deliberately non-deploying folders (`specs`) are meant to fall out of the
+  // dispatch loop. Warning about them would be noise on every correct call.
+  if (VERTICAL_NON_DEPLOYING_FOLDERS.includes(category)) return;
+  warnings.push(
+    `"${category}" is not one of the six folder names accounts-service deploys from (${Object.keys(VERTICAL_CONFIG_TYPES).join(', ')}). ` +
+      'The category folder is the ROUTING KEY, and an unrecognised name is skipped SILENTLY — no error, no log entry, nothing deploys from it. ' +
+      `If it is meant not to deploy, the intentional ones are: ${VERTICAL_NON_DEPLOYING_FOLDERS.join(', ')}.`
+  );
 }
 
 function validateFolder(p, errors, warnings) {
@@ -515,6 +565,16 @@ function validateFile(p, errors, warnings) {
   lintVerticalCategory(category, warnings);
 
   const ext = segs[segs.length - 1].toLowerCase();
+
+  // `specs` is documentation, not config — markdown is the point, and nothing
+  // deploys from it, so none of the config-shape lints below apply.
+  if (VERTICAL_NON_DEPLOYING_FOLDERS.includes(category)) {
+    if (ext === 'json') {
+      warnings.push(`a file in "${category}" is not deployed anywhere — if this is meant to be a config, it belongs in one of: ${Object.keys(VERTICAL_CONFIG_TYPES).join(', ')}.`);
+    }
+    return;
+  }
+
   if (category === 'document_templates') {
     if (ext === 'json') {
       warnings.push('document_templates config is forwarded verbatim to microstrate.file-generator.post.template — confirm it is a template CONFIG body and not a raw source document.');

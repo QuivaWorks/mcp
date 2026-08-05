@@ -1,0 +1,110 @@
+{
+  "name": "Deal Created",
+  "description": "When a Deal record is created, raise an initial qualification task, and for high-value deals also a decision-maker task.",
+  "config": {
+    "nodes": [
+      {
+        "id": "record.Deal",
+        "data": {
+          "id": "record.Deal",
+          "name": "On Deal created",
+          "node_type": "trigger",
+          "trigger_type": "record",
+          "payload": {
+            "record_config_id": "Deal",
+            "event_type": ["record-created"]
+          }
+        }
+      },
+      {
+        "id": "BUILD_TASKS",
+        "data": {
+          "id": "BUILD_TASKS",
+          "name": "Build task payloads",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function(){var due=new Date();due.setDate(due.getDate()+2);var owner=ownerId?[ownerId]:[];return{qual_title:'Initial qualification call: '+(dealName||'Untitled deal'),dm_title:'Identify decision maker for '+(dealName||'Untitled deal'),due:due.toISOString(),assignees:owner,deal_value:Number(dealValue)||0};})();",
+            "params": {
+              "dealName": "$.trigger.data.deal_name",
+              "ownerId": "$.trigger.data.deal_owner_user_id",
+              "dealValue": "$.trigger.data.deal_value"
+            }
+          }
+        }
+      },
+      {
+        "id": "CREATE_QUAL_TASK",
+        "data": {
+          "id": "CREATE_QUAL_TASK",
+          "name": "Create qualification task",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/workspaces/task",
+            "method": "POST",
+            "headers": { "Authorization": "Bearer |$.env.auth_token" },
+            "data": {
+              "space_id": "CRM_ACTIVITIES",
+              "title": "$.BUILD_TASKS.qual_title",
+              "description": "Automatically raised when the deal was created.",
+              "status": "to_do",
+              "priority": "medium",
+              "due_date": "$.BUILD_TASKS.due",
+              "assignees": "$.BUILD_TASKS.assignees",
+              "tags": ["crm", "qualification"]
+            }
+          }
+        }
+      },
+      {
+        "id": "CHECK_VALUE",
+        "data": {
+          "id": "CHECK_VALUE",
+          "name": "High value?",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": { "operator": ">", "input": ["$.BUILD_TASKS.deal_value", 50000] },
+              "outcome": "CREATE_DM_TASK"
+            },
+            { "outcome": "RESOLVE_SUCCESS" }
+          ]
+        }
+      },
+      {
+        "id": "CREATE_DM_TASK",
+        "data": {
+          "id": "CREATE_DM_TASK",
+          "name": "Create decision-maker task",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/workspaces/task",
+            "method": "POST",
+            "headers": { "Authorization": "Bearer |$.env.auth_token" },
+            "data": {
+              "space_id": "CRM_ACTIVITIES",
+              "title": "$.BUILD_TASKS.dm_title",
+              "description": "Deal value is above the high-value threshold; confirm who signs.",
+              "status": "to_do",
+              "priority": "high",
+              "due_date": "$.BUILD_TASKS.due",
+              "assignees": "$.BUILD_TASKS.assignees",
+              "tags": ["crm", "high-value"]
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      { "id": "e_trigger_build", "source": "record.Deal", "target": "BUILD_TASKS" },
+      { "id": "e_build_qual", "source": "BUILD_TASKS", "target": "CREATE_QUAL_TASK" },
+      { "id": "e_qual_check", "source": "CREATE_QUAL_TASK", "target": "CHECK_VALUE" },
+      { "id": "e_check_dm", "source": "CHECK_VALUE", "target": "CREATE_DM_TASK" }
+    ],
+    "result": {
+      "status": "success",
+      "qualification_task": "$.CREATE_QUAL_TASK.data.id"
+    }
+  }
+}

@@ -1,5 +1,87 @@
 # Lessons
 
+## 2026-07-31 — Three self-inflicted versions of this repo's own defect class, in one session
+
+Building the vertical folder/file surface (handoff §13). The work landed and is
+verified, but I produced the exact failure this repo exists to prevent **three
+times**, and each was caught by something different. Worth recording because none
+of them was carelessness — each was a check that looked like proof.
+
+### 1. I reported a stale clone as current
+
+`git fetch origin main` writes only `FETCH_HEAD`. It does **not** update
+`refs/remotes/origin/main`. So `git rev-parse origin/main` returned a local
+tracking ref that had not moved, which happened to equal `HEAD`, and I reported
+"0 commits behind" — while `main` was three commits ahead.
+
+The stale read then produced a wrong engine fact: I stated the folder marker was
+`.metadata.json`, straight from the handler source. It had been renamed to
+`__meta__.json` that morning (#1291) and the deployed platform already used the new
+name. **A live probe caught it, not any amount of source reading.**
+
+Use `git fetch origin '+refs/heads/*:refs/remotes/origin/*'` then
+`git rev-list --count HEAD..origin/main`. And note `engine/sync.mjs` was truthful
+throughout — it queries the remote over the API. My shortcut was the problem, and
+on re-run the drift check correctly reported four changed cited files.
+
+> Verifying against a thing that cannot move is not verification.
+
+### 2. A digest check that passed for the wrong reason
+
+The object store returns `digest: "SHA-256=<hash>"`. I compared it against a
+locally computed standard base64 digest, it matched, and I wrote in the handoff
+that this was "a plain SHA-256, verified by recomputing locally".
+
+It matched **by luck**: that file's hash contained no `+` or `/`, the only two
+characters where base64 and base64url differ. The next file hashed to a value
+containing a `/` and the comparison failed. The encoding is base64**url**, padding
+retained.
+
+Both sides are now normalised (alphabet folded, padding stripped), and the real
+server digest for known bytes is a test fixture — with an assertion that the
+fixture *contains* a `/` in standard base64, so the test cannot silently stop
+proving anything.
+
+> A comparison that can pass for the wrong reason is not a check. When one passes
+> first time, ask which inputs would have made it fail.
+
+### 3. I verified against the index and called it verified — the user was looking at the UI
+
+`create_folder` returned `verified: true` for all eight `crm` folders. I had
+confirmed each marker appeared in the file index, which is the right thing for
+deployment, because `deployVerticals` reads the index.
+
+The user then said three folders were not visible. **16 of 21 folder markers have a
+blank `name` in the index** (0 of 8 config files do); the UI's tree builder derives
+folder paths from `name`, so an empty folder with an unnamed marker never renders.
+My check found the entries by falling back to decoding the `subject` — correct for
+*locating* them, and I treated "found" as "fine".
+
+The deeper problem was that a single boolean covered two different consumers. Now
+`indexed` (found at all) and `name_indexed` (usable by deployment and the UI) are
+reported separately; `create_folder` exposes `visible_in_ui`, `write_file` exposes
+`will_deploy` and will not call a config verified without a name — because an
+unnamed *config* fails `deployVerticals`' prefix test and would silently never
+deploy.
+
+> One resource, several consumers, and each may read a different field. "Verified"
+> has to name which consumer.
+
+### What actually caught each one
+
+- the marker rename — **a live probe**, after the source misled me
+- the digest — **the second test case**; the first was a coincidence
+- the false green — **the user opening the UI**
+
+None was caught by reading source, and none by the test suite as it stood. The
+suite only started catching them once each finding was turned into a fixture with a
+real value in it. Three of them now are.
+
+**One process change worth keeping:** when a mechanical check goes green, write
+down which consumer it speaks for. All three failures above are the same sentence —
+*I checked the thing that was easy to check, and it was not the thing that reads
+the output.*
+
 ## 2026-07-28 — The risk-programme form "passed" with three silent UI defects
 
 The `risk_programme` config was reported complete: 27 fields, 2 forms, 47 field

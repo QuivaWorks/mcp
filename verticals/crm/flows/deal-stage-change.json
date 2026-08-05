@@ -1,0 +1,252 @@
+{
+  "name": "Deal Stage Change",
+  "description": "When a Deal is updated, detect a stage transition, stamp the date, and raise the task for that stage. Closed Won also marks the company a customer.",
+  "config": {
+    "nodes": [
+      {
+        "id": "record.Deal",
+        "data": {
+          "id": "record.Deal",
+          "node_type": "trigger",
+          "payload": {
+            "record_config_id": "Deal",
+            "event_type": [
+              "record-updated"
+            ]
+          },
+          "name": "On Deal record-updated",
+          "trigger_type": "record"
+        }
+      },
+      {
+        "id": "BUILD",
+        "data": {
+          "id": "BUILD",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function(){var owner=ownerId?[ownerId]:[];var d=new Date();var due=new Date();due.setDate(due.getDate()+1);return{stage:String(stage||''),name:String(dealName||'Untitled deal'),today:d.toISOString().slice(0,10),due:due.toISOString(),assignees:owner,company:String(companyId||''),lost:String(lostReason||'not stated')};})();",
+            "params": {
+              "stage": "$.trigger.data.deal_stage",
+              "dealName": "$.trigger.data.deal_name",
+              "ownerId": "$.trigger.data.deal_owner_user_id",
+              "companyId": "$.trigger.data.company_id",
+              "lostReason": "$.trigger.data.lost_reason"
+            }
+          }
+        }
+      },
+      {
+        "id": "STAMP_STAGE",
+        "data": {
+          "id": "STAMP_STAGE",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/records/Deal/|$.trigger.id",
+            "method": "PUT",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "data": {
+                "stage_change_date": "$.BUILD.today",
+                "days_in_current_stage": 0
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "ROUTE",
+        "data": {
+          "id": "ROUTE",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.BUILD.stage",
+                  "Proposal"
+                ]
+              },
+              "outcome": "TASK_PROPOSAL"
+            },
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.BUILD.stage",
+                  "Closed Won"
+                ]
+              },
+              "outcome": [
+                "TASK_WON",
+                "MARK_CUSTOMER"
+              ]
+            },
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.BUILD.stage",
+                  "Closed Lost"
+                ]
+              },
+              "outcome": "TASK_LOST"
+            },
+            {
+              "outcome": "RESOLVE_SUCCESS"
+            }
+          ]
+        }
+      },
+      {
+        "id": "TASK_PROPOSAL",
+        "data": {
+          "id": "TASK_PROPOSAL",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/workspaces/task",
+            "method": "POST",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "space_id": "CRM_ACTIVITIES",
+              "title": "Send proposal: |$.BUILD.name",
+              "description": "The deal reached Proposal.",
+              "status": "to_do",
+              "priority": "high",
+              "due_date": "$.BUILD.due",
+              "assignees": "$.BUILD.assignees",
+              "tags": [
+                "crm",
+                "proposal"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": "TASK_WON",
+        "data": {
+          "id": "TASK_WON",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/workspaces/task",
+            "method": "POST",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "space_id": "CRM_ACTIVITIES",
+              "title": "Schedule kickoff call: |$.BUILD.name",
+              "description": "Deal closed won. Book the kickoff.",
+              "status": "to_do",
+              "priority": "high",
+              "due_date": "$.BUILD.due",
+              "assignees": "$.BUILD.assignees",
+              "tags": [
+                "crm",
+                "won"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": "TASK_LOST",
+        "data": {
+          "id": "TASK_LOST",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/workspaces/task",
+            "method": "POST",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "space_id": "CRM_ACTIVITIES",
+              "title": "Post-mortem: |$.BUILD.name",
+              "description": "Deal lost. Reason given: |$.BUILD.lost",
+              "status": "to_do",
+              "priority": "medium",
+              "due_date": "$.BUILD.due",
+              "assignees": "$.BUILD.assignees",
+              "tags": [
+                "crm",
+                "lost"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": "MARK_CUSTOMER",
+        "data": {
+          "id": "MARK_CUSTOMER",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/records/Company/|$.BUILD.company",
+            "method": "PUT",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "data": {
+                "account_type": "Customer",
+                "account_status": "Active"
+              }
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_record_Deal_BUILD",
+        "source": "record.Deal",
+        "target": "BUILD"
+      },
+      {
+        "id": "e_BUILD_STAMP_STAGE",
+        "source": "BUILD",
+        "target": "STAMP_STAGE"
+      },
+      {
+        "id": "e_STAMP_STAGE_ROUTE",
+        "source": "STAMP_STAGE",
+        "target": "ROUTE"
+      },
+      {
+        "id": "e_ROUTE_TASK_PROPOSAL",
+        "source": "ROUTE",
+        "target": "TASK_PROPOSAL"
+      },
+      {
+        "id": "e_ROUTE_TASK_WON",
+        "source": "ROUTE",
+        "target": "TASK_WON"
+      },
+      {
+        "id": "e_ROUTE_TASK_LOST",
+        "source": "ROUTE",
+        "target": "TASK_LOST"
+      },
+      {
+        "id": "e_ROUTE_MARK_CUSTOMER",
+        "source": "ROUTE",
+        "target": "MARK_CUSTOMER"
+      }
+    ],
+    "result": {
+      "status": "success",
+      "stage": "$.BUILD.stage"
+    }
+  }
+}

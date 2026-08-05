@@ -8,7 +8,7 @@ import { z } from 'zod';
 
 import { QuivaClient, WORKSPACES_BUCKET, fileKeyOf, digestMatches, expectedDigestString } from './client.js';
 import { GOTCHAS, listReferenceTopics, getReference } from './workspaces-docs.js';
-import { validate } from './validate.js';
+import { validate, verticalRouting } from './validate.js';
 import { listExamples, getExample } from './examples.js';
 
 const client = new QuivaClient();
@@ -25,7 +25,9 @@ Recipe:
 3. validate_payload — lint a create/update body locally before sending.
 4. create_space -> create_task -> create_comment — build resources.
 5. update_task / update_multi_task / react_to_comment — collaborate; delete_* to clean up.
-6. set_task_action / delete_task_action — the per-task checklist (write-only; see below).
+6. set_task_action / delete_task_action — the per-task checklist. Read them back
+   via get_task, which returns a task_actions[] array. WARNING: writing a task
+   action silently resets the task's status.
 
 Spaces also hold FILES, and the space "VERTICAL" is a template library whose
 folders are deployed into an account when a vertical is added to it:
@@ -240,7 +242,7 @@ tool(
 
 tool(
   'get_task',
-  'Get one task by id. Returns the task plus top-level `watchers[]` and `muted[]` arrays.',
+  'Get one task by id. Returns the task plus top-level `watchers[]`, `muted[]` and `task_actions[]` arrays. This is the only working way to read task actions — the dedicated GET route is misrouted onto the write resource.',
   { id: z.string().describe('Task id') },
   async ({ id }) => client.get(`/workspaces/task/${encodeURIComponent(id)}`)
 );
@@ -291,7 +293,7 @@ tool(
 
 tool(
   'set_task_action',
-  'Create or update a checklist action on a task (PUT /workspaces/task/{task_id}/action). Omit `id` to create one (server assigns ta_<random>); pass an existing `id` to address that action. `description` is required on EVERY write, even one that only flips `done`. 404 "task not found" if the task does not exist. IMPORTANT: the response is your own request echoed back, not the stored record, and there is NO working read route for task actions — so this write cannot be verified afterwards. Nothing in the UI displays task actions yet either.',
+  'Create or update a checklist action on a task (PUT /workspaces/task/{task_id}/action). Omit `id` to create one (server assigns ta_<random>); pass an existing `id` to address that action. `description` is required on EVERY write, even one that only flips `done`. 404 "task not found" if the task does not exist. WARNING — THIS WRITE SILENTLY RESETS THE TASK STATUS: reproduced twice on 2026-08-04, two tasks went from `to_do` to `backlog` (a status not even defined in their space) with no status sent. Read the task first and re-assert its status afterwards, or do not use this on a task whose status matters. The response is your own request echoed back, not the stored record — verify with get_task, which returns `task_actions[]`. Nothing in the UI displays task actions yet.',
   {
     task_id: z.string().describe('Task id the action hangs off'),
     action: taskActionPayload,
@@ -400,22 +402,40 @@ tool(
 // than a fetch wrapper.
 // ---------------------------------------------------------------------------
 
-// Poll the file index until `key` shows up. Returns { indexed, waited_ms, entries }.
+// Poll the file index until `key` shows up.
+//
+// Two levels of "indexed", and conflating them produced a FALSE GREEN once
+// already, so they are reported separately:
+//
+//   indexed      — the key is in the index, found via `name` OR by decoding the
+//                  subject. Matching on `name` alone would hang forever on an
+//                  entry whose name is blank, which is common.
+//   name_indexed — the entry also carries a populated `name`. This is the
+//                  stricter bar, and it is the one that matters to CONSUMERS:
+//                  accounts-service deployVerticals matches on `file.Name`, and
+//                  the UI's file tree derives folder paths from it. An entry with
+//                  a blank name is invisible to both.
+//
+// Returns { indexed, name_indexed, waited_ms, entries }.
 async function waitForIndex(spaceId, key, timeoutMs = 60_000) {
   const started = Date.now();
   let entries = 0;
+  let indexed = false;
   for (;;) {
     const listed = await client.get('/workspaces/files', { space_id: spaceId });
-    // Resolve through the SUBJECT, not `name` — an index entry's name can be
-    // empty (every migrated folder marker in VERTICAL is, as of 2026-07-31) and
-    // matching on name alone would poll forever for a key that is already there.
-    const names = (listed?.results ?? []).map(fileKeyOf);
-    entries = names.length;
-    if (names.includes(key)) {
-      return { indexed: true, waited_ms: Date.now() - started, entries };
-    }
-    if (Date.now() - started >= timeoutMs) {
-      return { indexed: false, waited_ms: Date.now() - started, entries };
+    const results = listed?.results ?? [];
+    entries = results.length;
+    const match = results.find((f) => fileKeyOf(f) === key);
+    if (match) {
+      indexed = true;
+      const name_indexed = Boolean(match.name);
+      // Keep polling briefly if the key is present but unnamed — the name may
+      // still be filling in. Observed permanent for markers, so this is bounded.
+      if (name_indexed || Date.now() - started >= timeoutMs) {
+        return { indexed, name_indexed, waited_ms: Date.now() - started, entries };
+      }
+    } else if (Date.now() - started >= timeoutMs) {
+      return { indexed, name_indexed: false, waited_ms: Date.now() - started, entries };
     }
     await new Promise((r) => setTimeout(r, 3000));
   }
@@ -426,14 +446,25 @@ function spaceIdOfKey(key) {
   return String(key).split('.')[1] ?? '';
 }
 
-function indexNote(verification, key) {
-  if (verification.indexed) {
-    return `Confirmed in the file index after ${verification.waited_ms}ms. It will now be listed by list_files and picked up by vertical deployment.`;
+function indexNote(verification, key, { isMarker = false } = {}) {
+  if (!verification.indexed) {
+    return (
+      `NOT YET in the file index after ${verification.waited_ms}ms. The bytes are stored (the write returned a digest), but indexing is asynchronous and can take minutes. ` +
+      `Until "${key}" appears in list_files it is invisible to vertical deployment — re-run list_files before deploying, and do NOT treat this as written.`
+    );
   }
-  return (
-    `NOT YET in the file index after ${verification.waited_ms}ms. The bytes are stored (the write returned a digest), but indexing is asynchronous and can take minutes. ` +
-    `Until "${key}" appears in list_files it is invisible to vertical deployment — re-run list_files before deploying, and do NOT treat this as written.`
-  );
+  if (verification.name_indexed) {
+    return `Confirmed in the file index after ${verification.waited_ms}ms, with a populated \`name\` — so it is visible to vertical deployment and to the UI file tree.`;
+  }
+  // Present but unnamed. Harmless for a marker, serious for a config.
+  const shared =
+    `Present in the index after ${verification.waited_ms}ms but with an EMPTY \`name\` (the key was recovered from its subject). ` +
+    'This is a platform indexing defect, and it is permanent — the name does not fill in later. ';
+  return isMarker
+    ? shared +
+        'For a FOLDER this is cosmetic but visible: accounts-service skips markers anyway, so deployment is unaffected, but the UI file tree derives folder paths from `name` and will NOT show this folder while it is empty. It appears as soon as it contains a real file, because files do keep their names.'
+    : shared +
+        'For a CONFIG FILE this is SERIOUS: accounts-service deployVerticals matches on `file.Name`, so an unnamed entry fails the prefix test and the config WILL NOT DEPLOY — silently. Re-write the file and re-check before deploying.';
 }
 
 tool(
@@ -511,7 +542,16 @@ tool(
         return { response, already_existed, folder_path: base, marker_key: markerKey, verified: false, note: 'wait_for_index was false — nothing has been confirmed. The engine returns no body, so this is the write response only.' };
       }
       const verification = await waitForIndex(spaceId, markerKey);
-      return { response, already_existed, folder_path: base, marker_key: markerKey, verified: verification.indexed, verification, note: indexNote(verification, markerKey) };
+      return {
+        response,
+        already_existed,
+        folder_path: base,
+        marker_key: markerKey,
+        verified: verification.indexed,
+        visible_in_ui: verification.name_indexed,
+        verification,
+        note: indexNote(verification, markerKey, { isMarker: true }),
+      };
     }, 'created');
   }
 );
@@ -558,7 +598,23 @@ tool(
         return { ...result, verified: false, note: 'wait_for_index was false — the bytes are stored but nothing confirms the file is in the index yet.' };
       }
       const verification = await waitForIndex(spaceIdOfKey(key), key);
-      return { ...result, verified: verification.indexed && digest_ok, verification, note: indexNote(verification, key) };
+      const routing = verticalRouting(key);
+      return {
+        ...result,
+        // A config whose index entry has no `name` is skipped by deployVerticals,
+        // so "indexed" alone is not good enough to call a write verified.
+        verified: verification.name_indexed && digest_ok,
+        // will_deploy has to answer BOTH questions deployVerticals asks: is the
+        // index entry named, AND is the category one of the six routing keys. It
+        // used to report only the first, so a file in a MISSPELLED category folder
+        // (`flow/`, `record_config/`) came back will_deploy=true and then deployed
+        // nothing, silently — the exact failure this field exists to catch. It also
+        // claimed true for specs/, which never deploys by design.
+        will_deploy: verification.name_indexed && routing.deploys,
+        ...(routing.reason ? { will_deploy_reason: routing.reason } : {}),
+        verification,
+        note: indexNote(verification, key),
+      };
     }, 'written')
 );
 

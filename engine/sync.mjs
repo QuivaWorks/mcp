@@ -38,8 +38,17 @@ const SERVERS = [
 // A citation is a path into one of the engine's source trees. Kept deliberately
 // narrow: only paths ending in a real source extension, so prose mentions of a
 // service name are not mistaken for a verifiable claim.
+//
+// Every tree we cite MUST be listed here. Omitting one does not fail loudly — the
+// citation is simply never seen, and the claim it backs silently stops being
+// drift-checked. That happened: `accounts-service` was missing, so all ten
+// citations of accounts-service/accounts/updateaccount.go — the deployVerticals
+// contract, the single most important file for verticals — went unchecked from the
+// day they were written. Found 2026-08-04 by grepping for cited paths and diffing
+// against this list, not by anything failing. If you cite a new tree, add it here
+// and re-run with --pin.
 const CITATION =
-  /(?:workspaces-service|records-service|hub-service|file-generator-service|datahub-js-nodes|microstrate\/src)[A-Za-z0-9/._-]*\.(?:go|ts|svelte)/g;
+  /(?:workspaces-service|records-service|hub-service|file-generator-service|accounts-service|recall-service|numbergen-service|data-point-service|bellerophon-workforce|bellerophon-cerberus|datahub-js-nodes|microstrate\/src)[A-Za-z0-9/._-]*\.(?:go|ts|svelte)/g;
 
 // The OpenAPI specs our docs argue with now live in THIS repo, at
 // specs/openapi/. They were never on evari-olympus main — they were authored on
@@ -51,6 +60,19 @@ const SPEC_CITATION =
 const SPEC_DIR = join(ROOT, 'specs', 'openapi');
 
 const SKIP_DIRS = new Set(['node_modules', '.git']);
+
+// Guards the CITATION list above against the failure that let accounts-service go
+// unchecked: a citation into a tree nobody added to the alternation is invisible,
+// and invisibility looks exactly like "nothing to check". This finds any path that
+// LOOKS like an engine citation, and reports the ones CITATION would not match.
+// Deliberately loose on the left, then filtered to segments that are plausibly
+// engine trees, so this repo's own directories are not flagged.
+const BROAD_CITATION = /\b[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9._-]+)+\.(?:go|svelte)\b/g;
+// CITATION carries /g, and .test() on a global regex advances lastIndex — so calling
+// it in a loop returns alternating true/false. Test against a non-global clone.
+const CITATION_TEST = new RegExp(CITATION.source);
+const ENGINE_TREE = /(?:-service$|^bellerophon-|^microstrate$|^datahub-js-nodes$)/;
+const untrackedTrees = new Map(); // tree -> Set of "path (cited by file)"
 
 function walk(dir, out = []) {
   for (const entry of readdirSync(dir)) {
@@ -78,7 +100,16 @@ const missingSpecs = new Set();
 // path -> Set of repo-relative files that cite it
 function collectCitations() {
   const cited = new Map();
-  const roots = [...SERVERS.map((s) => join(ROOT, s)), join(ROOT, 'docs')];
+  // tools/ and verticals/ cite engine files too — tools/vertical/create-vertical.mjs
+  // cites the deployVerticals routing keys. Omitting them here hid those citations
+  // independently of the CITATION regex, so widening one without the other fixes
+  // only half the hole.
+  const roots = [
+    ...SERVERS.map((s) => join(ROOT, s)),
+    join(ROOT, 'docs'),
+    join(ROOT, 'tools'),
+    join(ROOT, 'verticals'),
+  ];
   for (const root of roots) {
     let files;
     try {
@@ -95,6 +126,14 @@ function collectCitations() {
       }
       for (const match of text.matchAll(SPEC_CITATION)) {
         if (!localSpecs.has(match[0])) missingSpecs.add(`${match[0]} (cited by ${rel})`);
+      }
+      for (const match of text.matchAll(BROAD_CITATION)) {
+        const path = match[0];
+        if (CITATION_TEST.test(path)) continue;
+        const tree = path.split('/')[0];
+        if (!ENGINE_TREE.test(tree)) continue;
+        if (!untrackedTrees.has(tree)) untrackedTrees.set(tree, new Set());
+        untrackedTrees.get(tree).add(`${path} (cited by ${rel})`);
       }
     }
   }
@@ -233,6 +272,17 @@ if (drifted.length) {
 if (added.length) {
   console.log('UNPINNED — newly cited, never pinned. Run --pin after verifying:');
   for (const a of added) console.log(`  ${a.path}\n      cited by ${a.cited_by.join(', ')}`);
+  console.log('');
+}
+if (untrackedTrees.size) {
+  console.log('UNTRACKED TREE — these look like engine citations but the CITATION');
+  console.log('regex in this file does not match them, so they are NOT drift-checked.');
+  console.log('Add the tree to the alternation and re-run with --pin, or rewrite the');
+  console.log('citation to a full path if it is only a fragment:');
+  for (const [tree, paths] of [...untrackedTrees].sort()) {
+    console.log(`  ${tree}/`);
+    for (const p of [...paths].sort()) console.log(`      ${p}`);
+  }
   console.log('');
 }
 

@@ -6,7 +6,7 @@
     "harvested_from": "https://api.microstrate.io"
   },
   "teaches": "The real layout of the VERTICAL space: which verticals exist, which category folders each has, and which marker filename each folder carries. This is the evidence behind the file/folder path rules and the six deployable category names — see get_workspaces_reference(\"verticals\").",
-  "file_count": 21,
+  "file_count": 29,
   "marker_styles_present": [
     "__meta__.json"
   ],
@@ -18,6 +18,39 @@
           "configs": [
             "spaces.VERTICAL.SHARED.record_configs.Client.json"
           ],
+          "folder_marker": "__meta__.json"
+        }
+      },
+      "marker_style": "__meta__.json"
+    },
+    "crm": {
+      "categories": {
+        "assistants": {
+          "configs": [],
+          "folder_marker": "__meta__.json"
+        },
+        "document_templates": {
+          "configs": [],
+          "folder_marker": "__meta__.json"
+        },
+        "flows": {
+          "configs": [],
+          "folder_marker": "__meta__.json"
+        },
+        "meeting_templates": {
+          "configs": [],
+          "folder_marker": "__meta__.json"
+        },
+        "record_configs": {
+          "configs": [],
+          "folder_marker": "__meta__.json"
+        },
+        "spaces": {
+          "configs": [],
+          "folder_marker": "__meta__.json"
+        },
+        "specs": {
+          "configs": [],
           "folder_marker": "__meta__.json"
         }
       },
@@ -170,6 +203,14 @@
     "spaces.VERTICAL.SHARED.__meta__.json",
     "spaces.VERTICAL.SHARED.record_configs.Client.json",
     "spaces.VERTICAL.SHARED.record_configs.__meta__.json",
+    "spaces.VERTICAL.crm.__meta__.json",
+    "spaces.VERTICAL.crm.assistants.__meta__.json",
+    "spaces.VERTICAL.crm.document_templates.__meta__.json",
+    "spaces.VERTICAL.crm.flows.__meta__.json",
+    "spaces.VERTICAL.crm.meeting_templates.__meta__.json",
+    "spaces.VERTICAL.crm.record_configs.__meta__.json",
+    "spaces.VERTICAL.crm.spaces.__meta__.json",
+    "spaces.VERTICAL.crm.specs.__meta__.json",
     "spaces.VERTICAL.financial_advisor.__meta__.json",
     "spaces.VERTICAL.financial_advisor.assistants.__meta__.json",
     "spaces.VERTICAL.financial_advisor.assistants.assist.json",

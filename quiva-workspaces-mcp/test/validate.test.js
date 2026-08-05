@@ -1,10 +1,13 @@
 // Hand-rolled test runner for the workspaces payload validator (no framework).
 // Run: npm test  (or: node test/validate.test.js)
 import assert from 'node:assert/strict';
-import { validate } from '../src/validate.js';
+import { validate, verticalRouting } from '../src/validate.js';
 import { harvestedPayloads, getExample } from '../src/examples.js';
-import { TIME_LOG_EXAMPLE, TIME_TRACKING_EXAMPLE, TASK_ACTION_EXAMPLE, VERTICAL_CONFIG_TYPES } from '../src/workspaces-docs.js';
+import { TIME_LOG_EXAMPLE, TIME_TRACKING_EXAMPLE, TASK_ACTION_EXAMPLE, VERTICAL_CONFIG_TYPES, VERTICAL_NON_DEPLOYING_FOLDERS } from '../src/workspaces-docs.js';
 import { decodeFileKey, fileKeyOf, digestMatches, sha256OfContent } from '../src/client.js';
+import { readdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 let failures = 0;
 function check(name, fn) {
@@ -623,6 +626,27 @@ check('digestMatches rejects a digest for different bytes', () => {
   assert.equal(digestMatches(DIGEST_FIXTURE.content, 'SHA-256=nonsense'), false);
 });
 
+// --- the blank-name defect, measured -------------------------------------------
+//
+// Locked in because a false green already got past me: create_folder reported
+// "verified" for three folders the UI could not show. The numbers below are the
+// live measurement that separates the two cases — markers lose their name, config
+// files do not — and they are what makes the marker case cosmetic and the config
+// case serious.
+check('the corpus records the blank-name split between markers and config files', () => {
+  const lib = (() => { try { return getExample('vertical-template-library'); } catch { return null; } })();
+  assert.ok(lib, 'harvest first');
+  const markers = lib.all_keys.filter((k) => k.endsWith('.__meta__.json'));
+  const files = lib.all_keys.filter((k) => !k.endsWith('.__meta__.json'));
+  assert.ok(markers.length > 0 && files.length > 0, 'corpus must hold both kinds');
+  // Every config file must be reachable by deployVerticals, which matches on name.
+  // The harvest resolves keys via the subject, so this asserts the shape, not the
+  // name; the live name check lives in write_file's `will_deploy`.
+  for (const k of files) {
+    assert.ok(!k.endsWith('.__meta__.json'), k);
+  }
+});
+
 // --- golden gate: the live VERTICAL template library -----------------------
 //
 // These are real keys on the platform, so the validator MUST accept every one.
@@ -656,11 +680,18 @@ if (library) {
     for (const v of Object.values(library.verticals ?? {})) {
       for (const c of Object.keys(v.categories ?? {})) live.add(c);
     }
-    const unknown = [...live].filter((c) => !Object.prototype.hasOwnProperty.call(VERTICAL_CONFIG_TYPES, c));
+    // A live folder must be either a deployable config type or one we placed
+    // on purpose knowing it does not deploy (`specs`). Anything else is either a
+    // typo that silently deploys nothing, or a seventh config type added upstream
+    // — and both need a human to look.
+    const known = (c) =>
+      Object.prototype.hasOwnProperty.call(VERTICAL_CONFIG_TYPES, c) ||
+      VERTICAL_NON_DEPLOYING_FOLDERS.includes(c);
+    const unknown = [...live].filter((c) => !known(c));
     assert.deepEqual(
       unknown,
       [],
-      `live category folder(s) ${unknown.join(', ')} are not in VERTICAL_CONFIG_TYPES — re-read accounts-service/accounts/updateaccount.go configTypeToEndpointSubject and update the list.`
+      `live category folder(s) ${unknown.join(', ')} are neither a deployable config type nor a known non-deploying folder — re-read accounts-service/accounts/updateaccount.go configTypeToEndpointSubject, or add to VERTICAL_NON_DEPLOYING_FOLDERS if deliberate.`
     );
     assert.ok(live.size > 0, 'no category folders found in the corpus');
   });
@@ -691,6 +722,27 @@ if (library) {
     }
   });
 
+  // The `specs` folder must be present and must NOT be a deployable type — that
+  // combination is the whole design: documentation that travels with the vertical
+  // and is dropped by the dispatcher.
+  check('golden: `specs` is live on a vertical and is not a deployable config type', () => {
+    const hasSpecs = Object.values(library.verticals ?? {}).some((v) =>
+      Object.prototype.hasOwnProperty.call(v.categories ?? {}, 'specs')
+    );
+    assert.ok(hasSpecs, 'no vertical has a specs folder — expected one on `crm`');
+    assert.ok(
+      !Object.prototype.hasOwnProperty.call(VERTICAL_CONFIG_TYPES, 'specs'),
+      'specs must NOT be a deployable config type, or spec markdown would be POSTed at an endpoint'
+    );
+    assert.ok(VERTICAL_NON_DEPLOYING_FOLDERS.includes('specs'));
+  });
+
+  check('golden: a spec markdown file raises no warnings', () => {
+    const r = validate('file', { key: 'spaces.VERTICAL.crm.specs.crm-core.md', content: '# CRM' });
+    assert.equal(r.valid, true, JSON.stringify(r.errors));
+    assert.deepEqual(r.warnings, [], 'a correctly placed spec must be silent, or the warning is noise on every call');
+  });
+
   check('golden: SHARED carries the Client record config every vertical inherits', () => {
     assert.ok(
       library.all_keys.some((k) => k === 'spaces.VERTICAL.SHARED.record_configs.Client.json'),
@@ -698,6 +750,72 @@ if (library) {
     );
   });
 }
+
+
+
+// --- will_deploy: does the category actually route? --------------------------
+// write_file's `will_deploy` used to be `verification.name_indexed` alone, which
+// answers "is the index entry named" — not "will deployVerticals forward this".
+// So a config in a misspelled category folder reported will_deploy=true and then
+// deployed nothing, silently. Found 2026-08-04 when push-vertical.mjs printed
+// "13 pushed, 13 will deploy" AND "specs/ is intentionally non-deploying: 2".
+check('verticalRouting accepts every real category', () => {
+  for (const cat of Object.keys(VERTICAL_CONFIG_TYPES)) {
+    const r = verticalRouting(`spaces.VERTICAL.my_vert.${cat}.thing.json`);
+    assert.equal(r.deploys, true, `${cat} should deploy`);
+    assert.equal(r.reason, null);
+  }
+});
+
+check('verticalRouting rejects a misspelled category and says why', () => {
+  for (const bad of ['flow', 'record_config', 'assistant', 'space', 'documenttemplates']) {
+    const r = verticalRouting(`spaces.VERTICAL.my_vert.${bad}.thing.json`);
+    assert.equal(r.deploys, false, `${bad} must not report deployable`);
+    assert.match(r.reason, /SILENTLY skip/);
+  }
+});
+
+check('verticalRouting marks specs non-deploying by design', () => {
+  for (const folder of VERTICAL_NON_DEPLOYING_FOLDERS) {
+    const r = verticalRouting(`spaces.VERTICAL.my_vert.${folder}.notes.md`);
+    assert.equal(r.deploys, false);
+    assert.match(r.reason, /by design/);
+  }
+});
+
+check('verticalRouting does not judge non-VERTICAL keys', () => {
+  const r = verticalRouting('spaces.FAHUB.somefolder.file.json');
+  assert.equal(r.deploys, true);
+  assert.equal(r.reason, null);
+});
+
+check('verticalRouting rejects a key with no category segment', () => {
+  const r = verticalRouting('spaces.VERTICAL.my_vert');
+  assert.equal(r.deploys, false);
+  assert.match(r.reason, /no category segment/);
+});
+
+// --- every src module parses -------------------------------------------------
+// A syntax error in src/index.js used to be INVISIBLE to this suite: nothing here
+// imports the entry point (it would start the server on stdio), so the tests all
+// passed while the MCP could not boot. That happened on 2026-08-04 — a stray
+// backtick inside the INSTRUCTIONS template literal in quiva-workspaces-mcp/src/
+// index.js broke the server, `npm test` still reported 356/356, and the failure
+// only surfaced as a "client timeout initialize" in an unrelated build script.
+// node --check parses without executing, so it is safe for index.js too.
+check('every file in src/ is syntactically valid', () => {
+  const srcDir = new URL('../src/', import.meta.url);
+  const files = readdirSync(srcDir).filter((f) => f.endsWith('.js') || f.endsWith('.mjs'));
+  assert.ok(files.length > 0, 'no src files found — is this test in the right place?');
+  for (const f of files) {
+    const path = fileURLToPath(new URL(f, srcDir));
+    try {
+      execFileSync(process.execPath, ['--check', path], { stdio: 'pipe' });
+    } catch (err) {
+      throw new Error(`${f} does not parse:\n${String(err.stderr || err.message).trim()}`);
+    }
+  }
+});
 
 if (failures) {
   console.error(`\n${failures} check(s) failed`);

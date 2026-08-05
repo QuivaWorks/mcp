@@ -1,0 +1,219 @@
+{
+  "id": "UWClient",
+  "name": "Underwriting Client",
+  "description": "Commercial applicant for Builders Risk cover: builders, contractors and project owners. Distinct from the shared Client record, which is a personal financial-advice contact.",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "legal_name": {
+        "type": "string",
+        "title": "Legal business name"
+      },
+      "business_type": {
+        "type": "string",
+        "title": "Business classification",
+        "enum": [
+          "Contractor",
+          "Developer",
+          "Owner",
+          "Other"
+        ]
+      },
+      "business_address": {
+        "type": "string",
+        "title": "Business address"
+      },
+      "contact_name": {
+        "type": "string",
+        "title": "Contact person"
+      },
+      "contact_phone": {
+        "type": "string",
+        "title": "Contact phone"
+      },
+      "contact_email": {
+        "type": "string",
+        "title": "Contact email",
+        "format": "email"
+      },
+      "license_number": {
+        "type": "string",
+        "title": "Licence number"
+      },
+      "years_in_business": {
+        "type": "integer",
+        "title": "Years in business",
+        "minimum": 0
+      }
+    },
+    "required": [
+      "legal_name",
+      "business_address",
+      "contact_name"
+    ]
+  },
+  "views": {
+    "forms": [
+      {
+        "id": "default",
+        "title": "Applicant",
+        "layout": {
+          "type": "grid",
+          "props": {
+            "gridTemplateColumns": "1fr",
+            "gap": 16
+          },
+          "children": [
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "legal_name",
+                  "props": {
+                    "label": "Legal business name"
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "business_type",
+                  "props": {
+                    "label": "Business classification",
+                    "options": [
+                      {
+                        "value": "Contractor",
+                        "text": "Contractor"
+                      },
+                      {
+                        "value": "Developer",
+                        "text": "Developer"
+                      },
+                      {
+                        "value": "Owner",
+                        "text": "Owner"
+                      },
+                      {
+                        "value": "Other",
+                        "text": "Other"
+                      }
+                    ]
+                  },
+                  "inputType": "dropdown"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "business_address",
+                  "props": {
+                    "label": "Business address"
+                  },
+                  "inputType": "textarea"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "contact_name",
+                  "props": {
+                    "label": "Contact person"
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "contact_phone",
+                  "props": {
+                    "label": "Contact phone"
+                  },
+                  "inputType": "phone"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "contact_email",
+                  "props": {
+                    "label": "Contact email",
+                    "placeholder": "name@example.com"
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "license_number",
+                  "props": {
+                    "label": "Licence number"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "years_in_business",
+                  "props": {
+                    "label": "Years in business",
+                    "min": 0,
+                    "showControls": true
+                  },
+                  "inputType": "number"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "table": {
+      "type": "table",
+      "columns": [
+        {
+          "field": "legal_name",
+          "order": 1
+        },
+        {
+          "field": "business_type",
+          "order": 2
+        },
+        {
+          "field": "contact_name",
+          "order": 3
+        },
+        {
+          "field": "contact_email",
+          "order": 4
+        },
+        {
+          "field": "years_in_business",
+          "order": 5
+        }
+      ]
+    }
+  }
+}
