@@ -28,8 +28,8 @@ export const GOTCHAS = [
   'create_task with no `status` now inherits the space\'s `default_status` instead of storing "" (handler/tasks.go createTask fetches the space and fills it in). Verified live: posting {title, space_id:"MCP_VERIFICATION_RENEWALS"} came back with status "awaiting_info". This is a behaviour change — a task created without a status used to land outside every board column; it now appears in the default one. It only applies when `space_id` is set: a task with no space still gets "".',
   // Time tracking merge semantics (all four cases verified live).
   'Task `time_tracking` is `{ estimate?: { time_in_seconds }, logs: [TimeLog] }` and the frontend derives every total from it — nothing is stored pre-computed. Merge behaviour verified live 2026-07-29: omitting `time_tracking` leaves it untouched; sending `time_tracking` WITHOUT `logs` preserves the existing logs; `"logs": []` clears them all; and `"logs": [...]` REPLACES the array wholesale rather than appending. To add one entry you must read the task and send the complete set back. Every TimeLog field (id, created_at, user) is client-supplied — the backend defaults nothing inside the object.',
-  // Task actions: write-only surface.
-  'Task actions (the checklist hung off a task) are WRITE-ONLY through the API. PUT /workspaces/task/{task_id}/action creates or updates one and DELETE .../action/{id} removes it, but the GET on the same path is mapped to the WRITE resource `microstrate.workspaces.put.task-action`, so it runs the add handler and returns 400 "description is required" (verified live). ListTaskActionsHandler exists in the service (registered as get.task-actions) and no gateway route reaches it. The write response is your own request echoed back, not the stored aggregate — so a task action cannot be verified after writing. Nothing in the frontend reads them yet either.',
+  // Task actions: readable since #1299, but writing one corrupts the task status.
+  'WRITING A TASK ACTION SILENTLY RESETS THE TASK STATUS. Reproduced twice with before/after reads on 2026-08-04: two CRM_ACTIVITIES tasks were `to_do` before a PUT /workspaces/task/{id}/action and `backlog` after it, with no status in either request and `updated_at` moved to the write time. `backlog` is not one of that space\'s statuses, so both tasks ended up in a status that renders in no column and matches no filter. The mechanism is unidentified — AddTaskActionHandler never writes the task subject and GetTaskHandler is read-only. Re-assert the status after any task-action write. Separately, task actions ARE now readable: get_task returns a top-level `task_actions[]` array (since #1299, verified live) — this repo previously documented them as write-only and unverifiable, which was true on 2026-07-29 and false two days later. Only the dedicated GET /workspaces/task/{id}/action route is still misrouted onto the write resource.',
   // Date formats.
   'due_date and scheduled_at are parsed as RFC3339 date-times on read (model/api.go Task.UnmarshalJSON), NOT plain "YYYY-MM-DD". A date-only value can fail to round-trip through GET — send a full RFC3339 timestamp like "2024-06-15T00:00:00Z".',
   // GetTask extra fields.
@@ -41,7 +41,7 @@ export const GOTCHAS = [
   // Files: dotted paths, and the marker rename that a source read gets wrong.
   'Space FILES are addressed by a DOTTED path — `spaces.<SPACE_ID>.<folder>.<subfolder>.<name>.<ext>`. `.` is the hierarchy separator, so no single name segment may contain one. A FOLDER is not a directory: it is a marker object at `<path>.<marker>.json` holding only `{created_at, created_by}`, and the marker filename was RENAMED from `metadata.json` to `__meta__.json` (evari-olympus 3a7ab968b "Files refactor signature approvals metadata" #1291, 2026-07-31; the frontend agrees — folder-metadata.utils.ts FOLDER_METADATA_FILENAME). Watched happen live: VERTICAL markers read as `metadata.json` early on 2026-07-31 and as `__meta__.json` an hour later, so existing markers were MIGRATED in place, not left behind. Write `__meta__.json`, but keep accepting `metadata.json` — accounts-service still skips both suffixes, and an unmigrated space may still hold the old name. A checkout predating the rename gives the WRONG answer straight from the handler source, which is why this was caught by writing a folder and looking, not by reading files.go.',
   // Files: an index entry's name can be blank. This one silently breaks polling.
-  'A file-index entry\'s `name` can be EMPTY while its `subject` is correct — observed live 2026-07-31 on ALL TWELVE folder markers in the VERTICAL space right after the #1291 rename migrated them, while markers created natively by the new code kept their name. THE SUBJECT IS THE AUTHORITATIVE KEY: it is `ms.workspace-files.` followed by one base64 RawStdEncoding segment per path segment, and the engine itself decodes it in exactly this situation (DeleteFolderHandler falls back to transform.ObjKeyUnsafe when Name is ""). Consequences: anything matching on `name` will not see those folders at all — a poll-until-indexed loop keyed on `name` waits forever for a key that is already present — and the `search` query param matches the stored name, so it cannot find them either. list_files therefore adds a resolved `key` to every entry; read `key`, not `name`. Deployment is NOT affected: an empty name fails both the marker-suffix and the vertical-prefix test in deployVerticals, so those entries are skipped, which is what should happen to a marker anyway.',
+  'A file-index entry\'s `name` is frequently EMPTY while its `subject` is correct, and this is NOT confined to migrated data — measured live 2026-07-31 across the VERTICAL space: 16 of 21 FOLDER MARKERS had a blank name, and 0 of 8 CONFIG FILES did. Three of eight markers created in a single fresh run came back blank, so it is a race in the folder-create indexing path, not a one-off migration artefact, and it is PERMANENT — re-listing minutes later does not fill it in. (An earlier note here claimed freshly created markers kept their name. That was wrong.) CONSEQUENCES, which differ by kind: for a FOLDER it is cosmetic but visible — accounts-service skips markers regardless so deployment is fine, but the UI file tree builds folder paths from `name`, so an EMPTY folder whose marker is unnamed DOES NOT APPEAR in the Files tab; it shows up as soon as it holds a real file, since files keep their names. For a CONFIG FILE it would be serious: deployVerticals matches on `file.Name`, so an unnamed config fails the prefix test and silently never deploys. THE SUBJECT IS THE AUTHORITATIVE KEY: it is `ms.workspace-files.` followed by one base64 RawStdEncoding segment per path segment, and the engine itself decodes it in exactly this situation (DeleteFolderHandler falls back to transform.ObjKeyUnsafe when Name is ""). Consequences: anything matching on `name` will not see those folders at all — a poll-until-indexed loop keyed on `name` waits forever for a key that is already present — and the `search` query param matches the stored name, so it cannot find them either. list_files therefore adds a resolved `key` to every entry; read `key`, not `name`. Deployment is NOT affected: an empty name fails both the marker-suffix and the vertical-prefix test in deployVerticals, so those entries are skipped, which is what should happen to a marker anyway.',
   // Files: the two sinks, and the async index. This is the operational trap.
   'A file write has TWO sinks: the object BUCKET and the file INDEX. `GET /workspaces/files` lists the INDEX, and so does the vertical deployer (accounts-service deployVerticals), so a file present in the bucket but missing from the index is readable by key and invisible to everything that matters. Writing an object DOES self-register — you do not need `/workspaces/files/file-record` (the UI never calls it; that route and `/sync-files` are repair paths). BUT INDEXING IS ASYNCHRONOUS: verified live twice, a config object was absent from the index at t+1s and present at t+16s, and a nested folder took minutes. create_folder also returns NO body at all (`response.Success(request)`). So "written" means "appears in the index" — poll for it; never write and immediately act on it.',
   // Files: deletes are deliberately not exposed.
@@ -152,6 +152,15 @@ const VERTICAL_CONFIG_TYPES = {
   spaces: 'microstrate.workspaces.post.space',
 };
 
+// Folders we put in a vertical ON PURPOSE that accounts-service does not deploy.
+// They reach the dispatch loop and fall out at the config-type lookup, which is
+// the intended outcome — so they must NOT be reported as an accidental typo, and
+// the golden gate must not treat them as an unknown category.
+//
+// `specs` holds the markdown brief a vertical was built from. It is documentation
+// that travels with the vertical, not configuration.
+const VERTICAL_NON_DEPLOYING_FOLDERS = ['specs'];
+
 const REFERENCE = {
   'spaces': {
     summary:
@@ -181,7 +190,7 @@ const REFERENCE = {
     time_tracking_note:
       'Tasks carry `time_tracking` ({ estimate?, logs[] }). See get_workspaces_reference("time-tracking") — logs[] REPLACES rather than appends, so adding an entry is read-modify-write.',
     task_actions_note:
-      'Checklist items live on a separate subject, not on the task. See get_workspaces_reference("task-actions") — they are write-only today because the GET route is misrouted.',
+      'Checklist items are stored on a separate subject but ARE returned by get_task in a top-level `task_actions[]` array (since #1299). See get_workspaces_reference("task-actions") — and note that writing one silently resets the task status.',
     example_create: CREATE_TASK_EXAMPLE,
     example_update: UPDATE_TASK_EXAMPLE,
     multi_update_note:
@@ -218,16 +227,20 @@ const REFERENCE = {
   },
   'task-actions': {
     summary:
-      'A task action is a checklist item hung off a task, optionally linking platform resources. It lives on its own subject (`ms.workspaces.task-action.{taskID}.{actionID}`), NOT as a field on the task — so it never shows up in get_task. WRITE-ONLY: there is no working read route (see read_is_broken).',
+      'A task action is a checklist item hung off a task, optionally linking platform resources. It is stored on its own subject (`ms.workspaces.task-action.{taskID}.{actionID}`), not as a field on the task — but since #1299 (2026-07-31) get_task RETURNS them in a top-level `task_actions[]` array, so they are readable after all. Writing one has a destructive side effect — see status_reset.',
     write_route: 'PUT /workspaces/task/{task_id}/action — create when `id` is omitted (server assigns ta_<random>), address an existing action by passing its `id`.',
     delete_route: 'DELETE /workspaces/task/{task_id}/action/{id} — returns { message: "success" }; 404 "resource not found" for an unknown id.',
     create_required: ['description'],
-    read_is_broken:
-      'GET /workspaces/task/{task_id}/action is mapped to the WRITE resource `microstrate.workspaces.put.task-action`, so it invokes AddTaskActionHandler and returns 400 "description is required" (verified live 2026-07-29). ListTaskActionsHandler exists at workspaces-service/handler/task_actions.go:94 and is registered as `get.task-actions` in service/service.go, but no gateway mapping points at it. Fix: repoint the GET mapping at microstrate.workspaces.get.task-actions.',
-    unverifiable:
-      'The write handler responds with your own request body echoed back (response.SuccessWithBody(request, body)), not the stored aggregate. With no read route, NOTHING about a task action can be confirmed after writing — including whether a partial write merges or replaces. Treat every write as unverified until the GET is fixed.',
+    read_via_get_task:
+      'VERIFIED LIVE 2026-08-04: GetTaskHandler (workspaces-service/handler/tasks.go:326) fetches the task and its actions concurrently and returns `task_actions[]` alongside `watchers[]`/`muted[]`. Wrote action ta_QIp6dqlpxK to CRM_ACTIVITIES-1 and read it back in full. This REPLACED an earlier claim in this file that task actions were write-only and unverifiable; that claim was true when written (2026-07-29) and #1299 falsified it two days later. Prefer get_task over the dedicated route below.',
+    dedicated_read_route_still_broken:
+      'GET /workspaces/task/{task_id}/action is still mapped to the WRITE resource `microstrate.workspaces.put.task-action`, so it invokes AddTaskActionHandler and returns 400 "description is required". ListTaskActionsHandler exists at workspaces-service/handler/task_actions.go:104 and is registered as `get.task-actions` in service/service.go, but no gateway mapping points at it. Fix: repoint the GET mapping at microstrate.workspaces.get.task-actions. Until then, read through get_task.',
+    status_reset:
+      'DESTRUCTIVE, SILENT, AND UNEXPLAINED — writing a task action RESETS THE TASK STATUS. Reproduced twice with before/after reads on 2026-08-04: CRM_ACTIVITIES-1 and -2 were both `to_do` before the write and both `backlog` after it, with `updated_at` moved to the write timestamp. No status was sent in either request. `backlog` is NOT among that space\'s statuses (to_do/in_progress/waiting/done/cancelled, default to_do), so the tasks landed in a status that renders in no column and matches no status filter. AddTaskActionHandler (task_actions.go:29) never writes the task subject, GetTaskHandler is read-only, and `DefaultSpaceStatuses[0].ID == "backlog"` at workspaces-service/data/const.go:74 is otherwise unreferenced in the service — so the mechanism is NOT in the handler and has not been identified. Suspect a consumer or reindex path introduced by #1291/#1299 (both landed 2026-07-31 and both touch these files). PRACTICAL ADVICE: do not write task actions to a task whose status matters, and re-assert the status afterwards if you must.',
+    unverifiable_write_response:
+      'The write handler responds with your own request body echoed back (response.SuccessWithBody(request, body)), not the stored aggregate. So the write response alone still proves nothing — confirm through get_task.',
     resource_shape: '{ resource_id, resource_type, metadata? } — both ids are free-form strings; the service does not validate that the resource exists.',
-    frontend_support: 'None yet — no component in microstrate/src reads or writes task actions, so an action you create is invisible in the UI.',
+    frontend_support: 'None yet — no component in microstrate/src reads or writes task actions, so an action you create is invisible in the UI even though the API now returns it.',
     validation_quirk:
       '`description` is required on EVERY write, not just creates: the handler checks it before touching the store, so a call that only means to flip `done` still has to resend the description.',
     example: TASK_ACTION_EXAMPLE,
@@ -272,14 +285,14 @@ const REFERENCE = {
       'GET    /workspaces/space/{space_id}/tasks → get.tasks  (per-space list + filters)',
       'POST   /workspaces/task                   → post.task  (title required; id server-generated)',
       'PATCH  /workspaces/tasks                  → patch.tasks (batch; returns index-keyed object)',
-      'GET    /workspaces/task/{id}              → get.task   (task + watchers[] + muted[])',
+      'GET    /workspaces/task/{id}              → get.task   (task + watchers[] + muted[] + task_actions[])',
       'PATCH  /workspaces/task/{id}              → patch.task (merge; accepts time_tracking)',
       'DELETE /workspaces/task/{id}              → delete.task ({message:success})',
     ],
     task_actions: [
-      'PUT    /workspaces/task/{task_id}/action        → put.task-action    (create/update; description always required)',
+      'PUT    /workspaces/task/{task_id}/action        → put.task-action    (create/update; description always required) ** SILENTLY RESETS THE TASK STATUS — see get_workspaces_reference("task-actions").status_reset **',
       'DELETE /workspaces/task/{task_id}/action/{id}   → delete.task-action ({message:success})',
-      'GET    /workspaces/task/{task_id}/action        → put.task-action    ** MISROUTED ** — points at the WRITE resource, so it runs the add handler and 400s. The list handler (get.task-actions) has no route. Not exposed as a tool because it cannot work.',
+      'GET    /workspaces/task/{task_id}/action        → put.task-action    ** MISROUTED ** — points at the WRITE resource, so it runs the add handler and 400s. The list handler (get.task-actions) has no route. Not exposed as a tool: read task actions through GET /workspaces/task/{id} instead, which returns them in task_actions[].',
     ],
     comments: [
       'POST   /workspaces/task/{task_id}/comment           → post.comment',
@@ -320,7 +333,9 @@ const REFERENCE = {
       consequence:
         'A newly created folder renders as EMPTY in the UI Files tab — correct, not a failure. The marker is filtered out of the tree.',
       name_can_be_blank:
-        'A migrated marker\'s index entry has an EMPTY `name` while its `subject` is correct. The subject is `ms.workspace-files.` + one base64 RawStdEncoding segment per path segment, and the engine decodes it in this exact case (transform.ObjKeyUnsafe). list_files adds a resolved `key` to every entry — use it. Matching on `name` makes empty folders invisible and makes a poll-until-indexed loop hang forever.',
+        'A marker\'s index entry very often has an EMPTY `name` while its `subject` is correct — 16 of 21 markers live on 2026-07-31, including 3 of 8 created in one fresh run, and it never fills in. The subject is `ms.workspace-files.` + one base64 RawStdEncoding segment per path segment, and the engine decodes it in this exact case (transform.ObjKeyUnsafe). list_files adds a resolved `key` to every entry — use it, because matching on `name` makes a poll-until-indexed loop hang forever.',
+      why_an_empty_folder_may_not_show_in_the_UI:
+        'The UI builds its folder tree from `name`. A folder whose marker has a blank name and which contains NO files therefore has nothing to derive a path from, and does not render in the Files tab — even though it exists, is in the index, and behaves correctly for deployment. Put a real file in it and it appears, because config files keep their names. So "I cannot see the folder I just created" is usually this, not a failed create: check `visible_in_ui` on the create_folder result.',
     },
     writing_a_file: {
       route: 'POST {base}/api/default-storage/object/{bucket}/{key} with the raw bytes as the body',
@@ -365,6 +380,11 @@ const REFERENCE = {
     shared_folder:
       'spaces.VERTICAL.SHARED.* is ALWAYS deployed alongside whichever vertical was requested (deployVerticals appends "SHARED" to the list). That is how every account with any vertical ends up with the `Client` record config.',
     config_types: VERTICAL_CONFIG_TYPES,
+    non_deploying_folders: {
+      folders: VERTICAL_NON_DEPLOYING_FOLDERS,
+      why:
+        'Folders we place in a vertical on purpose that are NOT deployed. `specs` holds the markdown brief the vertical was built from — documentation that travels with the vertical, not configuration. It reaches the dispatch loop and falls out at the config-type lookup, which is the intended outcome. Note this is ONE layer of protection rather than two: a folder at the VERTICAL root never matches the vertical prefix at all, whereas one inside a vertical does and is stopped only by the config-type table. If a `specs` config type were ever added upstream, these files would start being POSTed at an endpoint.',
+    },
     how_deployment_is_triggered:
       'Updating an account with a `verticals` array. accounts-service updateaccount.go then runs `go deployVerticals(...)` — a goroutine, so it is fire-and-forget and the account-update response tells you nothing about whether it worked.',
     rules_that_bite: [
@@ -374,7 +394,7 @@ const REFERENCE = {
       'MARKER FILES NEVER DEPLOY — both `.metadata.json` and `.__meta__.json` suffixes are skipped.',
       'FLOWS get a collection created for them (name = the vertical id split on `_` and title-cased, e.g. insurance_broker -> "Insurance Broker") and have `collection` + `auto_publish: true` injected into the payload.',
       'ASSISTANTS must be wrapped as `{ "config": { ... } }` and have `config.shared` FORCED to "team", whatever you wrote.',
-      'The only observability is a stream: microstrate.accounts.<account_id>.deploy-verticals, one message per file with { name, vertical, config_type, subject, status, error }.',
+      'The only observability is a stream: microstrate-accounts.<account_id>.deploy-verticals, one message per file with { name, vertical, config_type, subject, status, error }.',
     ],
     space_configs_and_record_configs:
       'A space config under `spaces/` may attach record configs. `record_configs: [{ id, form_id? }]` is the CURRENT shape and WINS on read; `record_config_ids: [string]` is LEGACY and is only read when `record_configs` is absent (microstrate/src/components/spaces/records/space-record-configs.utils.ts:12). Persisting from the UI writes `record_configs` and DELETES `record_config_ids`. So adding a config to `record_config_ids` alone, while `record_configs` is present, is silently ignored — write BOTH and keep them identical, and treat `record_configs` as authoritative.',
@@ -407,4 +427,5 @@ export {
   VERTICAL_SPACE_ID,
   VERTICAL_CONFIG_TYPES,
   FOLDER_MARKERS,
+  VERTICAL_NON_DEPLOYING_FOLDERS,
 };

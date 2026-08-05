@@ -1,0 +1,246 @@
+{
+  "id": "Activity",
+  "name": "Activity",
+  "description": "A logged interaction — call, email, meeting, demo or task — against a contact, company or deal.",
+  "schema": {
+    "type": "object",
+    "required": ["title", "activity_type", "status"],
+    "properties": {
+      "title": { "type": "string", "title": "Title" },
+      "activity_type": {
+        "type": "string",
+        "title": "Type",
+        "enum": ["Call", "Email", "Meeting", "Demo", "Follow-up", "Task", "Other"]
+      },
+      "status": {
+        "type": "string",
+        "title": "Status",
+        "enum": ["Scheduled", "In Progress", "Completed", "Cancelled"]
+      },
+      "related_contact_id": { "type": "string", "title": "Contact" },
+      "related_company_id": { "type": "string", "title": "Company" },
+      "related_deal_id": { "type": "string", "title": "Deal" },
+      "assigned_to_user_id": { "type": "string", "title": "Assigned to" },
+      "scheduled_date": { "type": "string", "title": "Scheduled", "format": "date" },
+      "scheduled_duration_minutes": { "type": "number", "title": "Planned duration (min)", "minimum": 0 },
+      "actual_duration_minutes": { "type": "number", "title": "Actual duration (min)", "minimum": 0 },
+      "outcome": {
+        "type": "string",
+        "title": "Outcome",
+        "enum": ["Positive", "Negative", "Neutral", "Pending"]
+      },
+      "next_action": { "type": "string", "title": "Next action" },
+      "notes": { "type": "string", "title": "Notes" },
+      "completed_at": { "type": "string", "title": "Completed at", "format": "date" }
+    }
+  },
+  "views": {
+    "forms": [
+      {
+        "id": "default",
+        "title": "Activity",
+        "description": "Log or schedule an interaction.",
+        "layout": {
+          "type": "grid",
+          "props": { "gridTemplateColumns": "1fr", "gap": 16 },
+          "children": [
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "2fr 1fr 1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "title",
+                  "inputType": "text",
+                  "props": { "label": "Title", "placeholder": "Discovery call with Acme" }
+                },
+                {
+                  "type": "field",
+                  "field": "activity_type",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "Type",
+                    "options": [
+                      { "value": "Call", "text": "Call" },
+                      { "value": "Email", "text": "Email" },
+                      { "value": "Meeting", "text": "Meeting" },
+                      { "value": "Demo", "text": "Demo" },
+                      { "value": "Follow-up", "text": "Follow-up" },
+                      { "value": "Task", "text": "Task" },
+                      { "value": "Other", "text": "Other" }
+                    ]
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "status",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "Status",
+                    "options": [
+                      { "value": "Scheduled", "text": "Scheduled" },
+                      { "value": "In Progress", "text": "In Progress" },
+                      { "value": "Completed", "text": "Completed" },
+                      { "value": "Cancelled", "text": "Cancelled" }
+                    ],
+                    "defaultValue": "Scheduled"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr 1fr 1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "related_contact_id",
+                  "inputType": "text",
+                  "props": { "label": "Contact", "helpText": { "markdown": "Record id of the Client." } }
+                },
+                {
+                  "type": "field",
+                  "field": "related_company_id",
+                  "inputType": "text",
+                  "props": { "label": "Company", "helpText": { "markdown": "Record id of the Company." } }
+                },
+                {
+                  "type": "field",
+                  "field": "related_deal_id",
+                  "inputType": "text",
+                  "props": { "label": "Deal", "helpText": { "markdown": "Record id of the Deal." } }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr 1fr 1fr 1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "assigned_to_user_id",
+                  "inputType": "text",
+                  "props": { "label": "Assigned to" }
+                },
+                {
+                  "type": "field",
+                  "field": "scheduled_date",
+                  "inputType": "date",
+                  "props": { "label": "Scheduled" }
+                },
+                {
+                  "type": "field",
+                  "field": "scheduled_duration_minutes",
+                  "inputType": "number",
+                  "props": { "label": "Planned duration (min)", "min": 0, "step": 15, "showControls": true, "defaultValue": 30 }
+                },
+                {
+                  "type": "field",
+                  "field": "actual_duration_minutes",
+                  "inputType": "number",
+                  "props": { "label": "Actual duration (min)", "min": 0, "step": 5, "showControls": true },
+                  "rules": [
+                    {
+                      "id": "actual_duration_minutes.visible",
+                      "property": "visible",
+                      "logic": { "in": [{ "var": "activity_type" }, ["Call", "Meeting", "Demo"]] },
+                      "description": "Actual duration is shown only for a Call, Meeting or Demo."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr 2fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "outcome",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "Outcome",
+                    "options": [
+                      { "value": "Positive", "text": "Positive" },
+                      { "value": "Negative", "text": "Negative" },
+                      { "value": "Neutral", "text": "Neutral" },
+                      { "value": "Pending", "text": "Pending" }
+                    ]
+                  },
+                  "rules": [
+                    {
+                      "id": "outcome.visible",
+                      "property": "visible",
+                      "logic": { "in": [{ "var": "activity_type" }, ["Call", "Meeting", "Demo"]] },
+                      "description": "Outcome is shown only for a Call, Meeting or Demo."
+                    }
+                  ]
+                },
+                {
+                  "type": "field",
+                  "field": "next_action",
+                  "inputType": "text",
+                  "props": {
+                    "label": "Next action",
+                    "placeholder": "What should happen next?",
+                    "helpText": { "markdown": "If filled, the activity-completion flow creates a follow-up task." }
+                  },
+                  "rules": [
+                    {
+                      "id": "next_action.visible",
+                      "property": "visible",
+                      "logic": { "==": [{ "var": "status" }, "Completed"] },
+                      "description": "Next action is shown only once Status is Completed."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "notes",
+                  "inputType": "textarea",
+                  "props": { "label": "Notes", "placeholder": "What happened?" }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "completed_at",
+                  "inputType": "date",
+                  "props": { "label": "Completed at" },
+                  "rules": [
+                    { "id": "completed_at.readonly", "property": "readonly", "logic": true, "description": "Written by the activity-completion flow." }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "table": {
+      "type": "table",
+      "columns": [
+        { "field": "title", "order": 1 },
+        { "field": "activity_type", "order": 2 },
+        { "field": "status", "order": 3 },
+        { "field": "related_contact_id", "order": 4 },
+        { "field": "related_company_id", "order": 5 },
+        { "field": "related_deal_id", "order": 6 },
+        { "field": "scheduled_date", "order": 7 },
+        { "field": "outcome", "order": 8 },
+        { "field": "assigned_to_user_id", "order": 9 },
+        { "field": "completed_at", "order": 10 }
+      ]
+    }
+  }
+}

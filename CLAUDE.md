@@ -74,9 +74,14 @@ before. Never hard-code a real person into a committed file.
 ## Conventions
 
 - Tests are dependency-free `node:test`-style scripts: `npm test` runs all five
-  suites (296 checks) with no network.
+  suites (356 checks) with no network.
 - `npm run harvest` re-pulls the live corpus. Run it after platform changes; if the
   validators still accept everything, the corpus is current.
+- `verticals/` holds vertical templates authored for the `VERTICAL` space (see
+  [verticals/README.md](verticals/README.md)). One path rule:
+  `verticals/<v>/<category>/<name>.<ext>` <-> `spaces.VERTICAL.<v>.<category>.<name>.<ext>`.
+  The category folder is a **routing key** — an unrecognised name deploys nothing
+  and says nothing. `specs/` is the one folder that deliberately never deploys.
 - Credentials live only in per-server `.env` files. `.env.example` files must stay
   blank — a live staging key has been committed to one before.
 - `quiva-agents-mcp` needs `QUIVA_API_KEY` **empty** and a bearer token set; the

@@ -1,0 +1,36 @@
+{
+  "key": "crm_proposal",
+  "label": "CRM Proposal",
+  "source": {
+    "key": "obj://microstrate-documents/crm.proposal.docx",
+    "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  },
+  "output": {
+    "name": "proposal-{deal_name}",
+    "content_type": "application/pdf"
+  },
+  "_notes": {
+    "source_file": "proposal.docx sits beside this config in the repo. It is NOT deployed by the vertical — only this config is. The DOCX must be uploaded to obj://microstrate-documents/crm.proposal.docx in the target account first, with a POST (not PUT) to /api/default-storage/object/<bucket>/<key>; a PUT returns 200 and stores nothing.",
+    "placeholders": [
+      "{close_date}",
+      "{company_name}",
+      "{contact_name}",
+      "{currency}",
+      "{deal_name}",
+      "{deal_owner_name}",
+      "{deal_value}",
+      "{today}"
+    ],
+    "payload_contract": "A trigger payload MUST supply all eight keys above. Any placeholder with no matching key renders as an empty string, silently, and the PDF still reports success. Re-extract the list from the DOCX after any edit: python3 -c \"import zipfile,re;print(sorted(set(re.findall(r'{[^{}]{1,60}}', zipfile.ZipFile('proposal.docx').read('word/document.xml').decode()))))\"",
+    "field_sources": {
+      "deal_name": "Deal.deal_name",
+      "company_name": "Company.company_name",
+      "contact_name": "Client first and last name joined",
+      "deal_value": "Deal.deal_value, formatted",
+      "currency": "Deal.currency",
+      "close_date": "Deal.close_date, formatted",
+      "deal_owner_name": "user lookup on Deal.deal_owner_user_id",
+      "today": "date of generation"
+    }
+  }
+}
