@@ -1,0 +1,1132 @@
+{
+  "id": "UWQuote",
+  "name": "Builders Risk Quote",
+  "description": "A Builders Risk quotation: applicant, project, coverage and risk detail, plus the pricing written back by the quote-pricing flow.",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "quote_reference": {
+        "type": "string",
+        "title": "Quote reference"
+      },
+      "status": {
+        "type": "string",
+        "title": "Status",
+        "enum": [
+          "Draft",
+          "Submitted",
+          "Priced",
+          "Accepted",
+          "Declined",
+          "Expired"
+        ],
+        "default": "Draft"
+      },
+      "client_id": {
+        "type": "string",
+        "title": "Applicant record id"
+      },
+      "underwriter_id": {
+        "type": "string",
+        "title": "Underwriter (user id)"
+      },
+      "quote_date": {
+        "type": "string",
+        "title": "Quote date",
+        "format": "date"
+      },
+      "validity_days": {
+        "type": "integer",
+        "title": "Valid for (days)",
+        "minimum": 1,
+        "default": 30
+      },
+      "insured_name": {
+        "type": "string",
+        "title": "Insured / builder name"
+      },
+      "insured_license": {
+        "type": "string",
+        "title": "Licence number"
+      },
+      "insured_address": {
+        "type": "string",
+        "title": "Business address"
+      },
+      "insured_contact": {
+        "type": "string",
+        "title": "Contact person"
+      },
+      "insured_phone": {
+        "type": "string",
+        "title": "Contact phone"
+      },
+      "insured_email": {
+        "type": "string",
+        "title": "Contact email",
+        "format": "email"
+      },
+      "insured_years_in_business": {
+        "type": "integer",
+        "title": "Years in business",
+        "minimum": 0
+      },
+      "prior_loss_history": {
+        "type": "boolean",
+        "title": "Prior losses?"
+      },
+      "prior_loss_details": {
+        "type": "string",
+        "title": "Prior loss details"
+      },
+      "project_name": {
+        "type": "string",
+        "title": "Project name"
+      },
+      "project_type": {
+        "type": "string",
+        "title": "Project type",
+        "enum": [
+          "New Construction",
+          "Renovation",
+          "Demolition"
+        ]
+      },
+      "project_address": {
+        "type": "string",
+        "title": "Project address"
+      },
+      "renovation_scope": {
+        "type": "string",
+        "title": "Renovation scope"
+      },
+      "demolition_permit": {
+        "type": "string",
+        "title": "Demolition permit reference"
+      },
+      "start_date": {
+        "type": "string",
+        "title": "Estimated start",
+        "format": "date"
+      },
+      "completion_date": {
+        "type": "string",
+        "title": "Estimated completion",
+        "format": "date"
+      },
+      "construction_type": {
+        "type": "string",
+        "title": "Construction type",
+        "enum": [
+          "Wood Frame",
+          "Masonry/Concrete",
+          "Steel Frame"
+        ]
+      },
+      "location_zone": {
+        "type": "string",
+        "title": "Location risk zone",
+        "enum": [
+          "Urban High Risk",
+          "Urban Standard",
+          "Suburban",
+          "Rural"
+        ]
+      },
+      "square_footage": {
+        "type": "number",
+        "title": "Square footage",
+        "minimum": 0
+      },
+      "stories": {
+        "type": "integer",
+        "title": "Number of stories",
+        "minimum": 1
+      },
+      "contract_value": {
+        "type": "number",
+        "title": "Estimated contract value",
+        "minimum": 0
+      },
+      "tiv": {
+        "type": "number",
+        "title": "Total Insurable Value (TIV)",
+        "minimum": 0
+      },
+      "coverage_limits": {
+        "type": "number",
+        "title": "Coverage limit requested",
+        "minimum": 0
+      },
+      "deductible": {
+        "type": "number",
+        "title": "Deductible",
+        "minimum": 0
+      },
+      "special_requirements": {
+        "type": "string",
+        "title": "Special coverage requirements"
+      },
+      "exclusions": {
+        "type": "string",
+        "title": "Exclusions or limitations requested"
+      },
+      "temporary_structures": {
+        "type": "boolean",
+        "title": "Temporary structures on site?"
+      },
+      "hazardous_materials": {
+        "type": "boolean",
+        "title": "Hazardous materials on site?"
+      },
+      "site_security": {
+        "type": "string",
+        "title": "Site access and security measures"
+      },
+      "adjacent_concerns": {
+        "type": "string",
+        "title": "Adjacent property concerns"
+      },
+      "additional_risk_factors": {
+        "type": "string",
+        "title": "Additional risk factors"
+      },
+      "base_rate": {
+        "type": "number",
+        "title": "Base rate per $100 TIV"
+      },
+      "base_premium": {
+        "type": "number",
+        "title": "Base premium"
+      },
+      "duration_modifier": {
+        "type": "number",
+        "title": "Duration modifier"
+      },
+      "construction_modifier": {
+        "type": "number",
+        "title": "Construction modifier"
+      },
+      "experience_modifier": {
+        "type": "number",
+        "title": "Experience modifier"
+      },
+      "location_modifier": {
+        "type": "number",
+        "title": "Location modifier"
+      },
+      "total_premium": {
+        "type": "number",
+        "title": "TOTAL PREMIUM"
+      },
+      "quote_document_key": {
+        "type": "string",
+        "title": "Quote document (object-store key)"
+      },
+      "linked_policy_id": {
+        "type": "string",
+        "title": "Resulting policy record id"
+      },
+      "renewal_of_policy_id": {
+        "type": "string",
+        "title": "Renewal of policy record id"
+      }
+    },
+    "required": [
+      "status",
+      "client_id",
+      "insured_name",
+      "insured_address",
+      "project_name",
+      "project_type",
+      "project_address",
+      "tiv"
+    ]
+  },
+  "views": {
+    "forms": [
+      {
+        "id": "default",
+        "title": "Quote",
+        "layout": {
+          "type": "grid",
+          "props": {
+            "gridTemplateColumns": "1fr",
+            "gap": 16
+          },
+          "children": [
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "quote_reference",
+                  "props": {
+                    "label": "Quote reference",
+                    "helpText": {
+                      "markdown": "Written by the pricing flow as `Q-<record id>`. Not sequential."
+                    }
+                  },
+                  "rules": [
+                    {
+                      "id": "quote_reference.readonly",
+                      "property": "readonly",
+                      "logic": true,
+                      "description": "Written by a flow, never edited by hand."
+                    }
+                  ]
+                },
+                {
+                  "type": "field",
+                  "field": "status",
+                  "props": {
+                    "label": "Status",
+                    "options": [
+                      {
+                        "value": "Draft",
+                        "text": "Draft"
+                      },
+                      {
+                        "value": "Submitted",
+                        "text": "Submitted"
+                      },
+                      {
+                        "value": "Priced",
+                        "text": "Priced"
+                      },
+                      {
+                        "value": "Accepted",
+                        "text": "Accepted"
+                      },
+                      {
+                        "value": "Declined",
+                        "text": "Declined"
+                      },
+                      {
+                        "value": "Expired",
+                        "text": "Expired"
+                      }
+                    ]
+                  },
+                  "inputType": "dropdown"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "client_id",
+                  "props": {
+                    "label": "Applicant record id",
+                    "helpText": {
+                      "markdown": "Id of the UWClient record."
+                    }
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "underwriter_id",
+                  "props": {
+                    "label": "Underwriter (user id)"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "quote_date",
+                  "props": {
+                    "label": "Quote date"
+                  },
+                  "inputType": "date"
+                },
+                {
+                  "type": "field",
+                  "field": "validity_days",
+                  "props": {
+                    "label": "Valid for (days)",
+                    "min": 1,
+                    "showControls": true,
+                    "defaultValue": 30
+                  },
+                  "inputType": "number"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "insured_name",
+                  "props": {
+                    "label": "Insured / builder name"
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "insured_license",
+                  "props": {
+                    "label": "Licence number"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "insured_address",
+                  "props": {
+                    "label": "Business address"
+                  },
+                  "inputType": "textarea"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "insured_contact",
+                  "props": {
+                    "label": "Contact person"
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "insured_phone",
+                  "props": {
+                    "label": "Contact phone"
+                  },
+                  "inputType": "phone"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "insured_email",
+                  "props": {
+                    "label": "Contact email"
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "insured_years_in_business",
+                  "props": {
+                    "label": "Years in business",
+                    "min": 0,
+                    "showControls": true
+                  },
+                  "inputType": "number"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "prior_loss_history",
+                  "props": {
+                    "label": "Prior losses?"
+                  },
+                  "inputType": "toggle"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "prior_loss_details",
+                  "props": {
+                    "label": "Prior loss details"
+                  },
+                  "inputType": "textarea",
+                  "rules": [
+                    {
+                      "id": "prior_loss_details.visible",
+                      "property": "visible",
+                      "logic": {
+                        "==": [
+                          {
+                            "var": "prior_loss_history"
+                          },
+                          true
+                        ]
+                      },
+                      "description": "Shown only when prior_loss_history is True."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "project_name",
+                  "props": {
+                    "label": "Project name"
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "project_type",
+                  "props": {
+                    "label": "Project type",
+                    "options": [
+                      {
+                        "value": "New Construction",
+                        "text": "New Construction"
+                      },
+                      {
+                        "value": "Renovation",
+                        "text": "Renovation"
+                      },
+                      {
+                        "value": "Demolition",
+                        "text": "Demolition"
+                      }
+                    ]
+                  },
+                  "inputType": "dropdown"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "project_address",
+                  "props": {
+                    "label": "Project address"
+                  },
+                  "inputType": "textarea"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "renovation_scope",
+                  "props": {
+                    "label": "Renovation scope"
+                  },
+                  "inputType": "textarea",
+                  "rules": [
+                    {
+                      "id": "renovation_scope.visible",
+                      "property": "visible",
+                      "logic": {
+                        "==": [
+                          {
+                            "var": "project_type"
+                          },
+                          "Renovation"
+                        ]
+                      },
+                      "description": "Shown only when project_type is 'Renovation'."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "demolition_permit",
+                  "props": {
+                    "label": "Demolition permit reference"
+                  },
+                  "rules": [
+                    {
+                      "id": "demolition_permit.visible",
+                      "property": "visible",
+                      "logic": {
+                        "==": [
+                          {
+                            "var": "project_type"
+                          },
+                          "Demolition"
+                        ]
+                      },
+                      "description": "Shown only when project_type is 'Demolition'."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "start_date",
+                  "props": {
+                    "label": "Estimated start"
+                  },
+                  "inputType": "date"
+                },
+                {
+                  "type": "field",
+                  "field": "completion_date",
+                  "props": {
+                    "label": "Estimated completion"
+                  },
+                  "inputType": "date"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "construction_type",
+                  "props": {
+                    "label": "Construction type",
+                    "options": [
+                      {
+                        "value": "Wood Frame",
+                        "text": "Wood Frame"
+                      },
+                      {
+                        "value": "Masonry/Concrete",
+                        "text": "Masonry/Concrete"
+                      },
+                      {
+                        "value": "Steel Frame",
+                        "text": "Steel Frame"
+                      }
+                    ]
+                  },
+                  "inputType": "dropdown"
+                },
+                {
+                  "type": "field",
+                  "field": "location_zone",
+                  "props": {
+                    "label": "Location risk zone",
+                    "options": [
+                      {
+                        "value": "Urban High Risk",
+                        "text": "Urban High Risk"
+                      },
+                      {
+                        "value": "Urban Standard",
+                        "text": "Urban Standard"
+                      },
+                      {
+                        "value": "Suburban",
+                        "text": "Suburban"
+                      },
+                      {
+                        "value": "Rural",
+                        "text": "Rural"
+                      }
+                    ]
+                  },
+                  "inputType": "dropdown"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "square_footage",
+                  "props": {
+                    "label": "Square footage",
+                    "min": 0
+                  },
+                  "inputType": "number"
+                },
+                {
+                  "type": "field",
+                  "field": "stories",
+                  "props": {
+                    "label": "Number of stories",
+                    "min": 1,
+                    "showControls": true
+                  },
+                  "inputType": "number"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "contract_value",
+                  "props": {
+                    "label": "Estimated contract value",
+                    "min": 0,
+                    "decimalPlace": 2
+                  },
+                  "inputType": "currency"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "tiv",
+                  "props": {
+                    "label": "Total Insurable Value (TIV)",
+                    "min": 0,
+                    "decimalPlace": 2
+                  },
+                  "inputType": "currency"
+                },
+                {
+                  "type": "field",
+                  "field": "coverage_limits",
+                  "props": {
+                    "label": "Coverage limit requested",
+                    "min": 0,
+                    "decimalPlace": 2
+                  },
+                  "inputType": "currency"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "deductible",
+                  "props": {
+                    "label": "Deductible",
+                    "min": 0,
+                    "decimalPlace": 2
+                  },
+                  "inputType": "currency"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "special_requirements",
+                  "props": {
+                    "label": "Special coverage requirements"
+                  },
+                  "inputType": "textarea"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "exclusions",
+                  "props": {
+                    "label": "Exclusions or limitations requested"
+                  },
+                  "inputType": "textarea"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "temporary_structures",
+                  "props": {
+                    "label": "Temporary structures on site?"
+                  },
+                  "inputType": "toggle"
+                },
+                {
+                  "type": "field",
+                  "field": "hazardous_materials",
+                  "props": {
+                    "label": "Hazardous materials on site?"
+                  },
+                  "inputType": "toggle"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "site_security",
+                  "props": {
+                    "label": "Site access and security measures"
+                  },
+                  "inputType": "textarea"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "adjacent_concerns",
+                  "props": {
+                    "label": "Adjacent property concerns"
+                  },
+                  "inputType": "textarea"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "additional_risk_factors",
+                  "props": {
+                    "label": "Additional risk factors"
+                  },
+                  "inputType": "textarea"
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "base_rate",
+                  "props": {
+                    "label": "Base rate per $100 TIV"
+                  },
+                  "rules": [
+                    {
+                      "id": "base_rate.readonly",
+                      "property": "readonly",
+                      "logic": true,
+                      "description": "Written by a flow, never edited by hand."
+                    }
+                  ]
+                },
+                {
+                  "type": "field",
+                  "field": "base_premium",
+                  "props": {
+                    "label": "Base premium",
+                    "decimalPlace": 2
+                  },
+                  "inputType": "currency",
+                  "rules": [
+                    {
+                      "id": "base_premium.readonly",
+                      "property": "readonly",
+                      "logic": true,
+                      "description": "Written by a flow, never edited by hand."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "duration_modifier",
+                  "props": {
+                    "label": "Duration modifier"
+                  },
+                  "rules": [
+                    {
+                      "id": "duration_modifier.readonly",
+                      "property": "readonly",
+                      "logic": true,
+                      "description": "Written by a flow, never edited by hand."
+                    }
+                  ]
+                },
+                {
+                  "type": "field",
+                  "field": "construction_modifier",
+                  "props": {
+                    "label": "Construction modifier"
+                  },
+                  "rules": [
+                    {
+                      "id": "construction_modifier.readonly",
+                      "property": "readonly",
+                      "logic": true,
+                      "description": "Written by a flow, never edited by hand."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "experience_modifier",
+                  "props": {
+                    "label": "Experience modifier"
+                  },
+                  "rules": [
+                    {
+                      "id": "experience_modifier.readonly",
+                      "property": "readonly",
+                      "logic": true,
+                      "description": "Written by a flow, never edited by hand."
+                    }
+                  ]
+                },
+                {
+                  "type": "field",
+                  "field": "location_modifier",
+                  "props": {
+                    "label": "Location modifier"
+                  },
+                  "rules": [
+                    {
+                      "id": "location_modifier.readonly",
+                      "property": "readonly",
+                      "logic": true,
+                      "description": "Written by a flow, never edited by hand."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "total_premium",
+                  "props": {
+                    "label": "TOTAL PREMIUM",
+                    "decimalPlace": 2
+                  },
+                  "inputType": "currency",
+                  "rules": [
+                    {
+                      "id": "total_premium.readonly",
+                      "property": "readonly",
+                      "logic": true,
+                      "description": "Written by a flow, never edited by hand."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "quote_document_key",
+                  "props": {
+                    "label": "Quote document (object-store key)",
+                    "helpText": {
+                      "markdown": "Records cannot hold attachments; this is the key to follow."
+                    }
+                  },
+                  "rules": [
+                    {
+                      "id": "quote_document_key.readonly",
+                      "property": "readonly",
+                      "logic": true,
+                      "description": "Written by a flow, never edited by hand."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": {
+                "gridTemplateColumns": "1fr 1fr"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "linked_policy_id",
+                  "props": {
+                    "label": "Resulting policy record id"
+                  },
+                  "rules": [
+                    {
+                      "id": "linked_policy_id.readonly",
+                      "property": "readonly",
+                      "logic": true,
+                      "description": "Written by a flow, never edited by hand."
+                    }
+                  ]
+                },
+                {
+                  "type": "field",
+                  "field": "renewal_of_policy_id",
+                  "props": {
+                    "label": "Renewal of policy record id"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "table": {
+      "type": "table",
+      "columns": [
+        {
+          "field": "quote_reference",
+          "order": 1
+        },
+        {
+          "field": "insured_name",
+          "order": 2
+        },
+        {
+          "field": "project_name",
+          "order": 3
+        },
+        {
+          "field": "project_type",
+          "order": 4
+        },
+        {
+          "field": "tiv",
+          "order": 5
+        },
+        {
+          "field": "total_premium",
+          "order": 6
+        },
+        {
+          "field": "status",
+          "order": 7
+        },
+        {
+          "field": "quote_date",
+          "order": 8
+        }
+      ]
+    }
+  }
+}

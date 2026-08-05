@@ -3,6 +3,9 @@
 import assert from 'node:assert/strict';
 import { validate } from '../src/validate.js';
 import { readHarvested, getExample } from '../src/examples.js';
+import { readdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 let failures = 0;
 function check(name, fn) {
@@ -244,6 +247,29 @@ check('the authored example passes the validator and keeps output_schema a descr
   }
 });
 
+
+
+// --- every src module parses -------------------------------------------------
+// A syntax error in src/index.js used to be INVISIBLE to this suite: nothing here
+// imports the entry point (it would start the server on stdio), so the tests all
+// passed while the MCP could not boot. That happened on 2026-08-04 — a stray
+// backtick inside the INSTRUCTIONS template literal in quiva-workspaces-mcp/src/
+// index.js broke the server, `npm test` still reported 356/356, and the failure
+// only surfaced as a "client timeout initialize" in an unrelated build script.
+// node --check parses without executing, so it is safe for index.js too.
+check('every file in src/ is syntactically valid', () => {
+  const srcDir = new URL('../src/', import.meta.url);
+  const files = readdirSync(srcDir).filter((f) => f.endsWith('.js') || f.endsWith('.mjs'));
+  assert.ok(files.length > 0, 'no src files found — is this test in the right place?');
+  for (const f of files) {
+    const path = fileURLToPath(new URL(f, srcDir));
+    try {
+      execFileSync(process.execPath, ['--check', path], { stdio: 'pipe' });
+    } catch (err) {
+      throw new Error(`${f} does not parse:\n${String(err.stderr || err.message).trim()}`);
+    }
+  }
+});
 
 if (failures) {
   console.error(`\n${failures} check(s) failed`);

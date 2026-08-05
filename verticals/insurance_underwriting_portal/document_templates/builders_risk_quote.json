@@ -1,0 +1,49 @@
+{
+  "key": "builders_risk_quote",
+  "label": "Builders Risk Quotation",
+  "source": {
+    "key": "obj://microstrate-documents/insurance_underwriting_portal.builders_risk_quote.docx",
+    "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  },
+  "output": {
+    "name": "quotation-{quote_reference}",
+    "content_type": "application/pdf",
+    "bucket": "microstrate-documents",
+    "folder": "underwriting.quotes"
+  },
+  "_notes": {
+    "source_file": "builders_risk_quote.docx sits beside this config in the repo. It is NOT deployed by the vertical — only this config is. Upload the DOCX to the target account first with a POST (not PUT) to /api/default-storage/object/microstrate-documents/insurance_underwriting_portal.builders_risk_quote.docx; a PUT returns 200 and stores nothing.",
+    "placeholders": [
+      "{base_premium}",
+      "{base_rate}",
+      "{completion_date}",
+      "{construction_modifier}",
+      "{construction_type}",
+      "{coverage_limits}",
+      "{deductible}",
+      "{duration_modifier}",
+      "{experience_modifier}",
+      "{insured_address}",
+      "{insured_contact}",
+      "{insured_email}",
+      "{insured_license}",
+      "{insured_name}",
+      "{insured_phone}",
+      "{insured_years_in_business}",
+      "{location_modifier}",
+      "{project_address}",
+      "{project_name}",
+      "{project_type}",
+      "{quote_date}",
+      "{quote_reference}",
+      "{square_footage}",
+      "{start_date}",
+      "{stories}",
+      "{tiv}",
+      "{total_premium}",
+      "{validity_days}"
+    ],
+    "payload_contract": "A trigger payload MUST supply all 28 keys above. Any placeholder with no matching key renders as an EMPTY STRING, silently, and the job still reports success. All 28 are named exactly as fields on the UWQuote record config — verified 2026-08-04, zero orphans in either direction that matter. Re-extract after ANY edit to the DOCX: python3 tools/vertical/make-docx.py <plan.json>, which prints the list from the written file rather than from the plan.",
+    "source_record": "UWQuote. Eight of these (quote_reference, quote_date, base_rate, base_premium and the four modifiers, plus total_premium) are written by the quote-pricing flow — so on a quote that was never priced they are blank, and the PDF will show empty values with their labels intact."
+  }
+}

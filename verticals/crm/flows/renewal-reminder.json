@@ -1,0 +1,128 @@
+{
+  "name": "Renewal Reminder",
+  "description": "Daily. Finds customers whose contract renews within 90 days and raises ONE digest task listing them by urgency.",
+  "config": {
+    "nodes": [
+      {
+        "id": "SCHEDULE",
+        "data": {
+          "id": "SCHEDULE",
+          "node_type": "trigger",
+          "payload": {
+            "trigger_on": "2026-08-05T06:30:00Z",
+            "trigger_every": "24h",
+            "trigger": {}
+          },
+          "name": "Daily renewal check",
+          "trigger_type": "schedule"
+        }
+      },
+      {
+        "id": "LIST_COMPANIES",
+        "data": {
+          "id": "LIST_COMPANIES",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/records/Company",
+            "method": "GET",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "query": {
+              "limit": 500
+            }
+          }
+        }
+      },
+      {
+        "id": "FIND_RENEWALS",
+        "data": {
+          "id": "FIND_RENEWALS",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function(){var rows=(list&&list.results)||list||[];var out=[],now=Date.now();for(var i=0;i<rows.length;i++){var d=rows[i].data||{};if(String(d.account_type||'')!=='Customer')continue;if(!d.contract_renewal_date)continue;var days=Math.ceil((Date.parse(d.contract_renewal_date)-now)/86400000);if(days<0)out.push('- OVERDUE '+(d.company_name||rows[i].id)+' renewal lapsed '+(-days)+' days ago');else if(days<=30)out.push('- URGENT '+(d.company_name||rows[i].id)+' renews in '+days+' days');else if(days<=90)out.push('- '+(d.company_name||rows[i].id)+' renews in '+days+' days');}return{count:out.length,body:out.join('\\n')||'None.'};})();",
+            "params": {
+              "list": "$.LIST_COMPANIES.data"
+            }
+          }
+        }
+      },
+      {
+        "id": "CHECK_ANY",
+        "data": {
+          "id": "CHECK_ANY",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": ">",
+                "input": [
+                  "$.FIND_RENEWALS.count",
+                  0
+                ]
+              },
+              "outcome": "CREATE_DIGEST"
+            },
+            {
+              "outcome": "RESOLVE_SUCCESS"
+            }
+          ]
+        }
+      },
+      {
+        "id": "CREATE_DIGEST",
+        "data": {
+          "id": "CREATE_DIGEST",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/workspaces/task",
+            "method": "POST",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "space_id": "CRM_ACTIVITIES",
+              "title": "Renewals due",
+              "description": "Customer contracts renewing within 90 days:\n\n|$.FIND_RENEWALS.body",
+              "status": "to_do",
+              "priority": "high",
+              "tags": [
+                "crm",
+                "digest",
+                "renewals"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_SCHEDULE_LIST_COMPANIES",
+        "source": "SCHEDULE",
+        "target": "LIST_COMPANIES"
+      },
+      {
+        "id": "e_LIST_COMPANIES_FIND_RENEWALS",
+        "source": "LIST_COMPANIES",
+        "target": "FIND_RENEWALS"
+      },
+      {
+        "id": "e_FIND_RENEWALS_CHECK_ANY",
+        "source": "FIND_RENEWALS",
+        "target": "CHECK_ANY"
+      },
+      {
+        "id": "e_CHECK_ANY_CREATE_DIGEST",
+        "source": "CHECK_ANY",
+        "target": "CREATE_DIGEST"
+      }
+    ],
+    "result": {
+      "status": "success",
+      "renewals": "$.FIND_RENEWALS.count"
+    }
+  }
+}

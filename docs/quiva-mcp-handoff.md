@@ -1453,3 +1453,310 @@ Use the **Preview** tab. Behaviour to check is listed in the example's
 `how_to_verify_on_staging` and printed by the push script — including one thing
 expected to look broken: changing the note's alignment in the inspector does
 nothing, which is §12.2's frontend bug.
+
+---
+
+## 13. Verticals: the folder/file surface and the `crm` skeleton (2026-07-31)
+
+**Goal:** stand up a new vertical (`crm`) as a reviewable folder tree in git that
+mirrors the `VERTICAL` template space on staging, so MCP-authored configs can be
+pushed to it and deployed into accounts.
+
+Three phases were agreed. **Phase 0 and Phase 1 are done. Phases 2 and 3 are not
+started.** Nothing is committed — the whole session is in the working tree (§13.8).
+
+### 13.0 The deployment contract — read this first
+
+`accounts-service/accounts/updateaccount.go` `deployVerticals` is the **only**
+consumer of the `VERTICAL` space (the entire engine references it in two files,
+one of which is the constant). It fires from an account update when `verticals` is
+set, as `go deployVerticals(...)`.
+
+It lists `spaces.VERTICAL.*`, skips `*.metadata.json` / `*.__meta__.json`, takes
+**the first path segment after `spaces.VERTICAL.<vertical>.`** as the config type,
+and forwards the file bytes verbatim to one of exactly six endpoints:
+
+| Folder (exact) | Endpoint | Transform |
+|---|---|---|
+| `assistants` | `microstrate.hub.post.agent` | must be `{config:{…}}`; `config.shared` **forced** to `"team"` |
+| `document_templates` | `microstrate.file-generator.post.template` | verbatim |
+| `flows` | `microstrate.hub.post.workflow` | collection auto-created; `collection` + `auto_publish:true` injected |
+| `meeting_templates` | `microstrate.recall.post.summarization-template` | verbatim |
+| `record_configs` | `microstrate.records.post.config` | verbatim |
+| `spaces` | `microstrate.workspaces.post.space` | verbatim |
+
+Rules that bite, all source-verified:
+
+- **The folder name is the routing key.** An unrecognised name is `continue`d —
+  no error, no log line. `record_config` instead of `record_configs` deploys
+  nothing and says nothing.
+- **`SHARED` is always appended** (`verticals = append(verticals, "SHARED")`).
+  That is how every account gets the `Client` record config.
+- **Delta-only.** Only verticals *not already* on the account deploy. Re-adding an
+  existing one does nothing; redeploy means remove, save, re-add.
+- **No dependency order.** Files deploy in index-listing order, so a space
+  referencing `Client` can be created before `Client` exists.
+- **Only observability** is the stream
+  `microstrate-accounts.<account_id>.deploy-verticals`, one message per file with
+  `{name, vertical, config_type, subject, status, error}`.
+- Flow collection name = the vertical id split on `_`, first letter upper-cased
+  only (`util.CapitalizeFirst`). So **`crm` yields a collection named "Crm"**, not
+  "CRM". No override exists. Accepted knowingly.
+
+### 13.1 `record_config_ids` is the LEGACY key — corrects the original instruction
+
+`microstrate/src/components/spaces/records/space-record-configs.utils.ts:12`:
+
+```ts
+if (space.record_configs) return space.record_configs
+return (space.record_config_ids ?? []).map((id) => ({ id }))
+```
+
+`record_configs: [{id, form_id?}]` is current and **wins on read**;
+`record_config_ids: string[]` is only consulted when `record_configs` is absent,
+and `withRecordConfigs` **deletes** it when persisting from the UI.
+
+So adding a config to `record_config_ids` alone, while `record_configs` exists, is
+silently ignored. **Write both, identically.** Both live space configs
+(`fahub.json`, `ibhub.json`) do exactly that, which is why they work. Now a
+validator warning when they disagree, plus a golden-gate assertion that the live
+pair agree.
+
+### 13.2 Phase 0 — the file/folder surface (DONE)
+
+`POST /workspaces/files/folder` was live on the gateway but **never probed and not
+an MCP tool**; the config-file write route was not established at all. Both now
+are, live.
+
+| Operation | Route | Notes |
+|---|---|---|
+| list index | `GET /workspaces/files?space_id=&subfolder=&search=&exact=` | the index, not the bucket |
+| create folder | `POST /workspaces/files/folder` `{space_id, subfolder?, folder, full_path?, metadata?}` | `subfolder` is the PARENT prefix. Returns **no body**. 409 if it exists |
+| read content | `GET {base}/api/default-storage/object/{bucket}/{key}` | different URL root, **absent from `quiva-endpoints.json`** |
+| write content | `POST` the same URL | raw bytes; returns `{name,size,digest,…}` |
+
+Bucket `microstrate-workspaces`. An API key suffices for all four. Writing an
+object **self-registers** in the index — `/workspaces/files/file-record` and
+`/sync-files` are repair paths, and the UI never calls them.
+
+**New tools (25 → 29):** `list_files`, `create_folder`, `read_file`, `write_file`.
+**New validator kinds:** `folder`, `file`. **New reference topics:** `files`,
+`verticals`. **Tests 296 → 356**, including a golden gate over every live
+`VERTICAL` key.
+
+Four things a source read alone would have got wrong:
+
+1. **The folder marker is `__meta__.json`, not `.metadata.json`** — renamed *and
+   migrated in place* by evari-olympus `3a7ab968b` (#1291) on 2026-07-31. Watched
+   change mid-session. `accounts-service` skips both suffixes.
+2. **An index entry's `name` is frequently EMPTY** while its `subject` is correct.
+   The subject is `ms.workspace-files.` + one base64 `RawStdEncoding` segment per
+   path segment; the engine decodes it in this case itself
+   (`DeleteFolderHandler` → `transform.ObjKeyUnsafe`). See §13.4 — this is the
+   important one.
+3. **The digest is base64URL, not base64.** `SHA-256=<hash>` with `-`/`_`.
+4. **Indexing is asynchronous** (0.5s–minutes). Since `deployVerticals` reads the
+   index, push-then-immediately-deploy silently deploys a subset.
+
+**Delete is deliberately NOT exposed.** Source-derived and unverified: query
+params not body, recursive, soft (copies to a trash bucket), hard-requires a JWT
+(unlike create), and a partial failure returns 400 while keeping what it removed.
+Documented in `get_workspaces_reference("files")`. Reason: `delete_workflow`
+already silently orphaned every draft it "deleted" while returning success.
+
+### 13.3 Phase 1 — the tree (DONE)
+
+New top-level `verticals/` in the repo. **21 folders on staging, 21 in the repo,
+zero difference either way** (verified by comparing both trees).
+
+```
+verticals/
+├── README.md            the path rule, the seven folders, deploy semantics
+├── SHARED/record_configs/
+├── financial_advisor/   (6)
+├── insurance_broker/    (2)
+├── uig/                 (stub)
+└── crm/                 assistants document_templates flows meeting_templates
+                         record_configs spaces specs
+```
+
+One path rule both directions:
+
+```
+verticals/<vertical>/<category>/<name>.<ext>
+   ⟷   spaces.VERTICAL.<vertical>.<category>.<name>.<ext>
+```
+
+`.` is the hierarchy separator, so **no path segment may contain a dot**. Markers
+are not committed (recreated on push); empty dirs carry `.gitkeep`.
+
+**`specs` is the seventh folder and is deliberately non-deploying.** It holds the
+markdown brief a vertical was built from. It is *inside* the vertical (agreed
+after discussion) so one path rule covers everything and the brief travels with
+what it describes. Note it is **one** layer of protection rather than two: a file
+at the VERTICAL root never matches the vertical prefix, whereas one inside a
+vertical does and is stopped only by the config-type table. If a `specs` config
+type were ever added upstream, spec markdown would start being POSTed.
+`VERTICAL_NON_DEPLOYING_FOLDERS = ['specs']` records the intent, the validator
+stays quiet on it, and the golden gate accepts "deployable OR known
+non-deploying" while still failing on a genuine seventh type.
+
+Structure was **generated from**
+`quiva-workspaces-mcp/examples/harvested/vertical-template-library.json`, a
+harvest of the live space — so it reflects the platform, not someone's memory.
+Existing verticals' file **contents are not mirrored yet** (deferred to Phase 2's
+`pull`, because pulling raises push-time identity substitution — see §13.6).
+
+### 13.4 An empty folder can be INVISIBLE in the UI — and my check was a false green
+
+Reported by the user: `crm/document_templates` and `crm/flows` could not be seen,
+though `create_folder` had returned `verified: true` for all eight.
+
+Measured live across `VERTICAL`: **16 of 21 folder markers have a blank `name`;
+0 of 8 config files do.** Three of the eight `crm` markers created in a *single
+fresh run* came back blank, in no pattern — so it is a race in the folder-create
+indexing path, not migration damage, and it is **permanent** (re-listed over
+40s; names never fill in). The marker objects themselves are intact.
+
+Why it matters, and it differs by kind:
+
+- `buildTreeStructure` (`microstrate/src/utils/storage-file-tree.utils.ts:250`)
+  does `item.name.split('.')` and derives folders from **each file's own path**
+  (`parts.slice(0,-2)`). An entry with `name: ""` yields one part, hits the
+  `parts.length <= 2` branch, and never produces a folder node. So a folder that
+  is empty *and* has an unnamed marker does not render — while one containing a
+  named file renders fine, because the file builds the path itself.
+- **For a folder this is cosmetic.** `deployVerticals` skips markers anyway.
+- **For a CONFIG it would be serious:** `deployVerticals` matches on `file.Name`,
+  so an unnamed config fails the prefix test and would silently never deploy.
+
+Live confirmation, no writes needed: six folders already have a blank marker *and*
+named files (`financial_advisor/flows` among them) and render correctly. The
+model predicts `financial_advisor/meeting_templates`,
+`financial_advisor/record_configs`, `insurance_broker/record_configs` and **`uig`**
+are also invisible today — i.e. the platform already has a vertical nobody can see.
+**Unconfirmed in the UI; ask the user.**
+
+**Fixed in the tools:** `waitForIndex` now reports `indexed` (found by name *or*
+subject) separately from `name_indexed`. `create_folder` returns `visible_in_ui`;
+`write_file` returns `will_deploy` and no longer calls a write verified unless the
+name is present. The gotcha claiming freshly created markers keep their name was
+wrong and is corrected with the 16/21 measurement.
+
+⚠️ **Do not add a placeholder file to force a folder visible.** A `README.md` in
+`flows/` is POSTed to the workflow endpoint at deploy time and fails. Only `specs/`
+can safely hold markdown.
+
+**Platform bug worth reporting:** folder creation intermittently fails to persist
+`name` into the file index, permanently.
+
+### 13.5 Phase 2 — sync (NOT STARTED)
+
+Three verbs:
+
+- **`pull`** platform → repo. Seeds the existing verticals' contents; after a push,
+  the diff should be empty.
+- **`push`** repo → platform. Must wait for the index, **check `will_deploy` on
+  every config** (§13.4), substitute identities (§13.6), and be re-runnable
+  (`create_folder` already treats 409 as success).
+- **`deploy`** platform → an account. Adds the vertical id to the account's
+  `verticals`. Must handle delta-only, and must read the
+  `deploy-verticals` stream — that is the only way to know what deployed.
+
+Done means: push `crm`, read the stream, one `SUCCESS` per config, then open the
+account and find the resources. Not "the API said 200". Publish and confirm
+`SHARED` first, since there is no dependency order.
+
+**Blocked on:** a throwaway sub-account to test `deploy` against (it writes real
+resources), and the `.docx` question in §13.7.
+
+### 13.6 Nobody's identity in a committed file
+
+`financial_advisor`'s assistant carries a real user id in
+`config.escalate_user_ids` — **functional config, not metadata**. Per CLAUDE.md the
+convention is placeholder-in-git, real value substituted at push, as the per-MCP
+`tools/push-example.mjs` scripts do. Not yet implemented; it is a Phase 2 `push`
+requirement.
+
+**Related finding for whoever owns that vertical:** a main-account user id is
+deployed unchanged into every sub-account taking `financial_advisor`, where it
+almost certainly does not resolve. That template may already ship a dead
+escalation target.
+
+### 13.7 Phase 3 — the spec agent (NOT STARTED)
+
+A Quiva agent takes a rough spec (the user's example source is an AI chat session)
+and opens a PR into this repo containing `verticals/<vertical>/specs/<name>.md`,
+which is then what a human points Claude Code and the MCPs at. The agent writes
+the brief, never the configs — that keeps a review gate between "what we intend"
+and "what got built".
+
+Shape: `trigger → AUTHOR_SPEC (agent) → EXTRACT (eval) → GH_BRANCH → GH_COMMIT →
+GH_PR`. The `EXTRACT` node is mandatory: agent results come back **markdown-fenced**,
+so a bare `JSON.parse` throws (§10.2). The agent's output needs a `vertical` field
+now that specs live inside verticals.
+
+**Hard external blocker:** a `SECRET::GITHUB_TOKEN::` must be provisioned
+platform-side. Confirm that before building the flow — the sanctions.io node in the
+flows playbook is still dead for exactly this reason.
+
+**A route that may help, half-verified:** an object-store trigger appends
+`obj://<bucket>/<key>` to a run's `knowledge`
+(`hub-service/service/service.go:293`), and `obj://` is a real agent knowledge
+scheme (`hub-service/model/agents.go:46`) resolved at invoke time by
+`bellerophon-workforce/agent/llmagent/llm_agent.go:599`. So dropping a spec in
+storage could hand it to an agent with no glue. **But nothing in the engine
+publishes that trigger** — `TriggerTypeObjectStore` appears exactly twice: the
+constant and the consumer. Test it early rather than designing around it.
+
+### 13.8 State, and what is left on staging
+
+**356 checks pass across the five suites, 0 failures** — flows 41, records 93,
+documents 35, workspaces 156, agents 38 (was 296 at session start).
+
+**Partly committed.** `4f79af1 "folder create vertical mcp"` landed the Phase 0
+tooling mid-session: `quiva-workspaces-mcp/{src/client.js,src/index.js,
+src/validate.js,src/workspaces-docs.js,test/validate.test.js,
+tools/harvest-examples.mjs}`, the re-harvested examples, and
+`examples/harvested/vertical-template-library.json`.
+
+**Still uncommitted** at the time of writing: `verticals/**` (untracked — the whole
+Phase 1 tree), `docs/{lessons.md,quiva-mcp-handoff.md}`, `CLAUDE.md`, `README.md`,
+and the §13.4 false-green fixes to `src/index.js` / `src/workspaces-docs.js` /
+`src/validate.js` / `test/validate.test.js` that were made after that commit.
+
+**Engine drift is NOT pinned.** `node engine/sync.mjs` reports 3 unpinned (new
+citations: `storage.api.ts`, `workspaces-service/data/const.go`,
+`space-record-configs.utils.ts`) and 4 changed (main moved 3 commits during the
+session). `--pin` would re-baseline all 30 at once, marking those 4 verified
+without anyone re-reading them — deliberately not run. The one that mattered was
+checked: the `get.task-actions` misroute is **unchanged**, so that documented claim
+still holds.
+
+**Left on staging (creates only, nothing deleted — the user asked to be consulted
+before any delete):**
+
+```
+spaces.VERTICAL.crm.*                                  8 folder markers (Phase 1, intended)
+spaces.MCP_VERIFICATION_RENEWALS.zzz_mcp_probe.*       probe folders + 3 zzz_probe*.json configs
+```
+
+The probe artefacts are in a throwaway space and inert — `deployVerticals` reads
+only `space_id=VERTICAL`. Remove with
+`DELETE /workspaces/files/folder?space_id=MCP_VERIFICATION_RENEWALS&folder=zzz_mcp_probe`
+(recursive, soft) and verify by re-listing, not by the response.
+
+### 13.9 Open decisions
+
+1. **A throwaway sub-account** for the Phase 2 `deploy` test.
+2. **`document_templates` holds raw `.docx`** in `financial_advisor` with no JSON
+   config. Those bytes go to a JSON template endpoint, which should fail. Do FA
+   document templates actually deploy today? Changes what goes in
+   `crm/document_templates`.
+3. **`uig`** — abandoned stub or in progress? Per §13.4 it is probably invisible in
+   the UI.
+4. **Is the `GITHUB_TOKEN` secret provisioned?** Gates Phase 3 entirely.
+5. **Pull the existing verticals' contents** now, with identity substitution?
+6. **Commit the rest?** `4f79af1` covers the Phase 0 tooling; `verticals/**`, the
+   docs, and the §13.4 fixes are still in the working tree.
+7. **`SHARED`** — does `crm` need a record config that all verticals should get?
