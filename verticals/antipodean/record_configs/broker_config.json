@@ -1,0 +1,267 @@
+{
+  "id": "broker_config",
+  "name": "Broker",
+  "description": "Publisher-side (Antipodean). NOT in the customer spec \u2014 defined here because spec \u00a73 and \u00a79 both require a broker of record and the plan (\u00a76.1) requires this config to be built. The broker of record for a distribution: the distributor account id, provisioning state (for gate G4's half-provisioned-distributor detectability), and descriptive fields for the underwriter workbench.",
+  "label": "Broker",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "broker_id": {
+        "type": "string",
+        "title": "Broker id (distributor account id)",
+        "description": "The distributor ACCOUNT id (plan \u00a77.5.1) \u2014 never a user, never a name. This is how a workbench turns an account id into a name (contract artefact 2).",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Broker id (distributor account id)"
+          }
+        }
+      },
+      "distribution_id": {
+        "type": "string",
+        "title": "Distribution id",
+        "description": "Open question 20 \u2014 application account id or account NKey \u2014 decides the VALUE, not the field (contract artefact 2).",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Distribution id"
+          }
+        }
+      },
+      "broker_status": {
+        "type": "string",
+        "title": "Broker status",
+        "enum": [
+          "pending",
+          "active",
+          "suspended",
+          "ended"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Broker status",
+            "options": [
+              {
+                "text": "Pending",
+                "value": "pending"
+              },
+              {
+                "text": "Active",
+                "value": "active"
+              },
+              {
+                "text": "Suspended",
+                "value": "suspended"
+              },
+              {
+                "text": "Ended",
+                "value": "ended"
+              }
+            ]
+          }
+        }
+      },
+      "provisioning_state": {
+        "type": "string",
+        "title": "Provisioning state",
+        "description": "ADDED BY ARTEFACT 1. Gate G4 requires a half-provisioned distributor to be DETECTABLE \u2014 an absence query. Written by the install script at each step.",
+        "enum": [
+          "not_started",
+          "partial",
+          "complete",
+          "failed"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Provisioning state",
+            "options": [
+              {
+                "text": "Not Started",
+                "value": "not_started"
+              },
+              {
+                "text": "Partial",
+                "value": "partial"
+              },
+              {
+                "text": "Complete",
+                "value": "complete"
+              },
+              {
+                "text": "Failed",
+                "value": "failed"
+              }
+            ]
+          }
+        }
+      },
+      "activity_signal_enabled": {
+        "type": "string",
+        "title": "Activity signal enabled",
+        "description": "Open question 19 decides the default, not the field (contract artefact 2). Plan \u00a71.6/R13 \u2014 a Distribution-level setting, disclosed in the distribution agreement.",
+        "enum": [
+          "true",
+          "false"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Activity signal enabled",
+            "options": [
+              {
+                "text": "True",
+                "value": "true"
+              },
+              {
+                "text": "False",
+                "value": "false"
+              }
+            ]
+          }
+        }
+      },
+      "onboarded_at": {
+        "type": "string",
+        "title": "Onboarded at",
+        "format": "date-time",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Onboarded at"
+          }
+        }
+      },
+      "brokerage_name": {
+        "type": "string",
+        "title": "Brokerage (legal/trading name)",
+        "description": "WAVE-1 AUTHORED \u2014 not in any frozen contract artefact. broker_config itself is not in the customer spec (plan \u00a76.1: 'Not in the spec. Required \u2014 \u00a73 and \u00a79 both need a broker of record'). Human-readable name for C-WB-REFERRAL's 'from broker X' workbench question \u2014 the indexed broker_id alone is an opaque account id.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Brokerage (legal/trading name)"
+          }
+        }
+      },
+      "primary_contact_name": {
+        "type": "string",
+        "title": "Primary contact name",
+        "description": "WAVE-1 AUTHORED.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Primary contact name"
+          }
+        }
+      },
+      "primary_contact_email": {
+        "type": "string",
+        "title": "Primary contact email",
+        "description": "WAVE-1 AUTHORED.",
+        "format": "email",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Primary contact email"
+          }
+        }
+      },
+      "primary_contact_phone": {
+        "type": "string",
+        "title": "Primary contact phone",
+        "description": "WAVE-1 AUTHORED.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Primary contact phone"
+          }
+        }
+      },
+      "distribution_agreement_ref": {
+        "type": "string",
+        "title": "Distribution agreement reference",
+        "description": "WAVE-1 AUTHORED. Where the activity-signal disclosure (open question 19, plan R13) and any other per-distribution commercial terms are recorded \u2014 a reference, not the document itself.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Distribution agreement reference"
+          }
+        }
+      },
+      "msr_key_ref": {
+        "type": "string",
+        "title": "msr- key reference",
+        "description": "WAVE-1 AUTHORED, named in 02-index-fields.json \u00a75 'deliberately excluded' (read by name, not queried). A reference to the restricted API key minted for this distribution (plan \u00a77.4 item 3) \u2014 never the key material itself.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "msr- key reference"
+          }
+        }
+      }
+    }
+  },
+  "views": {
+    "table": {
+      "type": "table",
+      "columns": [
+        {
+          "field": "broker_id",
+          "order": 0
+        },
+        {
+          "field": "distribution_id",
+          "order": 1
+        },
+        {
+          "field": "broker_status",
+          "order": 2
+        },
+        {
+          "field": "provisioning_state",
+          "order": 3
+        },
+        {
+          "field": "activity_signal_enabled",
+          "order": 4
+        },
+        {
+          "field": "onboarded_at",
+          "order": 5
+        },
+        {
+          "field": "brokerage_name",
+          "order": 6
+        }
+      ]
+    }
+  },
+  "index_fields": [
+    {
+      "field": "broker_id",
+      "type": "keyword"
+    },
+    {
+      "field": "distribution_id",
+      "type": "keyword"
+    },
+    {
+      "field": "broker_status",
+      "type": "keyword"
+    },
+    {
+      "field": "provisioning_state",
+      "type": "keyword"
+    },
+    {
+      "field": "activity_signal_enabled",
+      "type": "keyword"
+    },
+    {
+      "field": "onboarded_at",
+      "type": "datetime"
+    }
+  ]
+}

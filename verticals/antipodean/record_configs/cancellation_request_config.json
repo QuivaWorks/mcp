@@ -1,0 +1,286 @@
+{
+  "id": "cancellation_request_config",
+  "name": "Cancellation request",
+  "description": "A broker-initiated request to cancel an in-force policy. Distributor-side. canc_referral_check/canc_reason/canc_reason_other/canc_open_claims are the 4 PROCESS=Cancellation rows from artefact 1 (D-9: not quote-form keys).",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "owner_user_id": {
+        "type": "string",
+        "title": "Owner (user id)",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Owner (user id)",
+            "helpText": {
+              "markdown": "The broker user inside the brokerage's own account."
+            }
+          }
+        }
+      },
+      "submitted_at": {
+        "type": "string",
+        "title": "Submitted at",
+        "format": "date-time",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Submitted at"
+          }
+        }
+      },
+      "version": {
+        "type": "number",
+        "title": "Version",
+        "ui": {
+          "inputType": "number",
+          "props": {
+            "label": "Version",
+            "helpText": {
+              "markdown": "Submission versioning: idempotency is on (quoteId, version), never quoteId alone (\u00a71.5, \u00a77.4 item 9)."
+            }
+          }
+        }
+      },
+      "policy_number": {
+        "type": "string",
+        "title": "Policy number",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Policy number",
+            "helpText": {
+              "markdown": "P-{PRODUCT_CODE}-{YYYY}-{000000}."
+            }
+          }
+        }
+      },
+      "request_reference": {
+        "type": "string",
+        "title": "Request reference",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Request reference"
+          }
+        }
+      },
+      "request_status": {
+        "type": "string",
+        "title": "Request status",
+        "enum": [
+          "DRAFT",
+          "SUBMITTED",
+          "REFERRED",
+          "APPROVED",
+          "DECLINED"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Request status",
+            "options": [
+              {
+                "value": "DRAFT",
+                "text": "Draft"
+              },
+              {
+                "value": "SUBMITTED",
+                "text": "Submitted"
+              },
+              {
+                "value": "REFERRED",
+                "text": "Referred"
+              },
+              {
+                "value": "APPROVED",
+                "text": "Approved"
+              },
+              {
+                "value": "DECLINED",
+                "text": "Declined"
+              }
+            ]
+          }
+        }
+      },
+      "publisher_ref": {
+        "type": "string",
+        "title": "Publisher reference",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Publisher reference",
+            "helpText": {
+              "markdown": "The publisher-side record id this request became, so the return projection can match back."
+            }
+          }
+        }
+      },
+      "canc_referral_check": {
+        "type": "string",
+        "title": "Is there any notification or claim? (refer),",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Is there any notification or claim? (refer),",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "canc_reason": {
+        "type": "string",
+        "title": "Why do you want to cancel reason",
+        "enum": [
+          "lost_to_competitor",
+          "non_payment",
+          "cover_no_longer_required",
+          "business_closure",
+          "other"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Why do you want to cancel reason",
+            "options": [
+              {
+                "value": "lost_to_competitor",
+                "text": "Lost to competitor"
+              },
+              {
+                "value": "non_payment",
+                "text": "Non-Payment"
+              },
+              {
+                "value": "cover_no_longer_required",
+                "text": "Cover no longer required"
+              },
+              {
+                "value": "business_closure",
+                "text": "Business Closure"
+              },
+              {
+                "value": "other",
+                "text": "Other"
+              }
+            ]
+          }
+        }
+      },
+      "canc_reason_other": {
+        "type": "string",
+        "title": "What is the reason for your cancellation",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "What is the reason for your cancellation"
+          }
+        },
+        "description": "[wave-2 visibility rule: {\"==\": [{\"var\": \"canc_reason\"}, \"other\"]}]"
+      },
+      "canc_open_claims": {
+        "type": "string",
+        "title": "Do you have any open claims",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Do you have any open claims",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "views": {
+    "table": {
+      "type": "table",
+      "columns": [
+        {
+          "field": "request_reference",
+          "order": 1
+        },
+        {
+          "field": "policy_number",
+          "order": 2
+        },
+        {
+          "field": "request_status",
+          "order": 3
+        },
+        {
+          "field": "owner_user_id",
+          "order": 4
+        },
+        {
+          "field": "submitted_at",
+          "order": 5
+        },
+        {
+          "field": "canc_reason",
+          "order": 6
+        }
+      ]
+    }
+  },
+  "index_fields": [
+    {
+      "field": "request_reference",
+      "type": "keyword"
+    },
+    {
+      "field": "policy_number",
+      "type": "keyword"
+    },
+    {
+      "field": "owner_user_id",
+      "type": "keyword"
+    },
+    {
+      "field": "request_status",
+      "type": "keyword"
+    },
+    {
+      "field": "submitted_at",
+      "type": "datetime"
+    },
+    {
+      "field": "version",
+      "type": "numeric"
+    },
+    {
+      "field": "publisher_ref",
+      "type": "keyword"
+    },
+    {
+      "field": "canc_reason",
+      "type": "keyword"
+    }
+  ]
+}

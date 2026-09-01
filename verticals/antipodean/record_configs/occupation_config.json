@@ -1,0 +1,135 @@
+{
+  "id": "occupation_config",
+  "name": "Occupation Rate Table",
+  "description": "Publisher-side (Antipodean) reference table, loaded by P22 from CSV \u2014 not written by a flow or a form (contract artefact 2). The occupation list CONTENT is in no supplied file; this declares the shape of a table that does not yet exist. One of P22's three named reference tables (plan \u00a77.2, \u00a77.6).",
+  "label": "Occupation",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "occupation_code": {
+        "type": "string",
+        "title": "Occupation code",
+        "description": "The natural key. gen_occupation stores THIS value, never the label (01-key-list.json system_keys S-06) \u2014 a wording change must not re-key every historical submission. identity_fields for the P22 loader job.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Occupation code"
+          }
+        }
+      },
+      "occupation_label": {
+        "type": "string",
+        "title": "Occupation label",
+        "description": "The second and last use of text_sortable in the whole vertical \u2014 a human-readable value both typed against and read down a list (contract artefact 2 \u00a72.1).",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Occupation label"
+          }
+        }
+      },
+      "occupation_category": {
+        "type": "string",
+        "title": "Occupation category",
+        "description": "The grouping the P17 lookup presents. Taxonomy VALUES are in no supplied file \u2014 open question OQ-OCC.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Occupation category"
+          }
+        }
+      },
+      "product_code_list": {
+        "type": "string",
+        "title": "Eligible products (space-joined)",
+        "description": "Spec \u00a74.1 step 2: 'based on the chosen occupation, the system displays all eligible products'. Space-joined because arrays cannot be indexed (contract artefact 2 limits.L4).",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Eligible products (space-joined)"
+          }
+        }
+      },
+      "occupation_active": {
+        "type": "string",
+        "title": "Occupation active",
+        "description": "ADDED BY ARTEFACT 1. A retired occupation cannot be deleted \u2014 bound policies reference it \u2014 so the lookup filters on this positive flag rather than on 'not retired'.",
+        "ui": {
+          "inputType": "toggle",
+          "props": {
+            "label": "Occupation active"
+          }
+        },
+        "enum": [
+          "true",
+          "false"
+        ]
+      },
+      "rating_data": {
+        "type": "object",
+        "title": "Rating data (columns TBD)",
+        "description": "Hazard class, base rate, minimum premium and whatever else the rate table carries. \u00a74.2 says no rating specification exists in any form, so the column NAMES are unknown \u2014 deliberately NOT indexed (contract artefact 2 \u00a75, 'deliberately_not_indexed'); read off the row once occupation_code has found it, never filtered across. Wave-1 placeholder shape only \u2014 do not invent statutory rates (plan R3).",
+        "properties": {},
+        "ui": {
+          "inputType": "key-value",
+          "props": {
+            "label": "Rating data",
+            "helpText": {
+              "markdown": "Placeholder \u2014 content blocks P17, P22 and all of rating (contract artefact 2 \u00a76 OQ-OCC)."
+            }
+          }
+        }
+      }
+    }
+  },
+  "views": {
+    "table": {
+      "type": "table",
+      "columns": [
+        {
+          "field": "occupation_code",
+          "order": 0
+        },
+        {
+          "field": "occupation_label",
+          "order": 1
+        },
+        {
+          "field": "occupation_category",
+          "order": 2
+        },
+        {
+          "field": "product_code_list",
+          "order": 3
+        },
+        {
+          "field": "occupation_active",
+          "order": 4
+        }
+      ]
+    }
+  },
+  "index_fields": [
+    {
+      "field": "occupation_code",
+      "type": "keyword"
+    },
+    {
+      "field": "occupation_label",
+      "type": "text_sortable"
+    },
+    {
+      "field": "occupation_category",
+      "type": "keyword"
+    },
+    {
+      "field": "product_code_list",
+      "type": "text"
+    },
+    {
+      "field": "occupation_active",
+      "type": "keyword"
+    }
+  ]
+}

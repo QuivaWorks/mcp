@@ -1,0 +1,223 @@
+{
+  "id": "mta_request_config",
+  "name": "MTA request",
+  "description": "A broker-initiated request to amend an in-force policy. Distributor-side. Sole writer: the broker session (create/edit) and D1-class submit flow forwards it; the publisher-side decision returns via the same paired-record pattern as quotes (\u00a71.4 'one mechanism, four lifecycles').",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "owner_user_id": {
+        "type": "string",
+        "title": "Owner (user id)",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Owner (user id)",
+            "helpText": {
+              "markdown": "The broker user inside the brokerage's own account."
+            }
+          }
+        }
+      },
+      "submitted_at": {
+        "type": "string",
+        "title": "Submitted at",
+        "format": "date-time",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Submitted at"
+          }
+        }
+      },
+      "version": {
+        "type": "number",
+        "title": "Version",
+        "ui": {
+          "inputType": "number",
+          "props": {
+            "label": "Version",
+            "helpText": {
+              "markdown": "Submission versioning: idempotency is on (quoteId, version), never quoteId alone (\u00a71.5, \u00a77.4 item 9)."
+            }
+          }
+        }
+      },
+      "policy_number": {
+        "type": "string",
+        "title": "Policy number",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Policy number",
+            "helpText": {
+              "markdown": "P-{PRODUCT_CODE}-{YYYY}-{000000}."
+            }
+          }
+        }
+      },
+      "request_reference": {
+        "type": "string",
+        "title": "Request reference",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Request reference"
+          }
+        }
+      },
+      "request_status": {
+        "type": "string",
+        "title": "Request status",
+        "enum": [
+          "DRAFT",
+          "SUBMITTED",
+          "REFERRED",
+          "APPROVED",
+          "DECLINED"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Request status",
+            "options": [
+              {
+                "value": "DRAFT",
+                "text": "Draft"
+              },
+              {
+                "value": "SUBMITTED",
+                "text": "Submitted"
+              },
+              {
+                "value": "REFERRED",
+                "text": "Referred"
+              },
+              {
+                "value": "APPROVED",
+                "text": "Approved"
+              },
+              {
+                "value": "DECLINED",
+                "text": "Declined"
+              }
+            ]
+          }
+        }
+      },
+      "publisher_ref": {
+        "type": "string",
+        "title": "Publisher reference",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Publisher reference",
+            "helpText": {
+              "markdown": "The publisher-side record id this request became, so the return projection can match back."
+            }
+          }
+        }
+      },
+      "mta_reference": {
+        "type": "string",
+        "title": "MTA reference",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "MTA reference",
+            "helpText": {
+              "markdown": "MTA-{POLICY_NO}-{REV_INDEX}."
+            }
+          }
+        }
+      },
+      "requested_changes": {
+        "type": "string",
+        "title": "Requested changes",
+        "description": "Free-text description of the amendment requested. \u00a75.5 is one sentence in the spec and under-specified beyond this (plan \u00a76.1).",
+        "ui": {
+          "inputType": "textarea",
+          "props": {
+            "label": "Requested changes"
+          }
+        }
+      },
+      "effective_date": {
+        "type": "string",
+        "title": "Requested effective date",
+        "format": "date-time",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Requested effective date"
+          }
+        }
+      }
+    }
+  },
+  "views": {
+    "table": {
+      "type": "table",
+      "columns": [
+        {
+          "field": "request_reference",
+          "order": 1
+        },
+        {
+          "field": "policy_number",
+          "order": 2
+        },
+        {
+          "field": "request_status",
+          "order": 3
+        },
+        {
+          "field": "owner_user_id",
+          "order": 4
+        },
+        {
+          "field": "submitted_at",
+          "order": 5
+        },
+        {
+          "field": "mta_reference",
+          "order": 6
+        }
+      ]
+    }
+  },
+  "index_fields": [
+    {
+      "field": "request_reference",
+      "type": "keyword"
+    },
+    {
+      "field": "policy_number",
+      "type": "keyword"
+    },
+    {
+      "field": "owner_user_id",
+      "type": "keyword"
+    },
+    {
+      "field": "request_status",
+      "type": "keyword"
+    },
+    {
+      "field": "submitted_at",
+      "type": "datetime"
+    },
+    {
+      "field": "version",
+      "type": "numeric"
+    },
+    {
+      "field": "publisher_ref",
+      "type": "keyword"
+    },
+    {
+      "field": "mta_reference",
+      "type": "keyword"
+    }
+  ]
+}
