@@ -58,8 +58,8 @@ const FIELD_TYPES = [
 // surfaced by the builder and most lack prop editors.
 const INPUT_TYPES = [
   'array', 'checkbox', 'country', 'currency', 'date', 'date-range', 'dropdown',
-  'key-value', 'multi-country', 'multi-select', 'multi-toggle', 'number',
-  'phone', 'slider', 'tags', 'text', 'textarea', 'toggle',
+  'key-value', 'lookup', 'multi-country', 'multi-select', 'multi-toggle',
+  'number', 'phone', 'slider', 'tags', 'text', 'textarea', 'toggle', 'uploader',
 ];
 
 // Extra members of the InputType union (form.types.ts) that the renderer's
@@ -83,11 +83,13 @@ const INPUT_TYPES_EXTENDED = [...INPUT_TYPES_EXTENDED_USABLE, ...INPUT_TYPES_AVO
 
 // The builder's per-JSON-type input options (records.utils.ts inputOptionsForType).
 const INPUT_TYPES_BY_DATA_TYPE = {
-  string: ['text', 'textarea', 'dropdown', 'multi-select', 'multi-toggle', 'tags', 'array', 'date', 'date-range', 'phone', 'country', 'multi-country'],
+  string: ['text', 'textarea', 'dropdown', 'multi-select', 'multi-toggle', 'tags', 'array', 'date', 'date-range', 'phone', 'country', 'multi-country', 'uploader', 'lookup'],
   number: ['number', 'currency', 'slider'],
   integer: ['number', 'currency', 'slider'],
   boolean: ['toggle', 'checkbox'],
-  array: ['tags', 'array', 'multi-select (only if items have an enum)'],
+  // multi-select reads props.options and never items.enum, so an array of
+  // strings qualifies whether or not the enum has been authored.
+  array: ['tags', 'array', 'multi-select (array of strings)', 'uploader (array of strings — stores file paths)'],
   object: ['key-value'],
 };
 
