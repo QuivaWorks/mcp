@@ -1,0 +1,486 @@
+{
+  "id": "quote_outcome_config",
+  "name": "Quote outcome",
+  "description": "The broker's read-only view of the current underwriting decision for a quote. Distributor-side. Sole writer: D2 (outcome-materialise), the return projection -- NEVER the broker, and no other flow. This is the structural fix for the blind-put race: quote_config and quote_outcome_config share no property (assertion A4) so the broker's save and D2's projection can never collide on one KV entry.",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "quote_id": {
+        "type": "string",
+        "title": "Quote id",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Quote id",
+            "helpText": {
+              "markdown": "The distributor-side quote record's platform id. The join key both sides use, and the bind idempotency key (\u00a77.5.2)."
+            }
+          }
+        }
+      },
+      "quote_reference": {
+        "type": "string",
+        "title": "Quote reference",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Quote reference",
+            "helpText": {
+              "markdown": "Q-{PRODUCT_CODE}-{YYYY}-{000000}, minted publisher-side."
+            }
+          }
+        }
+      },
+      "product_code": {
+        "type": "string",
+        "title": "Product code",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Product code",
+            "helpText": {
+              "markdown": "Single-valued by the time a decision exists."
+            }
+          }
+        }
+      },
+      "decision_seq": {
+        "type": "number",
+        "title": "Decision sequence",
+        "description": "THE ordering key -- monotonic across the whole publisher account (one counter, DECISION_SEQ, never year-scoped). D2 drops any message whose decision_seq is <= the stored value (\u00a78.9 'Decision version <-> record write'). NOT submission_version -- two decisions can both carry v1 and land reversed.",
+        "ui": {
+          "inputType": "number",
+          "props": {
+            "label": "Decision sequence"
+          }
+        }
+      },
+      "submission_version": {
+        "type": "number",
+        "title": "Submission version answered",
+        "ui": {
+          "inputType": "number",
+          "props": {
+            "label": "Submission version answered",
+            "helpText": {
+              "markdown": "DESCRIPTIVE ONLY -- which submission version this outcome answers. Never an ordering key; order on decision_seq."
+            }
+          }
+        }
+      },
+      "outcome": {
+        "type": "string",
+        "title": "Engine outcome",
+        "enum": [
+          "ACCEPT",
+          "REFER",
+          "DECLINE"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Engine outcome",
+            "helpText": {
+              "markdown": "The engine's rate-time verdict (flow 1, underwriting-evaluate). Set once."
+            },
+            "options": [
+              {
+                "value": "ACCEPT",
+                "text": "Accept"
+              },
+              {
+                "value": "REFER",
+                "text": "Refer"
+              },
+              {
+                "value": "DECLINE",
+                "text": "Decline"
+              }
+            ]
+          }
+        }
+      },
+      "outcome_status": {
+        "type": "string",
+        "title": "Outcome status",
+        "enum": [
+          "REFERRED",
+          "ISSUED",
+          "DECLINED",
+          "LAPSED",
+          "SANCTION_REFERRAL",
+          "BOUND"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Outcome status",
+            "helpText": {
+              "markdown": "The decision's current lifecycle state. spec \u00a75.1's quote_status, relocated here (minus DRAFT, which is broker-side: quote.broker_stage)."
+            },
+            "options": [
+              {
+                "value": "REFERRED",
+                "text": "Referred"
+              },
+              {
+                "value": "ISSUED",
+                "text": "Issued"
+              },
+              {
+                "value": "DECLINED",
+                "text": "Declined"
+              },
+              {
+                "value": "LAPSED",
+                "text": "Lapsed"
+              },
+              {
+                "value": "SANCTION_REFERRAL",
+                "text": "Sanction Referral"
+              },
+              {
+                "value": "BOUND",
+                "text": "Bound"
+              }
+            ]
+          }
+        }
+      },
+      "outcome_current": {
+        "type": "string",
+        "title": "Current (not superseded)",
+        "enum": [
+          "true",
+          "false"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Current (not superseded)",
+            "helpText": {
+              "markdown": "'true'/'false' strings -- stands in for 'not superseded', which is a negation and unqueryable (limits.L1). No bool index type."
+            },
+            "options": [
+              {
+                "value": "true",
+                "text": "True"
+              },
+              {
+                "value": "false",
+                "text": "False"
+              }
+            ]
+          }
+        }
+      },
+      "reasons": {
+        "type": "array",
+        "title": "Reasons",
+        "description": "Broker-facing display text only (spec \u00a74.3 'Display Text (Broker)' column). decision.underwriter_reasons MUST NOT be projected here (assertion A16).",
+        "items": {
+          "type": "string"
+        },
+        "ui": {
+          "inputType": "tags",
+          "props": {
+            "label": "Reasons"
+          }
+        }
+      },
+      "decided_at": {
+        "type": "string",
+        "title": "Decided at",
+        "format": "date-time",
+        "description": "Display only. Never an ordering key -- two publisher-side flows are not one clock.",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Decided at"
+          }
+        }
+      },
+      "quote_validity_expiry": {
+        "type": "string",
+        "title": "Quote validity expiry",
+        "format": "date-time",
+        "description": "Property of the offer, not of the broker's draft -- moved here from quote_config per artefact 3 (see report D-quote_validity_expiry-product_version).",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Quote validity expiry"
+          }
+        }
+      },
+      "product_version": {
+        "type": "string",
+        "title": "Product version",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Product version",
+            "helpText": {
+              "markdown": "The version that produced this outcome. Mirrors submission.product_version. Moved here from quote_config per artefact 3."
+            }
+          }
+        }
+      },
+      "total_payable": {
+        "type": "number",
+        "title": "Total payable",
+        "ui": {
+          "inputType": "currency",
+          "props": {
+            "label": "Total payable",
+            "helpText": {
+              "markdown": "Flat, indexed copy of premium_breakdown.total_payable -- range-filter consumer (nested paths are not indexable)."
+            },
+            "min": 0,
+            "decimalPlace": 2
+          }
+        }
+      },
+      "premium_breakdown": {
+        "type": "object",
+        "title": "Premium breakdown",
+        "description": "Money is float64 end to end (\u00a75.4); computed in integer cents in the publisher's eval nodes, this carries the result -- D2 never recomputes it.",
+        "properties": {
+          "base_premium": {
+            "type": "number",
+            "title": "Base Premium",
+            "ui": {
+              "inputType": "currency",
+              "props": {
+                "label": "Base Premium",
+                "min": 0,
+                "decimalPlace": 2
+              }
+            }
+          },
+          "fsl_levy": {
+            "type": "number",
+            "title": "Fsl Levy",
+            "ui": {
+              "inputType": "currency",
+              "props": {
+                "label": "Fsl Levy",
+                "min": 0,
+                "decimalPlace": 2
+              }
+            }
+          },
+          "gst": {
+            "type": "number",
+            "title": "Gst",
+            "ui": {
+              "inputType": "currency",
+              "props": {
+                "label": "Gst",
+                "min": 0,
+                "decimalPlace": 2
+              }
+            }
+          },
+          "stamp_duty": {
+            "type": "number",
+            "title": "Stamp Duty",
+            "ui": {
+              "inputType": "currency",
+              "props": {
+                "label": "Stamp Duty",
+                "min": 0,
+                "decimalPlace": 2
+              }
+            }
+          },
+          "broker_commission": {
+            "type": "number",
+            "title": "Broker Commission",
+            "ui": {
+              "inputType": "currency",
+              "props": {
+                "label": "Broker Commission",
+                "min": 0,
+                "decimalPlace": 2
+              }
+            }
+          },
+          "total_payable": {
+            "type": "number",
+            "title": "Total Payable",
+            "ui": {
+              "inputType": "currency",
+              "props": {
+                "label": "Total Payable",
+                "min": 0,
+                "decimalPlace": 2
+              }
+            }
+          }
+        }
+      },
+      "documents": {
+        "type": "array",
+        "title": "Issued documents",
+        "description": "References, not bytes -- \u00a71.8 pulls the bytes through P2a (D4).",
+        "items": {
+          "type": "object",
+          "properties": {
+            "document_type": {
+              "type": "string",
+              "title": "Document type",
+              "ui": {
+                "inputType": "text",
+                "props": {
+                  "label": "Document type"
+                }
+              }
+            },
+            "publisher_ref": {
+              "type": "string",
+              "title": "Publisher reference",
+              "ui": {
+                "inputType": "text",
+                "props": {
+                  "label": "Publisher reference"
+                }
+              }
+            },
+            "local_object_key": {
+              "type": "string",
+              "title": "Local object key",
+              "ui": {
+                "inputType": "text",
+                "props": {
+                  "label": "Local object key"
+                }
+              }
+            },
+            "pulled_at": {
+              "type": "string",
+              "format": "date-time",
+              "title": "Pulled at",
+              "ui": {
+                "inputType": "date",
+                "props": {
+                  "label": "Pulled at"
+                }
+              }
+            }
+          }
+        }
+      },
+      "policy_number": {
+        "type": "string",
+        "title": "Policy number",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Policy number",
+            "helpText": {
+              "markdown": "Written by D2 from the BOUND decision, NOT by D1 from the synchronous /bind response (that ack is UI-only and must not be persisted)."
+            }
+          }
+        }
+      },
+      "bound_at": {
+        "type": "string",
+        "title": "Bound at",
+        "format": "date-time",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Bound at"
+          }
+        }
+      },
+      "superseded_by_quote_id": {
+        "type": "string",
+        "title": "Superseded by (quote id)",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Superseded by (quote id)",
+            "helpText": {
+              "markdown": "Written by D2 from a supersession decision emitted publisher-side by flow 6 (\u00a71.3). Not written by D6 -- D6 creates the new quote, D2 marks the old outcome."
+            }
+          }
+        }
+      }
+    }
+  },
+  "views": {
+    "table": {
+      "type": "table",
+      "columns": [
+        {
+          "field": "quote_reference",
+          "order": 1
+        },
+        {
+          "field": "outcome",
+          "order": 2
+        },
+        {
+          "field": "outcome_status",
+          "order": 3
+        },
+        {
+          "field": "product_code",
+          "order": 4
+        },
+        {
+          "field": "total_payable",
+          "order": 5
+        },
+        {
+          "field": "decided_at",
+          "order": 6
+        },
+        {
+          "field": "outcome_current",
+          "order": 7
+        }
+      ]
+    }
+  },
+  "index_fields": [
+    {
+      "field": "quote_id",
+      "type": "keyword"
+    },
+    {
+      "field": "outcome_current",
+      "type": "keyword"
+    },
+    {
+      "field": "outcome",
+      "type": "keyword"
+    },
+    {
+      "field": "submission_version",
+      "type": "numeric"
+    },
+    {
+      "field": "product_code",
+      "type": "keyword"
+    },
+    {
+      "field": "decided_at",
+      "type": "datetime"
+    },
+    {
+      "field": "total_payable",
+      "type": "numeric"
+    },
+    {
+      "field": "outcome_status",
+      "type": "keyword"
+    },
+    {
+      "field": "quote_validity_expiry",
+      "type": "datetime"
+    }
+  ]
+}

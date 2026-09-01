@@ -1,0 +1,574 @@
+{
+  "id": "policy_config",
+  "name": "Policy",
+  "description": "Publisher-side (Antipodean) \u2014 open question OQ-17 (what the broker sees after bind) is not yet settled; see contract artefact 2 \u00a76. A bound policy: identifiers, dates, void/renewal calendar, the four per-entity timer topics (contract artefact 5), and the MTA/sanctions state fields P9 needs for absence-shaped queries (contract artefact 1 system_keys).",
+  "label": "Policy",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "policy_number": {
+        "type": "string",
+        "title": "Policy number",
+        "description": "Records enforce no uniqueness \u2014 the bind flow's idempotency condition node is the guard, not the index (contract artefact 2).",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Policy number"
+          }
+        }
+      },
+      "quote_id": {
+        "type": "string",
+        "title": "Quote id",
+        "description": "A duplicate bind must return the first outcome, not mint a second policy (plan \u00a77.4 item 6).",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Quote id"
+          }
+        }
+      },
+      "broker_id": {
+        "type": "string",
+        "title": "Broker id (distributor account id)",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Broker id (distributor account id)"
+          }
+        }
+      },
+      "product_code": {
+        "type": "string",
+        "title": "Product code",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Product code"
+          }
+        }
+      },
+      "policy_status": {
+        "type": "string",
+        "title": "Policy status",
+        "description": "The scan's query is 'ACTIVE and past a deadline' \u2014 a positive filter, never 'not VOIDED' (contract artefact 2 limits.L1). Vocabulary: contract artefact 4 cross-reference table.",
+        "enum": [
+          "ACTIVE",
+          "OVERDUE",
+          "VOIDED",
+          "CANCELLED",
+          "EXPIRED"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Policy status",
+            "options": [
+              {
+                "text": "Active",
+                "value": "ACTIVE"
+              },
+              {
+                "text": "Overdue",
+                "value": "OVERDUE"
+              },
+              {
+                "text": "Voided",
+                "value": "VOIDED"
+              },
+              {
+                "text": "Cancelled",
+                "value": "CANCELLED"
+              },
+              {
+                "text": "Expired",
+                "value": "EXPIRED"
+              }
+            ]
+          }
+        }
+      },
+      "bind_date": {
+        "type": "string",
+        "title": "Bind date",
+        "description": "Day 0 of the 46/61 calendar, anchored to timezone_anchor. \u00a76.1's index_fields minimum names this field explicitly \u2014 it is the input to every deadline computation (plan \u00a74.4).",
+        "format": "date-time",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Bind date"
+          }
+        }
+      },
+      "inception_date": {
+        "type": "string",
+        "title": "Inception date",
+        "format": "date-time",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Inception date"
+          }
+        }
+      },
+      "expiration_date": {
+        "type": "string",
+        "title": "Expiration date",
+        "description": "The T-100/T-90 renewal backstop window. Same field as spec's 'expiry_date' \u2014 one spelling; spec's enumerated name wins (01-key-list.json system_keys S-01).",
+        "format": "date-time",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Expiration date"
+          }
+        }
+      },
+      "auto_renewal_eligible": {
+        "type": "string",
+        "title": "Auto-renewal eligible",
+        "description": "\"true\"/\"false\" strings \u2014 no bool index type.",
+        "enum": [
+          "true",
+          "false"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Auto-renewal eligible",
+            "options": [
+              {
+                "text": "True",
+                "value": "true"
+              },
+              {
+                "text": "False",
+                "value": "false"
+              }
+            ]
+          }
+        }
+      },
+      "void_after_days": {
+        "type": "number",
+        "title": "Void after days",
+        "description": "Plan \u00a76.1 explicit requirement. Chosen over spec \u00a75.2's void_grace_days \u2014 the plan is the later document (01-key-list.json system_keys S-03, flagged as A-12).",
+        "minimum": 0,
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Void after days"
+          }
+        }
+      },
+      "void_due_date": {
+        "type": "string",
+        "title": "Void due date",
+        "description": "bind_date + void_after_days, anchored. Re-stamped by flow 5 on reinstatement, so the reconcile scan reads the current value, not a computed one.",
+        "format": "date-time",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Void due date"
+          }
+        }
+      },
+      "void_override_reason": {
+        "type": "string",
+        "title": "Void override reason",
+        "description": "Spec \u00a74.5.5 term-extension override. Required justification \u2014 the only place \u00a74.5's 'mandatory' can live, because no audit trail on a record edit exists anywhere (plan \u00a76.4). Enforced by the task template's required form field, not by this schema.",
+        "ui": {
+          "inputType": "textarea",
+          "props": {
+            "label": "Void override reason"
+          }
+        }
+      },
+      "void_override_by": {
+        "type": "string",
+        "title": "Void override \u2014 actioned by (user id)",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Void override \u2014 actioned by (user id)"
+          }
+        }
+      },
+      "void_override_at": {
+        "type": "string",
+        "title": "Void override \u2014 actioned at",
+        "format": "date-time",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Void override \u2014 actioned at"
+          }
+        }
+      },
+      "voidance_notice_state": {
+        "type": "string",
+        "title": "Voidance notice state",
+        "description": "ADDED BY ARTEFACT 1. Positive form of the absence of voidance_notice_sent_at, which is not queryable.",
+        "enum": [
+          "pending",
+          "sent"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Voidance notice state",
+            "options": [
+              {
+                "text": "Pending",
+                "value": "pending"
+              },
+              {
+                "text": "Sent",
+                "value": "sent"
+              }
+            ]
+          }
+        }
+      },
+      "voidance_notice_sent_at": {
+        "type": "string",
+        "title": "Voidance notice sent at",
+        "description": "NULLABLE \u2014 RFC3339 or empty string, never a placeholder (contract artefact 2 limits.L8). Read by name; voidance_notice_state carries the query (plan R9).",
+        "format": "date-time",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Voidance notice sent at"
+          }
+        }
+      },
+      "timers_scheduled": {
+        "type": "string",
+        "title": "Timers scheduled",
+        "description": "ADDED BY ARTEFACT 1. Flow 13's exception query \u2014 'never scheduled or silently lost' is an absence query and therefore unaskable; this is the positive form. Stamped in the same write as the four topic fields below.",
+        "enum": [
+          "pending",
+          "scheduled",
+          "failed"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Timers scheduled",
+            "options": [
+              {
+                "text": "Pending",
+                "value": "pending"
+              },
+              {
+                "text": "Scheduled",
+                "value": "scheduled"
+              },
+              {
+                "text": "Failed",
+                "value": "failed"
+              }
+            ]
+          }
+        }
+      },
+      "mta_state": {
+        "type": "string",
+        "title": "MTA state",
+        "description": "ADDED BY ARTEFACT 1. 'none' must be written explicitly, never an empty string \u2014 an empty header value is dropped before indexing.",
+        "enum": [
+          "none",
+          "in_progress",
+          "referred",
+          "bound"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "MTA state",
+            "options": [
+              {
+                "text": "None",
+                "value": "none"
+              },
+              {
+                "text": "In Progress",
+                "value": "in_progress"
+              },
+              {
+                "text": "Referred",
+                "value": "referred"
+              },
+              {
+                "text": "Bound",
+                "value": "bound"
+              }
+            ]
+          }
+        }
+      },
+      "active_mta_id": {
+        "type": "string",
+        "title": "Active MTA id",
+        "description": "For the direct lookup once mta_state says there is one. Plan \u00a76.1 explicit requirement.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Active MTA id"
+          }
+        }
+      },
+      "revision_index": {
+        "type": "number",
+        "title": "Revision index",
+        "description": "Plan \u00a76.1 explicit requirement.",
+        "minimum": 0,
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Revision index"
+          }
+        }
+      },
+      "sanctions_state": {
+        "type": "string",
+        "title": "Sanctions state",
+        "enum": [
+          "not_run",
+          "clear",
+          "hit"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Sanctions state",
+            "options": [
+              {
+                "text": "Not Run",
+                "value": "not_run"
+              },
+              {
+                "text": "Clear",
+                "value": "clear"
+              },
+              {
+                "text": "Hit",
+                "value": "hit"
+              }
+            ]
+          }
+        }
+      },
+      "total_payable": {
+        "type": "number",
+        "title": "Total payable",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Total payable"
+          }
+        }
+      },
+      "timezone_anchor": {
+        "type": "string",
+        "title": "Timezone anchor (IANA)",
+        "description": "Business input (plan \u00a77.5 item 10, open question 11, contract artefact 5 A5-2). Anchors day-46/day-61/T-100/T-90. A UTC-anchored day-61 voids a Perth policy ~16h early against a stated local 23:59. Stamped at bind; changing it later re-dates every deadline.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Timezone anchor (IANA)"
+          }
+        }
+      },
+      "invoice_overdue_timer_topic": {
+        "type": "string",
+        "title": "invoice-overdue timer topic",
+        "description": "The stored, derived topic for the 'invoice-overdue:<policyId>' schedule \u2014 the ONLY thing microstrate.hub.delete.unschedule-flow accepts (contract artefact 5). Three states: absent/null = never scheduled or the stamp write failed (the exception condition \u2014 see timers_scheduled); empty string = deliberately not scheduled because trigger_on was already past; non-empty = the live topic.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "invoice-overdue timer topic"
+          }
+        }
+      },
+      "policy_void_timer_topic": {
+        "type": "string",
+        "title": "policy-void timer topic",
+        "description": "The stored, derived topic for the 'policy-void:<policyId>' schedule \u2014 the ONLY thing microstrate.hub.delete.unschedule-flow accepts (contract artefact 5). Three states: absent/null = never scheduled or the stamp write failed (the exception condition \u2014 see timers_scheduled); empty string = deliberately not scheduled because trigger_on was already past; non-empty = the live topic.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "policy-void timer topic"
+          }
+        }
+      },
+      "renewal_generate_timer_topic": {
+        "type": "string",
+        "title": "renewal-generate timer topic",
+        "description": "The stored, derived topic for the 'renewal-generate:<policyId>' schedule \u2014 the ONLY thing microstrate.hub.delete.unschedule-flow accepts (contract artefact 5). Three states: absent/null = never scheduled or the stamp write failed (the exception condition \u2014 see timers_scheduled); empty string = deliberately not scheduled because trigger_on was already past; non-empty = the live topic.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "renewal-generate timer topic"
+          }
+        }
+      },
+      "renewal_dispatch_timer_topic": {
+        "type": "string",
+        "title": "renewal-dispatch timer topic",
+        "description": "The stored, derived topic for the 'renewal-dispatch:<policyId>' schedule \u2014 the ONLY thing microstrate.hub.delete.unschedule-flow accepts (contract artefact 5). Three states: absent/null = never scheduled or the stamp write failed (the exception condition \u2014 see timers_scheduled); empty string = deliberately not scheduled because trigger_on was already past; non-empty = the live topic.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "renewal-dispatch timer topic"
+          }
+        }
+      }
+    }
+  },
+  "views": {
+    "table": {
+      "type": "table",
+      "columns": [
+        {
+          "field": "policy_number",
+          "order": 0
+        },
+        {
+          "field": "quote_id",
+          "order": 1
+        },
+        {
+          "field": "broker_id",
+          "order": 2
+        },
+        {
+          "field": "product_code",
+          "order": 3
+        },
+        {
+          "field": "policy_status",
+          "order": 4
+        },
+        {
+          "field": "bind_date",
+          "order": 5
+        },
+        {
+          "field": "inception_date",
+          "order": 6
+        },
+        {
+          "field": "expiration_date",
+          "order": 7
+        },
+        {
+          "field": "auto_renewal_eligible",
+          "order": 8
+        },
+        {
+          "field": "void_due_date",
+          "order": 9
+        },
+        {
+          "field": "voidance_notice_state",
+          "order": 10
+        },
+        {
+          "field": "timers_scheduled",
+          "order": 11
+        },
+        {
+          "field": "mta_state",
+          "order": 12
+        },
+        {
+          "field": "active_mta_id",
+          "order": 13
+        },
+        {
+          "field": "revision_index",
+          "order": 14
+        },
+        {
+          "field": "sanctions_state",
+          "order": 15
+        },
+        {
+          "field": "total_payable",
+          "order": 16
+        }
+      ]
+    }
+  },
+  "index_fields": [
+    {
+      "field": "policy_number",
+      "type": "keyword"
+    },
+    {
+      "field": "quote_id",
+      "type": "keyword"
+    },
+    {
+      "field": "broker_id",
+      "type": "keyword"
+    },
+    {
+      "field": "product_code",
+      "type": "keyword"
+    },
+    {
+      "field": "policy_status",
+      "type": "keyword"
+    },
+    {
+      "field": "bind_date",
+      "type": "datetime"
+    },
+    {
+      "field": "inception_date",
+      "type": "datetime"
+    },
+    {
+      "field": "expiration_date",
+      "type": "datetime"
+    },
+    {
+      "field": "auto_renewal_eligible",
+      "type": "keyword"
+    },
+    {
+      "field": "void_due_date",
+      "type": "datetime"
+    },
+    {
+      "field": "voidance_notice_state",
+      "type": "keyword"
+    },
+    {
+      "field": "timers_scheduled",
+      "type": "keyword"
+    },
+    {
+      "field": "mta_state",
+      "type": "keyword"
+    },
+    {
+      "field": "active_mta_id",
+      "type": "keyword"
+    },
+    {
+      "field": "revision_index",
+      "type": "numeric"
+    },
+    {
+      "field": "sanctions_state",
+      "type": "keyword"
+    },
+    {
+      "field": "total_payable",
+      "type": "numeric"
+    }
+  ]
+}

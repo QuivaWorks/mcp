@@ -1,0 +1,2413 @@
+{
+  "id": "quote_config",
+  "name": "Quote",
+  "description": "The broker's working quotation for an Antipodean product. Distributor-side (the brokerage's own account). Sole writer: the broker's own authenticated session (see report 'field authority' section) -- nothing automated ever patches this record. Wave 1: schema + table view only, no form (wave 2, single Opus agent, binds against this schema).",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "gen_occupation": {
+        "type": "string",
+        "title": "What is your occupation?",
+        "description": "Select the occupation that best describes your business activity OPTIONS UNRESOLVED (md \u00a77 A-06): Options come from the rating table, which is not in any supplied file. props.options is UNRESOLVED \u2014 see md \u00a77 A-06. Gate G2f requires every enum input to carry props.options, so this key blocks that gate until the occupation list is supplied (P22 loads it; P17 serves it).",
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "What is your occupation?",
+            "helpText": {
+              "markdown": "Select the occupation that best describes your business activity"
+            },
+            "options": []
+          }
+        }
+      },
+      "gen_policyholder_name": {
+        "type": "string",
+        "title": "What is the policyholder name?",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "What is the policyholder name?"
+          }
+        }
+      },
+      "gen_total_staff": {
+        "type": "number",
+        "title": "How many staff do you have in total?",
+        "multipleOf": 1,
+        "ui": {
+          "inputType": "number",
+          "props": {
+            "label": "How many staff do you have in total?",
+            "step": 1
+          }
+        }
+      },
+      "gen_total_revenue": {
+        "type": "number",
+        "title": "What was your Total Revenue in the last financial year?",
+        "description": "This is the estimate of the Total Gross Fee/Revenue that you expect to earn within the current Financial Year.",
+        "ui": {
+          "inputType": "currency",
+          "props": {
+            "label": "What was your Total Revenue in the last financial year?",
+            "helpText": {
+              "markdown": "This is the estimate of the Total Gross Fee/Revenue that you expect to earn within the current Financial Year."
+            },
+            "min": 0,
+            "decimalPlace": 2
+          }
+        }
+      },
+      "gen_total_wages": {
+        "type": "number",
+        "title": "What were your Total Wages in the last financial year?",
+        "ui": {
+          "inputType": "currency",
+          "props": {
+            "label": "What were your Total Wages in the last financial year?",
+            "min": 0,
+            "decimalPlace": 2
+          }
+        }
+      },
+      "gen_business_address": {
+        "type": "object",
+        "title": "What is your business address?",
+        "description": " P17 collapses this to one lookup input; 4 string leaves today (\u00a76.2).",
+        "properties": {
+          "street": {
+            "type": "string",
+            "title": "Street",
+            "ui": {
+              "inputType": "text",
+              "props": {
+                "label": "What is your business address? -- Street"
+              }
+            }
+          },
+          "suburb": {
+            "type": "string",
+            "title": "Suburb",
+            "ui": {
+              "inputType": "text",
+              "props": {
+                "label": "What is your business address? -- Suburb"
+              }
+            }
+          },
+          "state": {
+            "type": "string",
+            "title": "State",
+            "ui": {
+              "inputType": "text",
+              "props": {
+                "label": "What is your business address? -- State"
+              }
+            }
+          },
+          "postcode": {
+            "type": "string",
+            "title": "Postcode",
+            "ui": {
+              "inputType": "text",
+              "props": {
+                "label": "What is your business address? -- Postcode"
+              }
+            }
+          }
+        }
+      },
+      "gen_revenue_nsw": {
+        "type": "number",
+        "title": "Revenue % \u2014 NSW",
+        "minimum": 0,
+        "maximum": 100,
+        "ui": {
+          "inputType": "number",
+          "props": {
+            "label": "Revenue % \u2014 NSW",
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      "gen_revenue_vic": {
+        "type": "number",
+        "title": "Revenue % \u2014 VIC",
+        "minimum": 0,
+        "maximum": 100,
+        "ui": {
+          "inputType": "number",
+          "props": {
+            "label": "Revenue % \u2014 VIC",
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      "gen_revenue_qld": {
+        "type": "number",
+        "title": "Revenue % \u2014 QLD",
+        "minimum": 0,
+        "maximum": 100,
+        "ui": {
+          "inputType": "number",
+          "props": {
+            "label": "Revenue % \u2014 QLD",
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      "gen_revenue_wa": {
+        "type": "number",
+        "title": "Revenue % \u2014 WA",
+        "minimum": 0,
+        "maximum": 100,
+        "ui": {
+          "inputType": "number",
+          "props": {
+            "label": "Revenue % \u2014 WA",
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      "gen_revenue_sa": {
+        "type": "number",
+        "title": "Revenue % \u2014 SA",
+        "minimum": 0,
+        "maximum": 100,
+        "ui": {
+          "inputType": "number",
+          "props": {
+            "label": "Revenue % \u2014 SA",
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      "gen_revenue_tas": {
+        "type": "number",
+        "title": "Revenue % \u2014 TAS",
+        "minimum": 0,
+        "maximum": 100,
+        "ui": {
+          "inputType": "number",
+          "props": {
+            "label": "Revenue % \u2014 TAS",
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      "gen_revenue_nt": {
+        "type": "number",
+        "title": "Revenue % \u2014 NT",
+        "minimum": 0,
+        "maximum": 100,
+        "ui": {
+          "inputType": "number",
+          "props": {
+            "label": "Revenue % \u2014 NT",
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      "gen_revenue_act": {
+        "type": "number",
+        "title": "Revenue % \u2014 ACT",
+        "minimum": 0,
+        "maximum": 100,
+        "ui": {
+          "inputType": "number",
+          "props": {
+            "label": "Revenue % \u2014 ACT",
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      "gen_revenue_overseas": {
+        "type": "number",
+        "title": "Revenue % \u2014 Overseas",
+        "minimum": 0,
+        "maximum": 100,
+        "ui": {
+          "inputType": "number",
+          "props": {
+            "label": "Revenue % \u2014 Overseas",
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      "clm_insurance_declined": {
+        "type": "string",
+        "title": "Have you ever had an insurer decline your insurance application or refuse to renew your policy?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Have you ever had an insurer decline your insurance application or refuse to renew your policy?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "clm_criminal_conviction": {
+        "type": "string",
+        "title": "Have you or anyone else within your organisation, been convicted of a criminal offence?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Have you or anyone else within your organisation, been convicted of a criminal offence?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "clm_bankruptcy": {
+        "type": "string",
+        "title": "Have you or anyone else within your organisation, been declared bankrupt?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Have you or anyone else within your organisation, been declared bankrupt?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "clm_prior_claims": {
+        "type": "string",
+        "title": "During the past 5 years, have any claims been made against you, your principals, employees, or contractors, or have any circumstances been notified to your current or previous insurers that might give rise to a claim?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "During the past 5 years, have any claims been made against you, your principals, employees, or contractors, or have any circumstances been notified to your current or previous insurers that might give rise to a claim?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "clm_prior_claims_similar": {
+        "type": "string",
+        "title": "During the past 5 years, have you ever made a claim on an insurance policy similar to the coverage being requested in this application?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "During the past 5 years, have you ever made a claim on an insurance policy similar to the coverage being requested in this application?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "clm_fraud_crime": {
+        "type": "string",
+        "title": "During the past 5 years, have you ever experienced a fraud, crime or break and enter?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "During the past 5 years, have you ever experienced a fraud, crime or break and enter?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "clm_tax_audit": {
+        "type": "string",
+        "title": "During the past 5 years, have you ever been subject to a tax audit by the ATO, Risk Review by a State or Territory Revenue Office, or other investigation by an official body?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "During the past 5 years, have you ever been subject to a tax audit by the ATO, Risk Review by a State or Territory Revenue Office, or other investigation by an official body?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "clm_professional_complaint": {
+        "type": "string",
+        "title": "Have you, your principals, employees or contractors ever been the subject of a complaint to a professional association or statutory registration board?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Have you, your principals, employees or contractors ever been the subject of a complaint to a professional association or statutory registration board?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "clm_claim_product_reference": {
+        "type": "string",
+        "title": "If you have answered 'Yes' to any of the questions above, please advise which product the claim relates to?",
+        "enum": [
+          "ALH",
+          "API",
+          "ASL",
+          "BZP",
+          "CPL",
+          "DPI",
+          "XOL",
+          "GPI",
+          "ITL",
+          "MAL",
+          "MPI",
+          "MBP",
+          "OBL",
+          "PPL",
+          "RPL",
+          "STP",
+          "TAL",
+          "VTL"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "If you have answered 'Yes' to any of the questions above, please advise which product the claim relates to?",
+            "options": [
+              {
+                "value": "ALH",
+                "text": "Alh"
+              },
+              {
+                "value": "API",
+                "text": "Api"
+              },
+              {
+                "value": "ASL",
+                "text": "Asl"
+              },
+              {
+                "value": "BZP",
+                "text": "Bzp"
+              },
+              {
+                "value": "CPL",
+                "text": "Cpl"
+              },
+              {
+                "value": "DPI",
+                "text": "Dpi"
+              },
+              {
+                "value": "XOL",
+                "text": "Xol"
+              },
+              {
+                "value": "GPI",
+                "text": "Gpi"
+              },
+              {
+                "value": "ITL",
+                "text": "Itl"
+              },
+              {
+                "value": "MAL",
+                "text": "Mal"
+              },
+              {
+                "value": "MPI",
+                "text": "Mpi"
+              },
+              {
+                "value": "MBP",
+                "text": "Mbp"
+              },
+              {
+                "value": "OBL",
+                "text": "Obl"
+              },
+              {
+                "value": "PPL",
+                "text": "Ppl"
+              },
+              {
+                "value": "RPL",
+                "text": "Rpl"
+              },
+              {
+                "value": "STP",
+                "text": "Stp"
+              },
+              {
+                "value": "TAL",
+                "text": "Tal"
+              },
+              {
+                "value": "VTL",
+                "text": "Vtl"
+              }
+            ]
+          }
+        }
+      },
+      "itcl01_staff_qualified": {
+        "type": "string",
+        "title": "Do you ensure that all of your employees, agents and contractors are suitably qualified to perform the work which they are undertaking?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you ensure that all of your employees, agents and contractors are suitably qualified to perform the work which they are undertaking?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "itcl01_tqm_strategy": {
+        "type": "string",
+        "title": "Do you have a Total Quality Management (TQM) Strategy in place?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you have a Total Quality Management (TQM) Strategy in place?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "itcl01_bcp_and_drp": {
+        "type": "string",
+        "title": "Do you have a Business Continuity Plan (BCP) and Disaster Recovery Plan (DRP) in place?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you have a Business Continuity Plan (BCP) and Disaster Recovery Plan (DRP) in place?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "itcl01_privacy_infosec_policy": {
+        "type": "string",
+        "title": "Do you have a Privacy Policy and Information Security Policy?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you have a Privacy Policy and Information Security Policy?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "itcl01_dev_methodology": {
+        "type": "string",
+        "title": "(a) Does your product or systems development include a systems development methodology?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "(a) Does your product or systems development include a systems development methodology?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "itcl01_written_client_agreements": {
+        "type": "string",
+        "title": "(b) Do you have written agreements with all of your clients outlining the scope of the products, project or services to be provided?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "(b) Do you have written agreements with all of your clients outlining the scope of the products, project or services to be provided?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "itcl01_final_acceptance_test": {
+        "type": "string",
+        "title": "Do you require a final acceptance test and/or sign off in writing from your customer before final delivery of any products or services supplied by you?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you require a final acceptance test and/or sign off in writing from your customer before final delivery of any products or services supplied by you?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "itcl01_contracts_legal_review": {
+        "type": "string",
+        "title": "Are all contracts with third parties legally reviewed prior to signing?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Are all contracts with third parties legally reviewed prior to signing?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "itcl01_indemnify_third_party": {
+        "type": "string",
+        "title": "Do you ever agree to indemnify or hold harmless any third party for claims arising out of your services or products?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you ever agree to indemnify or hold harmless any third party for claims arising out of your services or products?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "itcl01_limit_liability": {
+        "type": "string",
+        "title": "Do you seek to limit your liability in all contracts to the cost of services or products provided by you?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you seek to limit your liability in all contracts to the cost of services or products provided by you?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "itcl01_medical_applications": {
+        "type": "string",
+        "title": "Do you perform any work in relation to medical/surgical applications or products?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you perform any work in relation to medical/surgical applications or products?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "itcl01_aerospace_systems": {
+        "type": "string",
+        "title": "Do you perform any work in relation to aerospace/radar/navigation systems?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you perform any work in relation to aerospace/radar/navigation systems?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "itcl01_military_systems": {
+        "type": "string",
+        "title": "Do you perform any work in relation to military/defence systems?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you perform any work in relation to military/defence systems?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "itcl01_oil_gas_power": {
+        "type": "string",
+        "title": "Do you perform any work in relation to oil, gas or power applications?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you perform any work in relation to oil, gas or power applications?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "itcl01_financial_systems": {
+        "type": "string",
+        "title": "Do you perform any work in relation to financial or banking systems that support share trading, financial transactions or financial calculations?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you perform any work in relation to financial or banking systems that support share trading, financial transactions or financial calculations?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "itcl01_gambling": {
+        "type": "string",
+        "title": "Do you perform any work in relation to gambling, sports betting, lotteries, poker machines or casinos?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you perform any work in relation to gambling, sports betting, lotteries, poker machines or casinos?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "itcl01_pornographic_material": {
+        "type": "string",
+        "title": "Do you perform any work in relation to production of pornographic material?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you perform any work in relation to production of pornographic material?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "itcl01_unchecked_gen_ai": {
+        "type": "string",
+        "title": "Does your business utilise open-loop generative AI models or LLMs in the creation, production or delivery of its products and services, that is not checked and signed off by a human?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "description": "LLM means Large Language Models.",
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Does your business utilise open-loop generative AI models or LLMs in the creation, production or delivery of its products and services, that is not checked and signed off by a human?",
+            "helpText": {
+              "markdown": "LLM means Large Language Models."
+            },
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "itcl01_ai_client_data": {
+        "type": "string",
+        "title": "Does your business utilise AI in the processing of client sensitive information?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Does your business utilise AI in the processing of client sensitive information?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "itcl01_ai_human_audit": {
+        "type": "string",
+        "title": "Do humans quality check or audit the output of any AI related output periodically?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do humans quality check or audit the output of any AI related output periodically?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "itcl01_ai_regulation_impact": {
+        "type": "string",
+        "title": "Do you believe that the introduction of increased regulation in the utilisation of AI would have a material impact on your business as it currently operates?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you believe that the introduction of increased regulation in the utilisation of AI would have a material impact on your business as it currently operates?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl01_staff_qualified": {
+        "type": "string",
+        "title": "Are all staff suitably qualified to provide the services that they are providing?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Are all staff suitably qualified to provide the services that they are providing?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl01_client_info": {
+        "type": "string",
+        "title": "Do you obtain client information in all cases?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you obtain client information in all cases?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl01_manufacture_products": {
+        "type": "string",
+        "title": "Do you manufacture, alter, repair, repackage or import any products? (eligibility)",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you manufacture, alter, repair, repackage or import any products? (eligibility)",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl01_laser_treatments": {
+        "type": "string",
+        "title": "Do you provide any form of laser or intense pulse treatments?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you provide any form of laser or intense pulse treatments?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl02_ahpra_registered": {
+        "type": "string",
+        "title": "Are all practitioners suitably qualified and registered with AHPRA?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Are all practitioners suitably qualified and registered with AHPRA?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl02_medical_history": {
+        "type": "string",
+        "title": "Do you obtain medical history or client information in all cases?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you obtain medical history or client information in all cases?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl02_contractors_pii": {
+        "type": "string",
+        "title": "Do you require contractors and agents to carry their own professional liability policy?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you require contractors and agents to carry their own professional liability policy?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl02_accurate_records": {
+        "type": "string",
+        "title": "Do you maintain accurate and descriptive records of all therapeutic services provided?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you maintain accurate and descriptive records of all therapeutic services provided?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl02_manufacture_products": {
+        "type": "string",
+        "title": "Do you manufacture, alter, repair, repackage or import any products?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you manufacture, alter, repair, repackage or import any products?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl03_qualified": {
+        "type": "string",
+        "title": "Are all practitioners suitably qualified?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Are all practitioners suitably qualified?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl03_medical_history": {
+        "type": "string",
+        "title": "Do you obtain medical history or client information in all cases?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you obtain medical history or client information in all cases?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl03_contractors_pii": {
+        "type": "string",
+        "title": "Do you require contractors and agents to carry their own professional liability policy?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you require contractors and agents to carry their own professional liability policy?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl03_accurate_records": {
+        "type": "string",
+        "title": "Do you maintain accurate and descriptive records of all therapeutic services provided?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you maintain accurate and descriptive records of all therapeutic services provided?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl03_informed_consent": {
+        "type": "string",
+        "title": "Do you obtain informed consent in all cases?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you obtain informed consent in all cases?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl03_manufacture_products": {
+        "type": "string",
+        "title": "Do you manufacture, alter, repair, repackage or import any products?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you manufacture, alter, repair, repackage or import any products?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl04_practitioners_licensed": {
+        "type": "string",
+        "title": "Does the Applicant ensure that all medical practitioners working for or in connection with the business are licensed and registered to practice in their specific field?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Does the Applicant ensure that all medical practitioners working for or in connection with the business are licensed and registered to practice in their specific field?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl04_practitioners_insured": {
+        "type": "string",
+        "title": "Does the Applicant ensure that all medical practitioners working for or in connection with the business are fully insured under their own medical indemnity insurance?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Does the Applicant ensure that all medical practitioners working for or in connection with the business are fully insured under their own medical indemnity insurance?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl04_medical_history": {
+        "type": "string",
+        "title": "Does the Applicant obtain medical history or client information in all cases?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Does the Applicant obtain medical history or client information in all cases?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl04_accurate_records": {
+        "type": "string",
+        "title": "Does the applicant maintain accurate and descriptive records of all medical or therapeutic services provided?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Does the applicant maintain accurate and descriptive records of all medical or therapeutic services provided?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl04_informed_consent": {
+        "type": "string",
+        "title": "Does the applicant obtain informed consent in all cases?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Does the applicant obtain informed consent in all cases?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl04_manufacture_products": {
+        "type": "string",
+        "title": "Does the applicant manufacture, alter, repair, repackage or import any products?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Does the applicant manufacture, alter, repair, repackage or import any products?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl05_practitioners_licensed": {
+        "type": "string",
+        "title": "If the Applicant employs any medical practitioners, does the Applicant ensure that they are licensed and registered to practice in their specific field?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "If the Applicant employs any medical practitioners, does the Applicant ensure that they are licensed and registered to practice in their specific field?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl05_practitioners_insured": {
+        "type": "string",
+        "title": "If the Applicant employs any medical practitioners, does the Applicant ensure that they are fully insured under their own medical malpractice insurance?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "If the Applicant employs any medical practitioners, does the Applicant ensure that they are fully insured under their own medical malpractice insurance?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl05_clinical_trials": {
+        "type": "string",
+        "title": "Is the Applicant engaged in clinical trials?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Is the Applicant engaged in clinical trials?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl05_accurate_records": {
+        "type": "string",
+        "title": "Does the applicant maintain accurate and descriptive records of all medical or therapeutic services provided?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Does the applicant maintain accurate and descriptive records of all medical or therapeutic services provided?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl05_informed_consent": {
+        "type": "string",
+        "title": "Does the applicant obtain informed consent in all cases?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Does the applicant obtain informed consent in all cases?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "ahcl05_manufacture_products": {
+        "type": "string",
+        "title": "Does the applicant manufacture, alter, repair, repackage or import any products?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Does the applicant manufacture, alter, repair, repackage or import any products?",
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "gp01_accidental_damage": {
+        "type": "string",
+        "title": "Do you want to include cover for Accidental Damage?",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "description": "When this cover is selected, then we will insure the property that you have told us about against any unforeseen accidental physical damage.",
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Do you want to include cover for Accidental Damage?",
+            "helpText": {
+              "markdown": "When this cover is selected, then we will insure the property that you have told us about against any unforeseen accidental physical damage."
+            },
+            "options": [
+              {
+                "value": "yes",
+                "text": "Yes"
+              },
+              {
+                "value": "no",
+                "text": "No"
+              }
+            ]
+          }
+        }
+      },
+      "gp01_specified_items": {
+        "type": "array",
+        "title": "Gp01 Specified Items",
+        "maxItems": 10,
+        "items": {
+          "type": "object",
+          "properties": {
+            "description": {
+              "type": "string",
+              "title": "Description",
+              "ui": {
+                "inputType": "text",
+                "props": {
+                  "label": "Description"
+                }
+              }
+            },
+            "value": {
+              "type": "number",
+              "title": "Value",
+              "ui": {
+                "inputType": "currency",
+                "props": {
+                  "label": "Value",
+                  "min": 0,
+                  "decimalPlace": 2
+                }
+              }
+            }
+          }
+        }
+      },
+      "gp01_cover_limit": {
+        "type": "number",
+        "title": "Select what Limit you want",
+        "enum": [
+          1000,
+          2000,
+          5000,
+          10000,
+          15000,
+          20000,
+          30000,
+          40000,
+          50000
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Select what Limit you want",
+            "options": [
+              {
+                "value": 1000,
+                "text": "1000"
+              },
+              {
+                "value": 2000,
+                "text": "2000"
+              },
+              {
+                "value": 5000,
+                "text": "5000"
+              },
+              {
+                "value": 10000,
+                "text": "10000"
+              },
+              {
+                "value": 15000,
+                "text": "15000"
+              },
+              {
+                "value": 20000,
+                "text": "20000"
+              },
+              {
+                "value": 30000,
+                "text": "30000"
+              },
+              {
+                "value": 40000,
+                "text": "40000"
+              },
+              {
+                "value": 50000,
+                "text": "50000"
+              }
+            ]
+          }
+        }
+      },
+      "gp01_excess": {
+        "type": "number",
+        "title": "Select what Excess you want",
+        "enum": [
+          0,
+          250,
+          500,
+          1000
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Select what Excess you want",
+            "options": [
+              {
+                "value": 0,
+                "text": "0"
+              },
+              {
+                "value": 250,
+                "text": "250"
+              },
+              {
+                "value": 500,
+                "text": "500"
+              },
+              {
+                "value": 1000,
+                "text": "1000"
+              }
+            ]
+          }
+        }
+      },
+      "cpl_limit_pi": {
+        "type": "number",
+        "title": "PI limit for CPL",
+        "enum": [
+          1000,
+          2000,
+          5000,
+          10000,
+          15000,
+          20000,
+          30000,
+          40000,
+          50000
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "PI limit for CPL",
+            "options": [
+              {
+                "value": 1000,
+                "text": "1000"
+              },
+              {
+                "value": 2000,
+                "text": "2000"
+              },
+              {
+                "value": 5000,
+                "text": "5000"
+              },
+              {
+                "value": 10000,
+                "text": "10000"
+              },
+              {
+                "value": 15000,
+                "text": "15000"
+              },
+              {
+                "value": 20000,
+                "text": "20000"
+              },
+              {
+                "value": 30000,
+                "text": "30000"
+              },
+              {
+                "value": 40000,
+                "text": "40000"
+              },
+              {
+                "value": 50000,
+                "text": "50000"
+              }
+            ]
+          }
+        }
+      },
+      "cpl_limit_pl": {
+        "type": "string",
+        "title": "Cpl Limit Pl",
+        "description": "UNRESOLVED in contract artefact 1 (md \u00a77 A-10): the source CSV gives no QUESTION_TYPE, VISIBLE or REQUIRED for this field. Placeholder string pending business input -- do not treat this shape as settled.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Cpl Limit Pl",
+            "helpText": {
+              "markdown": "UNRESOLVED type -- placeholder pending business input (A-10)."
+            }
+          }
+        }
+      },
+      "cpl_excess": {
+        "type": "string",
+        "title": "Cpl Excess",
+        "description": "UNRESOLVED in contract artefact 1 (md \u00a77 A-10): the source CSV gives no QUESTION_TYPE, VISIBLE or REQUIRED for this field. Placeholder string pending business input -- do not treat this shape as settled.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Cpl Excess",
+            "helpText": {
+              "markdown": "UNRESOLVED type -- placeholder pending business input (A-10)."
+            }
+          }
+        }
+      },
+      "cpl_claims_preparation_cost": {
+        "type": "number",
+        "title": "Cpl Claims Preparation Cost",
+        "multipleOf": 1,
+        "ui": {
+          "inputType": "number",
+          "props": {
+            "label": "Cpl Claims Preparation Cost",
+            "step": 1
+          }
+        }
+      },
+      "quote_reference": {
+        "type": "string",
+        "title": "Quote reference",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Quote reference",
+            "helpText": {
+              "markdown": "Q-{PRODUCT_CODE}-{YYYY}-{000000}. Minted publisher-side at rate time and returned in the rate response; the broker's own session (via D1's submit flow response) persists it -- not a flow patching quote."
+            }
+          }
+        }
+      },
+      "broker_stage": {
+        "type": "string",
+        "title": "Pipeline stage",
+        "enum": [
+          "new",
+          "working",
+          "awaiting_client",
+          "sent",
+          "dead"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Pipeline stage",
+            "helpText": {
+              "markdown": "The brokerage's own pipeline status -- distinct from the underwriting outcome, which lives on quote_outcome_config.outcome_status."
+            },
+            "options": [
+              {
+                "value": "new",
+                "text": "New"
+              },
+              {
+                "value": "working",
+                "text": "Working"
+              },
+              {
+                "value": "awaiting_client",
+                "text": "Awaiting Client"
+              },
+              {
+                "value": "sent",
+                "text": "Sent"
+              },
+              {
+                "value": "dead",
+                "text": "Dead"
+              }
+            ]
+          }
+        }
+      },
+      "owner_user_id": {
+        "type": "string",
+        "title": "Owner (user id)",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Owner (user id)",
+            "helpText": {
+              "markdown": "The broker user inside the brokerage's own account."
+            }
+          }
+        }
+      },
+      "primary_product_code": {
+        "type": "string",
+        "title": "Primary product code",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Primary product code",
+            "helpText": {
+              "markdown": "First entry of selected_products. Exists because arrays cannot be indexed (limits.L4)."
+            }
+          }
+        }
+      },
+      "pipeline_stage": {
+        "type": "string",
+        "title": "Funnel stage",
+        "enum": [
+          "started",
+          "completed",
+          "submitted",
+          "quoted",
+          "bound",
+          "lost"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Funnel stage",
+            "helpText": {
+              "markdown": "started/completed/submitted/quoted/bound/lost -- the conversion funnel (\u00a71.6/\u00a77.2), a positive field because absence is not queryable."
+            },
+            "options": [
+              {
+                "value": "started",
+                "text": "Started"
+              },
+              {
+                "value": "completed",
+                "text": "Completed"
+              },
+              {
+                "value": "submitted",
+                "text": "Submitted"
+              },
+              {
+                "value": "quoted",
+                "text": "Quoted"
+              },
+              {
+                "value": "bound",
+                "text": "Bound"
+              },
+              {
+                "value": "lost",
+                "text": "Lost"
+              }
+            ]
+          }
+        }
+      },
+      "submitted_at": {
+        "type": "string",
+        "title": "Submitted at",
+        "format": "date-time",
+        "description": "RFC3339. Empty on an unsubmitted quote.",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Submitted at"
+          }
+        }
+      },
+      "submitted_version": {
+        "type": "number",
+        "title": "Submitted version",
+        "ui": {
+          "inputType": "number",
+          "props": {
+            "label": "Submitted version",
+            "helpText": {
+              "markdown": "The submission version the publisher is holding. \u00a71.7's banner and P18's diff read it. 0 before the first submit."
+            }
+          }
+        }
+      },
+      "inception_date": {
+        "type": "string",
+        "title": "Requested inception date",
+        "format": "date-time",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Requested inception date"
+          }
+        }
+      },
+      "product_selections": {
+        "type": "array",
+        "title": "Product selections",
+        "description": "Limits, sub-limits and excesses per selected product (object[]). `in` cannot read an array of objects -- gating runs off selected_products instead (\u00a76.2). Never crosses in the activity signal.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "product_code": {
+              "type": "string",
+              "title": "Product code",
+              "ui": {
+                "inputType": "text",
+                "props": {
+                  "label": "Product code"
+                }
+              }
+            },
+            "limit": {
+              "type": "number",
+              "title": "Limit",
+              "ui": {
+                "inputType": "currency",
+                "props": {
+                  "label": "Limit",
+                  "min": 0,
+                  "decimalPlace": 2
+                }
+              }
+            },
+            "sub_limit": {
+              "type": "number",
+              "title": "Sub-limit",
+              "ui": {
+                "inputType": "currency",
+                "props": {
+                  "label": "Sub-limit",
+                  "min": 0,
+                  "decimalPlace": 2
+                }
+              }
+            },
+            "excess": {
+              "type": "number",
+              "title": "Excess",
+              "ui": {
+                "inputType": "currency",
+                "props": {
+                  "label": "Excess",
+                  "min": 0,
+                  "decimalPlace": 2
+                }
+              }
+            }
+          }
+        }
+      },
+      "selected_products": {
+        "type": "array",
+        "title": "Selected products",
+        "description": "Product codes selected on this quote. Drives `in`-based section gating (\u00a76.2) -- the only renderer-backed shape for that. The one answer-bearing value the activity signal (D3) may carry.",
+        "items": {
+          "type": "string",
+          "enum": [
+            "ALH",
+            "API",
+            "ASL",
+            "BZP",
+            "CPL",
+            "DPI",
+            "GPI",
+            "ITL",
+            "MAL",
+            "MBP",
+            "MPI",
+            "OBL",
+            "PPL",
+            "RPL",
+            "STP",
+            "TAL",
+            "VTL",
+            "XOL"
+          ]
+        },
+        "ui": {
+          "inputType": "multi-select",
+          "props": {
+            "label": "Selected products",
+            "options": [
+              {
+                "value": "ALH",
+                "text": "ALH"
+              },
+              {
+                "value": "API",
+                "text": "API"
+              },
+              {
+                "value": "ASL",
+                "text": "ASL"
+              },
+              {
+                "value": "BZP",
+                "text": "BZP"
+              },
+              {
+                "value": "CPL",
+                "text": "CPL"
+              },
+              {
+                "value": "DPI",
+                "text": "DPI"
+              },
+              {
+                "value": "GPI",
+                "text": "GPI"
+              },
+              {
+                "value": "ITL",
+                "text": "ITL"
+              },
+              {
+                "value": "MAL",
+                "text": "MAL"
+              },
+              {
+                "value": "MBP",
+                "text": "MBP"
+              },
+              {
+                "value": "MPI",
+                "text": "MPI"
+              },
+              {
+                "value": "OBL",
+                "text": "OBL"
+              },
+              {
+                "value": "PPL",
+                "text": "PPL"
+              },
+              {
+                "value": "RPL",
+                "text": "RPL"
+              },
+              {
+                "value": "STP",
+                "text": "STP"
+              },
+              {
+                "value": "TAL",
+                "text": "TAL"
+              },
+              {
+                "value": "VTL",
+                "text": "VTL"
+              },
+              {
+                "value": "XOL",
+                "text": "XOL"
+              }
+            ]
+          }
+        }
+      },
+      "submitted_snapshot": {
+        "type": "object",
+        "title": "Submitted snapshot",
+        "description": "DISTRIBUTOR-side, for P18's local diff (\u00a71.7). NOT the publisher-side baseline snapshot that submissions made redundant (\u00a76.1) -- two different fields in two different accounts. Written ONLY by the broker's own session, in the same save that submits (see D-submitted_snapshot in the report). Not indexed (arbitrary nested answer shape -- a snapshot of quote_config's own answer keys, so no fixed leaf set is declared here). additionalProperties deliberately omitted: records-service's JSONSchema model rejects a literal bool there (json: cannot unmarshal bool into ... additionalProperties of type model.JSONSchema) -- confirmed live on staging."
+      },
+      "broker_notes": {
+        "type": "string",
+        "title": "Broker notes",
+        "ui": {
+          "inputType": "textarea",
+          "props": {
+            "label": "Broker notes",
+            "helpText": {
+              "markdown": "Never crosses to the publisher. Distinct from decision.underwriter_notes, which never crosses the other way."
+            }
+          }
+        }
+      },
+      "attachments": {
+        "type": "array",
+        "title": "Attachments",
+        "description": "Files the broker attaches (e.g. claims history, prior policy schedules). D1 reads and forwards these through the gateway at submit; D1 does not write this key. PLATFORM GAP: the plan (\u00a76.1) flags that claim_config 'needs the uploader input type' and no such renderer input type exists today (quiva-records-mcp's INPUT_TYPES catalogue has no 'uploader' member) -- scoped item, not built here. Modelled as an array of object-store references pending that input type.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "file_name": {
+              "type": "string",
+              "title": "File name",
+              "ui": {
+                "inputType": "text",
+                "props": {
+                  "label": "File name"
+                }
+              }
+            },
+            "object_key": {
+              "type": "string",
+              "title": "Object key",
+              "ui": {
+                "inputType": "text",
+                "props": {
+                  "label": "Object key"
+                }
+              }
+            },
+            "uploaded_at": {
+              "type": "string",
+              "format": "date-time",
+              "title": "Uploaded at",
+              "ui": {
+                "inputType": "date",
+                "props": {
+                  "label": "Uploaded at"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "views": {
+    "table": {
+      "type": "table",
+      "columns": [
+        {
+          "field": "quote_reference",
+          "order": 1
+        },
+        {
+          "field": "broker_stage",
+          "order": 2
+        },
+        {
+          "field": "primary_product_code",
+          "order": 3
+        },
+        {
+          "field": "owner_user_id",
+          "order": 4
+        },
+        {
+          "field": "pipeline_stage",
+          "order": 5
+        },
+        {
+          "field": "submitted_at",
+          "order": 6
+        },
+        {
+          "field": "inception_date",
+          "order": 7
+        }
+      ]
+    }
+  },
+  "index_fields": [
+    {
+      "field": "broker_stage",
+      "type": "keyword"
+    },
+    {
+      "field": "quote_reference",
+      "type": "keyword"
+    },
+    {
+      "field": "quote_id",
+      "type": "keyword"
+    },
+    {
+      "field": "primary_product_code",
+      "type": "keyword"
+    },
+    {
+      "field": "owner_user_id",
+      "type": "keyword"
+    },
+    {
+      "field": "pipeline_stage",
+      "type": "keyword"
+    },
+    {
+      "field": "submitted_at",
+      "type": "datetime"
+    },
+    {
+      "field": "submitted_version",
+      "type": "numeric"
+    },
+    {
+      "field": "inception_date",
+      "type": "datetime"
+    }
+  ]
+}

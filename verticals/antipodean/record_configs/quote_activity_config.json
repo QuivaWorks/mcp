@@ -1,0 +1,391 @@
+{
+  "id": "quote_activity_config",
+  "name": "Quote Activity",
+  "description": "Publisher-side (Antipodean), mutable, overwritten in place. Pre-submission pipeline visibility \u2014 product, percent complete, section reached, last touched, broker of record (plan \u00a71.6). Sole writer: flow A (activity-ingress), built field-by-field from a literal allowlist. NEVER read by underwriting \u2014 sales only, gated by a P16 policy group (contract artefact 3 \u00a76, record table).",
+  "label": "Quote Activity",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "distributor_account_id": {
+        "type": "string",
+        "title": "Distributor account id",
+        "description": "Resolved from the authenticated session at the ingress, NEVER copied from the message body (contract artefact 3 A19, assertion table).",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Distributor account id"
+          }
+        }
+      },
+      "quote_id": {
+        "type": "string",
+        "title": "Quote id",
+        "description": "The upsert key \u2014 this record is overwritten in place, so flow A must find it before it writes (contract artefact 2).",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Quote id"
+          }
+        }
+      },
+      "broker_of_record": {
+        "type": "string",
+        "title": "Broker of record",
+        "description": "On the plan \u00a71.6 allowlist.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Broker of record"
+          }
+        }
+      },
+      "products": {
+        "type": "array",
+        "title": "Products",
+        "description": "THE DELIBERATE EXCEPTION to metadata-only (plan \u00a71.6, contract artefact 3 \u00a7fields DECIDED-HERE). Product codes are also a questionnaire answer (quote.selected_products) \u2014 this is the ONE key the allowlist intersection test permits from the answer-key set (assertion A10c). Never add a second exception here without changing plan \u00a71.6's disclosure position.",
+        "ui": {
+          "inputType": "multi-select",
+          "props": {
+            "label": "Products",
+            "options": [
+              {
+                "text": "ITL",
+                "value": "ITL"
+              },
+              {
+                "text": "ALH",
+                "value": "ALH"
+              },
+              {
+                "text": "GPI",
+                "value": "GPI"
+              },
+              {
+                "text": "CPL",
+                "value": "CPL"
+              },
+              {
+                "text": "API",
+                "value": "API"
+              },
+              {
+                "text": "ASL",
+                "value": "ASL"
+              },
+              {
+                "text": "BZP",
+                "value": "BZP"
+              },
+              {
+                "text": "DPI",
+                "value": "DPI"
+              },
+              {
+                "text": "XOL",
+                "value": "XOL"
+              },
+              {
+                "text": "MAL",
+                "value": "MAL"
+              },
+              {
+                "text": "MPI",
+                "value": "MPI"
+              },
+              {
+                "text": "MBP",
+                "value": "MBP"
+              },
+              {
+                "text": "OBL",
+                "value": "OBL"
+              },
+              {
+                "text": "PPL",
+                "value": "PPL"
+              },
+              {
+                "text": "RPL",
+                "value": "RPL"
+              },
+              {
+                "text": "STP",
+                "value": "STP"
+              },
+              {
+                "text": "TAL",
+                "value": "TAL"
+              },
+              {
+                "text": "VTL",
+                "value": "VTL"
+              }
+            ]
+          }
+        },
+        "items": {
+          "type": "string",
+          "enum": [
+            "ITL",
+            "ALH",
+            "GPI",
+            "CPL",
+            "API",
+            "ASL",
+            "BZP",
+            "DPI",
+            "XOL",
+            "MAL",
+            "MPI",
+            "MBP",
+            "OBL",
+            "PPL",
+            "RPL",
+            "STP",
+            "TAL",
+            "VTL"
+          ]
+        }
+      },
+      "product_code_list": {
+        "type": "string",
+        "title": "Product code list (space-joined)",
+        "description": "Derived from products, indexed as analysed text so a term leaf matches one code (contract artefact 2).",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Product code list (space-joined)"
+          }
+        }
+      },
+      "pipeline_stage": {
+        "type": "string",
+        "title": "Pipeline stage",
+        "description": "ADDED BY ARTEFACT 1. The funnel of \u00a77.2/\u00a71.6 as an explicit positive field.",
+        "enum": [
+          "started",
+          "completed",
+          "submitted",
+          "quoted",
+          "bound",
+          "lost"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Pipeline stage",
+            "options": [
+              {
+                "text": "Started",
+                "value": "started"
+              },
+              {
+                "text": "Completed",
+                "value": "completed"
+              },
+              {
+                "text": "Submitted",
+                "value": "submitted"
+              },
+              {
+                "text": "Quoted",
+                "value": "quoted"
+              },
+              {
+                "text": "Bound",
+                "value": "bound"
+              },
+              {
+                "text": "Lost",
+                "value": "lost"
+              }
+            ]
+          }
+        }
+      },
+      "section_reached": {
+        "type": "string",
+        "title": "Section reached",
+        "description": "MUST be a closed enum of the section codes from contract artefact 1 \u2014 flow A rejects a value outside it (assertion A11). This is the field the plan itself uses to show why a schema alone cannot hold the line: section_reached:\"turnover is $14.2M\" would validate perfectly if this were free text.",
+        "enum": [
+          "General",
+          "Claims",
+          "ITCL01",
+          "AHCL01",
+          "AHCL02",
+          "AHCL03",
+          "AHCL04",
+          "AHCL05",
+          "GP01",
+          "CPL"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Section reached",
+            "options": [
+              {
+                "text": "General",
+                "value": "General"
+              },
+              {
+                "text": "Claims",
+                "value": "Claims"
+              },
+              {
+                "text": "Itcl01",
+                "value": "ITCL01"
+              },
+              {
+                "text": "Ahcl01",
+                "value": "AHCL01"
+              },
+              {
+                "text": "Ahcl02",
+                "value": "AHCL02"
+              },
+              {
+                "text": "Ahcl03",
+                "value": "AHCL03"
+              },
+              {
+                "text": "Ahcl04",
+                "value": "AHCL04"
+              },
+              {
+                "text": "Ahcl05",
+                "value": "AHCL05"
+              },
+              {
+                "text": "Gp01",
+                "value": "GP01"
+              },
+              {
+                "text": "Cpl",
+                "value": "CPL"
+              }
+            ]
+          }
+        }
+      },
+      "percent_complete": {
+        "type": "number",
+        "title": "Percent complete",
+        "description": "Computed distributor-side by D3 from the count of answered keys; the publisher never sees which keys.",
+        "minimum": 0,
+        "maximum": 100,
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Percent complete"
+          }
+        }
+      },
+      "last_touched_at": {
+        "type": "string",
+        "title": "Last touched at",
+        "description": "'stalled over a week' is a date_end = now-7d range query \u2014 prefer this over stalled_days (contract artefact 2 limits.L5).",
+        "format": "date-time",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Last touched at"
+          }
+        }
+      },
+      "stalled_days": {
+        "type": "number",
+        "title": "Stalled days (derived, display only)",
+        "description": "Declared for display and sort; the FILTER must use last_touched_at \u2014 min:0 is indistinguishable from unset (contract artefact 2 limits.L5). NOT the throttle state (that lives in distributor-side flow-visible KV, contract artefact 3 \u00a76, assertion A17).",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Stalled days (derived, display only)"
+          }
+        }
+      }
+    }
+  },
+  "views": {
+    "table": {
+      "type": "table",
+      "columns": [
+        {
+          "field": "quote_id",
+          "order": 0
+        },
+        {
+          "field": "distributor_account_id",
+          "order": 1
+        },
+        {
+          "field": "broker_of_record",
+          "order": 2
+        },
+        {
+          "field": "product_code_list",
+          "order": 3
+        },
+        {
+          "field": "pipeline_stage",
+          "order": 4
+        },
+        {
+          "field": "section_reached",
+          "order": 5
+        },
+        {
+          "field": "percent_complete",
+          "order": 6
+        },
+        {
+          "field": "last_touched_at",
+          "order": 7
+        },
+        {
+          "field": "stalled_days",
+          "order": 8
+        }
+      ]
+    }
+  },
+  "index_fields": [
+    {
+      "field": "quote_id",
+      "type": "keyword"
+    },
+    {
+      "field": "distributor_account_id",
+      "type": "keyword"
+    },
+    {
+      "field": "broker_of_record",
+      "type": "keyword"
+    },
+    {
+      "field": "product_code_list",
+      "type": "text"
+    },
+    {
+      "field": "pipeline_stage",
+      "type": "keyword"
+    },
+    {
+      "field": "section_reached",
+      "type": "keyword"
+    },
+    {
+      "field": "percent_complete",
+      "type": "numeric"
+    },
+    {
+      "field": "last_touched_at",
+      "type": "datetime"
+    },
+    {
+      "field": "stalled_days",
+      "type": "numeric"
+    }
+  ]
+}

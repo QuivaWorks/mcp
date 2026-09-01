@@ -1,0 +1,136 @@
+{
+  "id": "clause_config",
+  "name": "Clause Library",
+  "description": "Publisher-side (Antipodean) reference table. Shape is easy; the clause library CONTENT is in no supplied file (plan \u00a76.1). Loaded by P22 (records-service/tools/recordload) \u2014 an example job already exists at examples/clause-library.json.",
+  "label": "Clause",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "clause_code": {
+        "type": "string",
+        "title": "Clause code",
+        "description": "The natural key \u2014 identity_fields for the P22 loader job (records-service/tools/recordload).",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Clause code"
+          }
+        }
+      },
+      "clause_category": {
+        "type": "string",
+        "title": "Clause category",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Clause category"
+          }
+        }
+      },
+      "product_code_list": {
+        "type": "string",
+        "title": "Product code list (space-joined)",
+        "description": "A clause applies to several products; arrays cannot be indexed \u2014 space-joined string, indexed analysed text (contract artefact 2 limits.L4). Matches the recordload example job at records-service/tools/recordload/examples/clause-library.json's product_code_list column \u2014 FLAGGED: that example currently maps the CSV column with `\"as\":\"list\"`, which produces a JSON array in the payload, not the space-joined string this field's index declaration needs. The mapping needs a join transform (or `\"as\":\"string\"` with pre-joined CSV data) before a real load; wave 1 declares the shape only.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Product code list (space-joined)"
+          }
+        }
+      },
+      "clause_active": {
+        "type": "string",
+        "title": "Clause active",
+        "description": "Positive form of 'not retired' (contract artefact 2).",
+        "ui": {
+          "inputType": "toggle",
+          "props": {
+            "label": "Clause active"
+          }
+        },
+        "enum": [
+          "true",
+          "false"
+        ]
+      },
+      "clause_title": {
+        "type": "string",
+        "title": "Clause title",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Clause title"
+          }
+        }
+      },
+      "wording_markdown": {
+        "type": "string",
+        "title": "Wording",
+        "description": "Free text \u2014 no mid-string search exists (contract artefact 2 \u00a75).",
+        "ui": {
+          "inputType": "markdown",
+          "props": {
+            "label": "Wording"
+          }
+        }
+      },
+      "retired_on": {
+        "type": "string",
+        "title": "Retired on",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Retired on"
+          }
+        },
+        "format": "date"
+      }
+    }
+  },
+  "views": {
+    "table": {
+      "type": "table",
+      "columns": [
+        {
+          "field": "clause_code",
+          "order": 0
+        },
+        {
+          "field": "clause_category",
+          "order": 1
+        },
+        {
+          "field": "product_code_list",
+          "order": 2
+        },
+        {
+          "field": "clause_active",
+          "order": 3
+        },
+        {
+          "field": "clause_title",
+          "order": 4
+        }
+      ]
+    }
+  },
+  "index_fields": [
+    {
+      "field": "clause_code",
+      "type": "keyword"
+    },
+    {
+      "field": "clause_category",
+      "type": "keyword"
+    },
+    {
+      "field": "product_code_list",
+      "type": "text"
+    },
+    {
+      "field": "clause_active",
+      "type": "keyword"
+    }
+  ]
+}
