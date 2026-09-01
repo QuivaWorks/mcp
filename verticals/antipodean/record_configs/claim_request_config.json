@@ -1,271 +1,271 @@
 {
-  "id": "claim_request_config",
-  "name": "Claim request (FNOL)",
-  "description": "A broker-initiated first-notification-of-loss request. Distributor-side. Note \u00a71.8: claims FNOL attachments travel broker -> publisher through the gateway upload route, same platform gap as quote_config.attachments (no 'uploader' input type exists yet -- scoped item).",
-  "schema": {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "object",
-    "properties": {
-      "owner_user_id": {
-        "type": "string",
-        "title": "Owner (user id)",
-        "ui": {
-          "inputType": "text",
-          "props": {
-            "label": "Owner (user id)",
-            "helpText": {
-              "markdown": "The broker user inside the brokerage's own account."
-            }
-          }
-        }
-      },
-      "submitted_at": {
-        "type": "string",
-        "title": "Submitted at",
-        "format": "date-time",
-        "ui": {
-          "inputType": "date",
-          "props": {
-            "label": "Submitted at"
-          }
-        }
-      },
-      "version": {
-        "type": "number",
-        "title": "Version",
-        "ui": {
-          "inputType": "number",
-          "props": {
-            "label": "Version",
-            "helpText": {
-              "markdown": "Submission versioning: idempotency is on (quoteId, version), never quoteId alone (\u00a71.5, \u00a77.4 item 9)."
-            }
-          }
-        }
-      },
-      "policy_number": {
-        "type": "string",
-        "title": "Policy number",
-        "ui": {
-          "inputType": "text",
-          "props": {
-            "label": "Policy number",
-            "helpText": {
-              "markdown": "P-{PRODUCT_CODE}-{YYYY}-{000000}."
-            }
-          }
-        }
-      },
-      "request_reference": {
-        "type": "string",
-        "title": "Request reference",
-        "ui": {
-          "inputType": "text",
-          "props": {
-            "label": "Request reference"
-          }
-        }
-      },
-      "request_status": {
-        "type": "string",
-        "title": "Request status",
-        "enum": [
-          "DRAFT",
-          "SUBMITTED",
-          "REFERRED",
-          "APPROVED",
-          "DECLINED"
-        ],
-        "ui": {
-          "inputType": "dropdown",
-          "props": {
-            "label": "Request status",
-            "options": [
-              {
-                "value": "DRAFT",
-                "text": "Draft"
-              },
-              {
-                "value": "SUBMITTED",
-                "text": "Submitted"
-              },
-              {
-                "value": "REFERRED",
-                "text": "Referred"
-              },
-              {
-                "value": "APPROVED",
-                "text": "Approved"
-              },
-              {
-                "value": "DECLINED",
-                "text": "Declined"
-              }
-            ]
-          }
-        }
-      },
-      "publisher_ref": {
-        "type": "string",
-        "title": "Publisher reference",
-        "ui": {
-          "inputType": "text",
-          "props": {
-            "label": "Publisher reference",
-            "helpText": {
-              "markdown": "The publisher-side record id this request became, so the return projection can match back."
-            }
-          }
-        }
-      },
-      "claim_number": {
-        "type": "string",
-        "title": "Claim number",
-        "ui": {
-          "inputType": "text",
-          "props": {
-            "label": "Claim number",
-            "helpText": {
-              "markdown": "CLM-{PRODUCT_CODE}-{YYYY}-{000000}. Empty until the publisher mints one."
-            }
-          }
-        }
-      },
-      "date_of_loss": {
-        "type": "string",
-        "title": "Date of loss",
-        "format": "date-time",
-        "ui": {
-          "inputType": "date",
-          "props": {
-            "label": "Date of loss"
-          }
-        }
-      },
-      "loss_description": {
-        "type": "string",
-        "title": "Loss description",
-        "ui": {
-          "inputType": "textarea",
-          "props": {
-            "label": "Loss description"
-          }
-        }
-      },
-      "attachments": {
-        "type": "array",
-        "title": "Attachments",
-        "description": "FNOL supporting documents. Same platform gap as quote_config.attachments -- no dedicated uploader input type exists in the renderer today.",
-        "items": {
-          "type": "object",
-          "properties": {
-            "file_name": {
-              "type": "string",
-              "title": "File name",
-              "ui": {
-                "inputType": "text",
-                "props": {
-                  "label": "File name"
-                }
-              }
-            },
-            "object_key": {
-              "type": "string",
-              "title": "Object key",
-              "ui": {
-                "inputType": "text",
-                "props": {
-                  "label": "Object key"
-                }
-              }
-            },
-            "uploaded_at": {
-              "type": "string",
-              "format": "date-time",
-              "title": "Uploaded at",
-              "ui": {
-                "inputType": "date",
-                "props": {
-                  "label": "Uploaded at"
-                }
-              }
-            }
-          }
-        }
+ "id": "claim_request_config",
+ "name": "Claim request (FNOL)",
+ "description": "A broker-initiated first-notification-of-loss request. Distributor-side. Note §1.8: claims FNOL attachments travel broker -> publisher through the gateway upload route, same platform gap as quote_config.attachments (no 'uploader' input type exists yet -- scoped item).",
+ "schema": {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+   "owner_user_id": {
+    "type": "string",
+    "title": "Owner (user id)",
+    "ui": {
+     "inputType": "text",
+     "props": {
+      "label": "Owner (user id)",
+      "helpText": {
+       "markdown": "The broker user inside the brokerage's own account."
       }
+     }
     }
-  },
-  "views": {
-    "table": {
-      "type": "table",
-      "columns": [
-        {
-          "field": "request_reference",
-          "order": 1
-        },
-        {
-          "field": "policy_number",
-          "order": 2
-        },
-        {
-          "field": "request_status",
-          "order": 3
-        },
-        {
-          "field": "owner_user_id",
-          "order": 4
-        },
-        {
-          "field": "submitted_at",
-          "order": 5
-        },
-        {
-          "field": "claim_number",
-          "order": 6
-        },
-        {
-          "field": "date_of_loss",
-          "order": 7
-        }
+   },
+   "submitted_at": {
+    "type": "string",
+    "title": "Submitted at",
+    "format": "date-time",
+    "ui": {
+     "inputType": "date",
+     "props": {
+      "label": "Submitted at"
+     }
+    }
+   },
+   "version": {
+    "type": "number",
+    "title": "Version",
+    "ui": {
+     "inputType": "number",
+     "props": {
+      "label": "Version",
+      "helpText": {
+       "markdown": "Submission versioning: idempotency is on (quoteId, version), never quoteId alone (§1.5, §7.4 item 9)."
+      }
+     }
+    }
+   },
+   "policy_number": {
+    "type": "string",
+    "title": "Policy number",
+    "ui": {
+     "inputType": "text",
+     "props": {
+      "label": "Policy number",
+      "helpText": {
+       "markdown": "P-{PRODUCT_CODE}-{YYYY}-{000000}."
+      }
+     }
+    }
+   },
+   "request_reference": {
+    "type": "string",
+    "title": "Request reference",
+    "ui": {
+     "inputType": "text",
+     "props": {
+      "label": "Request reference"
+     }
+    }
+   },
+   "request_status": {
+    "type": "string",
+    "title": "Request status",
+    "enum": [
+     "DRAFT",
+     "SUBMITTED",
+     "REFERRED",
+     "APPROVED",
+     "DECLINED"
+    ],
+    "ui": {
+     "inputType": "dropdown",
+     "props": {
+      "label": "Request status",
+      "options": [
+       {
+        "value": "DRAFT",
+        "text": "Draft"
+       },
+       {
+        "value": "SUBMITTED",
+        "text": "Submitted"
+       },
+       {
+        "value": "REFERRED",
+        "text": "Referred"
+       },
+       {
+        "value": "APPROVED",
+        "text": "Approved"
+       },
+       {
+        "value": "DECLINED",
+        "text": "Declined"
+       }
       ]
+     }
     }
+   },
+   "publisher_ref": {
+    "type": "string",
+    "title": "Publisher reference",
+    "ui": {
+     "inputType": "text",
+     "props": {
+      "label": "Publisher reference",
+      "helpText": {
+       "markdown": "The publisher-side record id this request became, so the return projection can match back."
+      }
+     }
+    }
+   },
+   "claim_number": {
+    "type": "string",
+    "title": "Claim number",
+    "ui": {
+     "inputType": "text",
+     "props": {
+      "label": "Claim number",
+      "helpText": {
+       "markdown": "CLM-{PRODUCT_CODE}-{YYYY}-{000000}. Empty until the publisher mints one."
+      }
+     }
+    }
+   },
+   "date_of_loss": {
+    "type": "string",
+    "title": "Date of loss",
+    "format": "date-time",
+    "ui": {
+     "inputType": "date",
+     "props": {
+      "label": "Date of loss"
+     }
+    }
+   },
+   "loss_description": {
+    "type": "string",
+    "title": "Loss description",
+    "ui": {
+     "inputType": "textarea",
+     "props": {
+      "label": "Loss description"
+     }
+    }
+   },
+   "attachments": {
+    "type": "array",
+    "title": "Attachments",
+    "description": "FNOL supporting documents. CORRECTED at G1: an `uploader` input type DOES exist (microstrate records.utils.ts inputOptionsForType, added 2026-08-10; quiva-records-mcp's catalogue was stale and has been updated). It is not used here because it binds an array of STRINGS and stores file paths only, which would drop file_name and content_type. Wave 2 must choose: keep this object shape and author a custom control, or flatten to string[] object keys and read the metadata back from the object store.",
+    "items": {
+     "type": "object",
+     "properties": {
+      "file_name": {
+       "type": "string",
+       "title": "File name",
+       "ui": {
+        "inputType": "text",
+        "props": {
+         "label": "File name"
+        }
+       }
+      },
+      "object_key": {
+       "type": "string",
+       "title": "Object key",
+       "ui": {
+        "inputType": "text",
+        "props": {
+         "label": "Object key"
+        }
+       }
+      },
+      "uploaded_at": {
+       "type": "string",
+       "format": "date-time",
+       "title": "Uploaded at",
+       "ui": {
+        "inputType": "date",
+        "props": {
+         "label": "Uploaded at"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "views": {
+  "table": {
+   "type": "table",
+   "columns": [
+    {
+     "field": "request_reference",
+     "order": 1
+    },
+    {
+     "field": "policy_number",
+     "order": 2
+    },
+    {
+     "field": "request_status",
+     "order": 3
+    },
+    {
+     "field": "owner_user_id",
+     "order": 4
+    },
+    {
+     "field": "submitted_at",
+     "order": 5
+    },
+    {
+     "field": "claim_number",
+     "order": 6
+    },
+    {
+     "field": "date_of_loss",
+     "order": 7
+    }
+   ]
+  }
+ },
+ "index_fields": [
+  {
+   "field": "request_reference",
+   "type": "keyword"
   },
-  "index_fields": [
-    {
-      "field": "request_reference",
-      "type": "keyword"
-    },
-    {
-      "field": "policy_number",
-      "type": "keyword"
-    },
-    {
-      "field": "owner_user_id",
-      "type": "keyword"
-    },
-    {
-      "field": "request_status",
-      "type": "keyword"
-    },
-    {
-      "field": "submitted_at",
-      "type": "datetime"
-    },
-    {
-      "field": "version",
-      "type": "numeric"
-    },
-    {
-      "field": "publisher_ref",
-      "type": "keyword"
-    },
-    {
-      "field": "claim_number",
-      "type": "keyword"
-    },
-    {
-      "field": "date_of_loss",
-      "type": "datetime"
-    }
-  ]
+  {
+   "field": "policy_number",
+   "type": "keyword"
+  },
+  {
+   "field": "owner_user_id",
+   "type": "keyword"
+  },
+  {
+   "field": "request_status",
+   "type": "keyword"
+  },
+  {
+   "field": "submitted_at",
+   "type": "datetime"
+  },
+  {
+   "field": "version",
+   "type": "numeric"
+  },
+  {
+   "field": "publisher_ref",
+   "type": "keyword"
+  },
+  {
+   "field": "claim_number",
+   "type": "keyword"
+  },
+  {
+   "field": "date_of_loss",
+   "type": "datetime"
+  }
+ ]
 }
