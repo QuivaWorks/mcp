@@ -140,6 +140,13 @@ tool(
 // Record configs
 // ---------------------------------------------------------------------------
 
+// index_fields declares which payload fields the indexer lifts (P9). Shape:
+// { field | key, type?, sortable? }. The contract artefact's `opts` digit string
+// is derived and is NOT part of the API payload — do not send it.
+const indexFieldsField = jsonValue.describe(
+  'Array of { field (or key), type?: keyword|text|text_sortable|numeric|datetime, sortable?: boolean }'
+);
+
 tool(
   'list_record_configs',
   'List record configurations. Optionally pass `ids` to batch-fetch specific configs. Call this first to discover available record types.',
@@ -166,9 +173,10 @@ tool(
     label: z.string().optional(),
     schema: schemaField,
     views: viewsField.optional(),
+    index_fields: indexFieldsField.optional(),
     skip_local_validation: z.boolean().default(false).describe('Set true only to intentionally bypass the local validator'),
   },
-  async ({ id, name, description, label, schema, views, skip_local_validation }) => {
+  async ({ id, name, description, label, schema, views, index_fields, skip_local_validation }) => {
     const config = { id, name, description, label, schema, views };
     let validation = null;
     if (!skip_local_validation) {
@@ -181,6 +189,7 @@ tool(
     if (description !== undefined) body.description = description;
     if (label !== undefined) body.label = label;
     if (views !== undefined) body.views = views;
+    if (index_fields !== undefined) body.index_fields = index_fields;
     const created = await client.post('/records/config', body);
     return validation?.warnings?.length ? { ...wrap(created), warnings: validation.warnings } : created;
   }
@@ -196,15 +205,17 @@ tool(
     label: z.string().optional(),
     schema: schemaField.optional(),
     views: viewsField.optional(),
+    index_fields: indexFieldsField.optional(),
     skip_local_validation: z.boolean().default(false),
   },
-  async ({ id, name, description, label, schema, views, skip_local_validation }) => {
+  async ({ id, name, description, label, schema, views, index_fields, skip_local_validation }) => {
     const body = {};
     if (name !== undefined) body.name = name;
     if (description !== undefined) body.description = description;
     if (label !== undefined) body.label = label;
     if (schema !== undefined) body.schema = schema;
     if (views !== undefined) body.views = views;
+    if (index_fields !== undefined) body.index_fields = index_fields;
 
     let validation = null;
     if (!skip_local_validation && (schema !== undefined || views !== undefined || name !== undefined)) {
