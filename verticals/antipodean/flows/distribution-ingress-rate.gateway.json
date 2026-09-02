@@ -1,0 +1,61 @@
+{
+ "_comment": [
+  "The gateway mapping for the distribution ingress. ONE mapping serves every",
+  "distributor: the path carries a chi route parameter, cerberus stamps it as the",
+  "x-param-distribution_id header, and the per-distributor isolation comes from the",
+  "msr- key, whose AllowEndpoints names one CONCRETE path. Measured: the pilot key",
+  "scoped to /d/DIST-PILOT-1/rate is 401'd on /d/DIST-OTHER-9/rate and on /decision.",
+  "",
+  "So the per-distributor provisioning cost is one KEY each, not one mapping each --",
+  "cheaper than plan section 8.7 assumed, and the key is the thing that must be",
+  "checked for, since the mapping is shared and always present."
+ ],
+ "gateway_id": "VWqPwSvI9DMS",
+ "url": "https://vwqpwsvi9dms.microstrate.io/d/{distribution_id}/rate",
+ "mapping": {
+  "gateway": "ms.gateway.VWqPwSvI9DMS.gateway",
+  "method": "POST",
+  "path": "/d/{distribution_id}/rate",
+  "is_public": false,
+  "timeout": 30000,
+  "limit": { "request": 600, "time": 1000 }
+ },
+ "mapping_version": {
+  "resource_type": "flow",
+  "resource": "ms.hub.config.workflow.3788449144.1929450446",
+  "invocation_type": "RequestResponse",
+  "active": true,
+  "description": "Distribution ingress: broker submit for one distributor"
+ },
+ "mapping_traffic_patch": {
+  "traffic_distribution": { "1": 100 },
+  "timeout": 30000,
+  "limit": { "request": 600, "time": 1000 },
+  "is_public": false
+ },
+ "msr_key": {
+  "_comment": [
+   "One per distributor. gateway_id is the ACCOUNT's gateway id and path is the",
+   "concrete mapping path -- cerberus matches `/{gateway_id}{path}` against the",
+   "request, and on a tenant gateway the request path it sees is prefixed with the",
+   "gateway id. Measured: gateway_id \"\" or a first-path-segment value is refused;",
+   "gateway_id VWqPwSvI9DMS with path /decision is accepted on POST /decision and",
+   "refused on POST /d/decision.",
+   "Restricted keys default to 90 days and GET /accounts/api-keys is supposed to",
+   "stop returning key material -- record the key at mint time regardless."
+  ],
+  "key_name": "dist-<distribution_id>-submit",
+  "scope": "account",
+  "expiry_days": 90,
+  "allow_endpoints": [
+   { "method": "post", "path": "/d/<distribution_id>/rate", "gateway_id": "VWqPwSvI9DMS" }
+  ]
+ },
+ "traps": [
+  "A digit-only value in config.static reaches the engine as a NUMBER: the flows MCP's jsonValue preprocess JSON.parses any digit-leading string. publisher_account_id \"9227248058\" arrived as 9227248058 and the submission write 400'd on schema validation. Coerce with String() inside the eval.",
+  "A `flow` node's payload object IS the sub-flow's $.trigger, flat. get_node_type_reference(\"flow\") documents a nested payload.payload; sending that makes the sub-flow read $.trigger.payload.* -- and flow 1 then normalises every fact to __unanswered and would have rated a BLANK submission rather than failing, had the occupation lookup not errored first.",
+  "x-url on a tenant gateway is /<gateway-id>/<mapping path>, NOT the path the client sent. Parse a route segment from the END, or use x-param-<name>.",
+  "An http node discards the response body on 4xx, so a rejected record write surfaces only as \"the function errored with status 400\". The failing node id is in list_errored_workflows; reproduce the write directly to see the reason.",
+  "Every records filter here is an exact keyword match in STORED case. Lowercasing a keyword filter returns zero hits with no error -- the lowercase rule applies to analysed text fields (prefix search), never to keyword equality. `folder` is queryable the same way even though it is not an index_fields entry."
+ ]
+}
