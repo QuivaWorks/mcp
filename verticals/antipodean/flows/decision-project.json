@@ -1,6 +1,6 @@
 {
  "name": "decision-project",
- "description": "Publisher side. Projects one decision to the distributor that owns the quote, by calling the DISTRIBUTOR's own gateway mapping (POST /decision) with the msr- key they minted for us. Callable with {decision_id} from any flow that writes or changes a decision -- flow 1 (underwriting-evaluate), flow 2 (quote-bind) and flow 11 (referral-decide) each need one `flow` node pointing here. It cannot be a record trigger: records-service only republishes a write that sets completed:true, and none of those flows does.",
+ "description": "Publisher side. Projects one decision to the distributor that owns the quote, by calling the DISTRIBUTOR's own gateway mapping (POST /decision) with the msr- key they minted for us. Callable with {decision_id}. It resolves the distributor and the submission version from the SUBMISSION, not the decision: measured, a BOUND decision written by flow 2 carries neither, so a projection that trusted the decision made every bind outcome undeliverable. It cannot be a record trigger: a record CREATE only republishes when the body sets completed:true, and none of flows 1, 2 or 11 does.",
  "config": {
   "static": {
    "distributors": {
@@ -39,14 +39,45 @@
     }
    },
    {
+    "id": "NEED_SUBMISSION",
+    "data": {
+     "id": "NEED_SUBMISSION",
+     "node_type": "eval",
+     "payload": {
+      "code": "(function () {\n  var d = (dec && dec.data) ? dec.data : {};\n  var sid = String(d.submission_id || '');\n  return {\n    submission_id: sid,\n    // A decision with no submission_id cannot be routed to anyone. Failing the\n    // run is the right failure for that: it is a malformed decision, not a\n    // transient condition, and both flow 1 and flow 2 do set it.\n    ok: sid !== ''\n  };\n})();",
+      "params": {
+       "dec": "$.LOAD_DECISION.data"
+      }
+     },
+     "name": "Which submission does it belong to?"
+    }
+   },
+   {
+    "id": "LOAD_SUBMISSION",
+    "data": {
+     "id": "LOAD_SUBMISSION",
+     "node_type": "http",
+     "payload": {
+      "url": "https://api.microstrate.io/records/submission_config/|$.NEED_SUBMISSION.submission_id",
+      "method": "GET",
+      "headers": {
+       "Authorization": "Bearer |$.env.auth_token",
+       "Content-Type": "application/json"
+      }
+     },
+     "name": "Load the submission (by id, so it cannot race the index)"
+    }
+   },
+   {
     "id": "RESOLVE",
     "data": {
      "id": "RESOLVE",
      "node_type": "eval",
      "payload": {
-      "code": "(function () {\n  var d = (dec && dec.data) ? dec.data : {};\n  var acct = String(d.distributor_account_id || '');\n  var row = (dists && dists[acct]) ? dists[acct] : null;\n  // The projection carries the OUTCOME, never the answers: the distributor\n  // already holds the answers (they are the broker's), and the ingress\n  // allowlist is the control on what crosses the other way.\n  var projection = {\n    quote_id: String(d.quote_id || ''),\n    submission_version: Number(d.submission_version || 0),\n    quote_reference: String(d.quote_reference || ''),\n    outcome: String(d.outcome || ''),\n    outcome_status: String(d.decision_status === 'ISSUED' ? 'ISSUED'\n                        : d.decision_status === 'DECLINED' ? 'DECLINED'\n                        : d.outcome === 'DECLINE' ? 'DECLINED'\n                        : d.outcome === 'BOUND' ? 'BOUND'\n                        : d.outcome === 'SANCTION_REFERRAL' ? 'SANCTION_REFERRAL'\n                        : 'REFERRED'),\n    product_code: String(d.product_code || ''),\n    product_version: String(d.product_version || ''),\n    decision_seq: Number(d.decision_seq || 0),\n    decided_at: String(d.decided_at || ''),\n    total_payable: Number(d.total_payable || 0),\n    premium_breakdown: {\n      base_premium: Number(d.base_premium || 0),\n      broker_commission: Number(d.broker_commission || 0),\n      fsl_levy: Number(d.fsl_levy || 0),\n      gst: Number(d.gst || 0),\n      stamp_duty: Number(d.stamp_duty || 0),\n      premium_basis: String(d.premium_basis || '')\n    },\n    reasons: Array.isArray(d.broker_reasons) ? d.broker_reasons : [],\n    documents: Array.isArray(d.issued_document_refs) ? d.issued_document_refs : [],\n    quote_validity_expiry: String(d.quote_validity_expiry || ''),\n    policy_number: String(d.policy_number || ''),\n    bound_at: String(d.bound_at || '')\n  };\n  return {\n    deliverable: row !== null && projection.quote_id !== '' && projection.submission_version > 0,\n    reason: row === null ? ('no distributor registered for account ' + acct)\n          : (projection.quote_id === '' ? 'decision carries no quote_id'\n          : (projection.submission_version > 0 ? '' : 'decision carries no submission_version')),\n    distributor_account_id: acct,\n    endpoint: row ? String(row.decision_url || '') : '',\n    projection: projection\n  };\n})();",
+      "code": "(function () {\n  var d = (dec && dec.data) ? dec.data : {};\n  var s = (sub && sub.data) ? sub.data : {};\n  // The submission wins for both fields: it is written once by the ingress and\n  // never updated, whereas a decision may be written by any of three flows and\n  // only one of them stamps them.\n  var acct = String(s.distributor_account_id || d.distributor_account_id || '');\n  var ver = Number(s.version || d.submission_version || 0);\n  var row = (dists && dists[acct]) ? dists[acct] : null;\n\n  // BOUND before ISSUED: quote-bind writes outcome BOUND with decision_status\n  // ISSUED, so reading decision_status first reports a bound policy as merely\n  // issued.\n  var status = String(d.outcome) === 'BOUND' ? 'BOUND'\n             : String(d.outcome) === 'SANCTION_REFERRAL' ? 'SANCTION_REFERRAL'\n             : String(d.decision_status) === 'ISSUED' ? 'ISSUED'\n             : String(d.decision_status) === 'DECLINED' ? 'DECLINED'\n             : String(d.outcome) === 'DECLINE' ? 'DECLINED'\n             : 'REFERRED';\n\n  // The projection carries the OUTCOME, never the answers: the distributor\n  // already holds the answers, because they are the broker's.\n  var projection = {\n    quote_id: String(d.quote_id || s.quote_id || ''),\n    submission_version: ver,\n    quote_reference: String(d.quote_reference || s.quote_reference || ''),\n    // quote_outcome_config.outcome enumerates ACCEPT/REFER/DECLINE ONLY, while\n    // decision_config.outcome also enumerates BOUND and SANCTION_REFERRAL.\n    // Sending the decision's value straight across 400s the outcome write on\n    // every bind -- the two enums are a field-authority mismatch across the\n    // crossing. The lifecycle value belongs in outcome_status, which does\n    // enumerate BOUND; outcome stays the underwriting verdict it always was.\n    outcome: (String(d.outcome) === 'DECLINE' ? 'DECLINE'\n            : String(d.outcome) === 'REFER' ? 'REFER'\n            : 'ACCEPT'),\n    outcome_status: status,\n    product_code: String(d.product_code || ''),\n    product_version: String(d.product_version || s.product_version || ''),\n    decision_seq: Number(d.decision_seq || 0),\n    decided_at: String(d.decided_at || ''),\n    total_payable: Number(d.total_payable || 0),\n    premium_breakdown: {\n      base_premium: Number(d.base_premium || 0),\n      broker_commission: Number(d.broker_commission || 0),\n      fsl_levy: Number(d.fsl_levy || 0),\n      gst: Number(d.gst || 0),\n      stamp_duty: Number(d.stamp_duty || 0),\n      premium_basis: String(d.premium_basis || '')\n    },\n    reasons: Array.isArray(d.broker_reasons) ? d.broker_reasons : [],\n    documents: Array.isArray(d.issued_document_refs) ? d.issued_document_refs : [],\n    quote_validity_expiry: String(d.quote_validity_expiry || ''),\n    policy_number: String(d.policy_number || ''),\n    bound_at: String(d.bound_at || '')\n  };\n\n  return {\n    deliverable: row !== null && projection.quote_id !== '' && ver > 0,\n    reason: row === null ? ('no distributor registered for account \"' + acct + '\"')\n          : (projection.quote_id === '' ? 'neither the decision nor its submission carries a quote_id'\n          : (ver > 0 ? '' : 'neither the decision nor its submission carries a submission version')),\n    distributor_account_id: acct,\n    endpoint: row ? String(row.decision_url || '') : '',\n    projection: projection\n  };\n})();",
       "params": {
        "dec": "$.LOAD_DECISION.data",
+       "sub": "$.LOAD_SUBMISSION.data",
        "dists": "$.static.distributors"
       }
      },
@@ -113,8 +144,18 @@
     "target": "LOAD_DECISION"
    },
    {
-    "id": "LOAD_DECISION-RESOLVE",
+    "id": "LOAD_DECISION-NEED_SUBMISSION",
     "source": "LOAD_DECISION",
+    "target": "NEED_SUBMISSION"
+   },
+   {
+    "id": "NEED_SUBMISSION-LOAD_SUBMISSION",
+    "source": "NEED_SUBMISSION",
+    "target": "LOAD_SUBMISSION"
+   },
+   {
+    "id": "LOAD_SUBMISSION-RESOLVE",
+    "source": "LOAD_SUBMISSION",
     "target": "RESOLVE"
    },
    {

@@ -1,0 +1,351 @@
+{
+ "name": "distribution-ingress-bind",
+ "description": "Publisher side. Gateway POST /d/{distribution_id}/bind. Holds the cross-tenancy check that quote-bind structurally cannot: quote-bind is reached by decision_id and has no way to know which distributor asked, so without this a distributor with a valid key for its own path could bind another distributor's quote by naming its id. Also holds bind idempotency on quote_id -- a duplicate bind returns the first outcome, never a second policy, and it decides that BEFORE any counter is touched. config.result names PREPARE_BIND, the last node every branch reaches.",
+ "config": {
+  "static": {
+   "space_id": "ANTIPODEAN",
+   "distribution_accounts": {
+    "DIST-PILOT-1": "9227248058"
+   }
+  },
+  "result": "$.PREPARE_BIND",
+  "nodes": [
+   {
+    "id": "TRIGGER_BIND_INGRESS",
+    "data": {
+     "id": "TRIGGER_BIND_INGRESS",
+     "node_type": "trigger",
+     "payload": {},
+     "name": "Broker bind (gateway POST /d/{distribution_id}/bind)"
+    }
+   },
+   {
+    "id": "INGRESS_BIND",
+    "data": {
+     "id": "INGRESS_BIND",
+     "node_type": "eval",
+     "payload": {
+      "code": "(function () {\n  var h = hdrs || {};\n  var distId = String(h['x-param-distribution_id'] || '');\n  if (distId === '') {\n    // x-url on a tenant gateway is /<gateway-id>/<mapping path>, so the route\n    // param is the second-to-last segment of /d/<id>/bind. Measured: the\n    // deployed cerberus sends NO x-param-* headers at all, so this fallback is\n    // not a fallback -- it is the only route, and counting from the front gets\n    // the gateway id.\n    var u = String(h['x-url'] || '').split('/');\n    distId = u.length >= 2 ? u[u.length - 2] : '';\n  }\n  var p = trg || {};\n  var quoteId = String(p.quote_id == null ? '' : p.quote_id);\n  if (!/^[A-Za-z0-9_-]{1,128}$/.test(quoteId)) quoteId = '';\n  var problems = [];\n  if (distId === '') problems.push('no distribution id on the request path');\n  if (quoteId === '') problems.push('missing or malformed quote_id');\n  return {\n    ok: problems.length === 0,\n    problems: problems,\n    distribution_id: distId,\n    quote_id: quoteId,\n    inception_date: String(p.inception_date || ''),\n    policyholder_name: String(p.policyholder_name || ''),\n    broker_email: String(p.broker_email || ''),\n    broker_filter: JSON.stringify([{ field: 'distribution_id', keyword: distId }]),\n    decision_filter: JSON.stringify([{ field: 'quote_id', keyword: quoteId }])\n  };\n})();",
+      "params": {
+       "trg": "$.trigger",
+       "hdrs": "$.env.headers"
+      }
+     },
+     "name": "Ingress: resolve the distributor"
+    }
+   },
+   {
+    "id": "LOAD_BROKER",
+    "data": {
+     "id": "LOAD_BROKER",
+     "node_type": "http",
+     "payload": {
+      "url": "https://api.microstrate.io/records",
+      "method": "GET",
+      "headers": {
+       "Authorization": "Bearer |$.env.auth_token",
+       "Content-Type": "application/json"
+      },
+      "query": {
+       "space_id": "$.static.space_id",
+       "config_id": "broker_config",
+       "filter": "$.INGRESS_BIND.broker_filter",
+       "limit": 5
+      }
+     },
+     "name": "Load the distribution"
+    }
+   },
+   {
+    "id": "LOAD_DECISIONS",
+    "data": {
+     "id": "LOAD_DECISIONS",
+     "node_type": "http",
+     "payload": {
+      "url": "https://api.microstrate.io/records",
+      "method": "GET",
+      "headers": {
+       "Authorization": "Bearer |$.env.auth_token",
+       "Content-Type": "application/json"
+      },
+      "query": {
+       "space_id": "$.static.space_id",
+       "config_id": "decision_config",
+       "filter": "$.INGRESS_BIND.decision_filter",
+       "limit": 20
+      }
+     },
+     "name": "Decisions held for this quote"
+    }
+   },
+   {
+    "id": "PREPARE_BIND",
+    "data": {
+     "id": "PREPARE_BIND",
+     "node_type": "eval",
+     "payload": {
+      "code": "(function () {\n  if (!ing.ok) return { action: 'refuse', accepted: false, reason: ing.problems.join('; '), quote_id: ing.quote_id, decision_id: '' };\n\n  var acct = String((accounts && accounts[ing.distribution_id]) || '');\n  if (acct === '') return { action: 'refuse', accepted: false, reason: 'distribution ' + ing.distribution_id + ' has no account registered', quote_id: ing.quote_id, decision_id: '' };\n\n  var brows = (brk && brk.results) ? brk.results : [];\n  var bseen = {}, buniq = [];\n  for (var i = 0; i < brows.length; i++) { var b = brows[i] || {}; if (!b.id || bseen[b.id]) continue; bseen[b.id] = true; buniq.push(b); }\n  if (buniq.length === 0) return { action: 'refuse', accepted: false, reason: 'no distribution registered as ' + ing.distribution_id, quote_id: ing.quote_id, decision_id: '' };\n  var bd = buniq[0].data || {};\n  if (String(bd.broker_status) !== 'active') return { action: 'refuse', accepted: false, reason: 'distribution ' + ing.distribution_id + ' is ' + String(bd.broker_status), quote_id: ing.quote_id, decision_id: '' };\n\n  var drows = (decs && decs.results) ? decs.results : [];\n  var dseen = {}, best = null, bound = null, foreign = 0;\n  for (var j = 0; j < drows.length; j++) {\n    var r = drows[j] || {};\n    if (!r.id || dseen[r.id]) continue;\n    dseen[r.id] = true;\n    var d = r.data || {};\n    if (String(d.distributor_account_id || '') !== acct) { foreign++; continue; }\n    if (String(d.outcome) === 'BOUND' || String(d.policy_number || '') !== '') {\n      if (bound === null || Number(d.decision_seq || 0) > Number((bound.data && bound.data.decision_seq) || 0)) bound = r;\n    }\n    if (String(d.outcome) === 'ACCEPT') {\n      if (best === null || Number(d.decision_seq || 0) > Number((best.data && best.data.decision_seq) || 0)) best = r;\n    }\n  }\n\n  // Idempotency on quote_id: a duplicate bind returns the first outcome, never\n  // a second policy. quote-bind's own CHECK_EXISTING_POLICY is the second line\n  // of defence, not the first -- by the time it runs a counter may already have\n  // been touched.\n  if (bound !== null) {\n    return { action: 'already_bound', accepted: true, reason: 'this quote is already bound', quote_id: ing.quote_id,\n             decision_id: bound.id, policy_number: String((bound.data && bound.data.policy_number) || '') };\n  }\n  if (best === null) {\n    return { action: 'refuse', accepted: false,\n             reason: foreign > 0\n               ? 'no ACCEPT decision for this quote belongs to ' + ing.distribution_id + ' (' + foreign + ' decision(s) belong to another distributor)'\n               : 'no ACCEPT decision for this quote',\n             quote_id: ing.quote_id, decision_id: '' };\n  }\n  var bdata = best.data || {};\n  return { action: 'bind', accepted: true, reason: '', quote_id: ing.quote_id, decision_id: best.id,\n           broker_id: String(bd.broker_id || ''),\n           policyholder_name: ing.policyholder_name || String(bdata.policyholder_name || ''),\n           broker_email: ing.broker_email || String(bd.primary_contact_email || ''),\n           inception_date: ing.inception_date };\n})();",
+      "params": {
+       "ing": "$.INGRESS_BIND",
+       "brk": "$.LOAD_BROKER.data",
+       "decs": "$.LOAD_DECISIONS.data",
+       "accounts": "$.static.distribution_accounts"
+      }
+     },
+     "name": "Gate, tenancy check and bind idempotency"
+    }
+   },
+   {
+    "id": "BIND_GATE",
+    "data": {
+     "id": "BIND_GATE",
+     "node_type": "condition",
+     "payload": [
+      {
+       "condition": {
+        "operator": "=",
+        "input": [
+         "$.PREPARE_BIND.action",
+         "refuse"
+        ]
+       },
+       "outcome": "REFUSE_BIND"
+      },
+      {
+       "condition": {
+        "operator": "=",
+        "input": [
+         "$.PREPARE_BIND.action",
+         "already_bound"
+        ]
+       },
+       "outcome": "ALREADY_BOUND"
+      },
+      {
+       "outcome": "RUN_BIND"
+      }
+     ],
+     "name": "Refuse, replay or bind"
+    }
+   },
+   {
+    "id": "REFUSE_BIND",
+    "data": {
+     "id": "REFUSE_BIND",
+     "node_type": "error",
+     "payload": {
+      "message": "Bind refused: |$.PREPARE_BIND.reason",
+      "status_code": 409
+     },
+     "name": "Refuse"
+    }
+   },
+   {
+    "id": "ALREADY_BOUND",
+    "data": {
+     "id": "ALREADY_BOUND",
+     "node_type": "eval",
+     "payload": {
+      "code": "(function(){ return { already_bound:true, decision_id:d, policy_number:p }; })();",
+      "params": {
+       "d": "$.PREPARE_BIND.decision_id",
+       "p": "$.PREPARE_BIND.policy_number"
+      }
+     },
+     "name": "Already bound"
+    }
+   },
+   {
+    "id": "RUN_BIND",
+    "data": {
+     "id": "RUN_BIND",
+     "node_type": "flow",
+     "payload": {
+      "decision_id": "$.PREPARE_BIND.decision_id",
+      "broker_id": "$.PREPARE_BIND.broker_id",
+      "policyholder_name": "$.PREPARE_BIND.policyholder_name",
+      "broker_email": "$.PREPARE_BIND.broker_email",
+      "inception_date": "$.PREPARE_BIND.inception_date"
+     },
+     "name": "Bind (flow 2)",
+     "subject": "ms.hub.config.workflow.3788449144.2185216717",
+     "await": true
+    }
+   },
+   {
+    "id": "INDEX_SETTLE",
+    "data": {
+     "id": "INDEX_SETTLE",
+     "node_type": "delay",
+     "payload": {
+      "time_ms": 6000
+     },
+     "name": "Let the index catch up (1s flush ticker)"
+    }
+   },
+   {
+    "id": "FIND_BOUND",
+    "data": {
+     "id": "FIND_BOUND",
+     "node_type": "http",
+     "payload": {
+      "url": "https://api.microstrate.io/records",
+      "method": "GET",
+      "headers": {
+       "Authorization": "Bearer |$.env.auth_token",
+       "Content-Type": "application/json"
+      },
+      "query": {
+       "space_id": "$.static.space_id",
+       "config_id": "decision_config",
+       "filter": "$.INGRESS_BIND.decision_filter",
+       "limit": 20
+      }
+     },
+     "name": "Find the BOUND decision"
+    }
+   },
+   {
+    "id": "CHOOSE_BOUND",
+    "data": {
+     "id": "CHOOSE_BOUND",
+     "node_type": "eval",
+     "payload": {
+      "code": "(function () {\n  var rows = (q && q.results) ? q.results : [];\n  var seen = {}, bound = null, newest = null;\n  for (var i = 0; i < rows.length; i++) {\n    var r = rows[i] || {};\n    if (!r.id || seen[r.id]) continue;\n    seen[r.id] = true;\n    var seq = Number((r.data && r.data.decision_seq) || 0);\n    if (newest === null || seq > Number((newest.data && newest.data.decision_seq) || 0)) newest = r;\n    if (String(r.data && r.data.outcome) === 'BOUND' || String((r.data && r.data.policy_number) || '') !== '') {\n      if (bound === null || seq > Number((bound.data && bound.data.decision_seq) || 0)) bound = r;\n    }\n  }\n  return {\n    decision_id: bound ? bound.id : '',\n    found: bound !== null,\n    reason: bound !== null ? '' : 'the BOUND decision is not visible in the index yet; the bind itself succeeded'\n  };\n})();",
+      "params": {
+       "q": "$.FIND_BOUND.data"
+      }
+     },
+     "name": "Newest decision for this quote"
+    }
+   },
+   {
+    "id": "PROJECT_GATE",
+    "data": {
+     "id": "PROJECT_GATE",
+     "node_type": "condition",
+     "payload": [
+      {
+       "condition": {
+        "operator": "=",
+        "input": [
+         "$.CHOOSE_BOUND.found",
+         false
+        ]
+       },
+       "outcome": "PROJECTION_DEFERRED"
+      },
+      {
+       "outcome": "PROJECT_BIND"
+      }
+     ],
+     "name": "Is the BOUND decision visible yet?"
+    }
+   },
+   {
+    "id": "PROJECTION_DEFERRED",
+    "data": {
+     "id": "PROJECTION_DEFERRED",
+     "node_type": "eval",
+     "payload": {
+      "code": "(function(){ return { bound:true, projected:false, reason:r }; })();",
+      "params": {
+       "r": "$.CHOOSE_BOUND.reason"
+      }
+     },
+     "name": "Bind succeeded, projection deferred"
+    }
+   },
+   {
+    "id": "PROJECT_BIND",
+    "data": {
+     "id": "PROJECT_BIND",
+     "node_type": "flow",
+     "payload": {
+      "decision_id": "$.CHOOSE_BOUND.decision_id"
+     },
+     "name": "Project the bind outcome back",
+     "subject": "ms.hub.config.workflow.3788449144.3892168891",
+     "await": true
+    }
+   }
+  ],
+  "edges": [
+   {
+    "id": "TRIGGER_BIND_INGRESS-INGRESS_BIND",
+    "source": "TRIGGER_BIND_INGRESS",
+    "target": "INGRESS_BIND"
+   },
+   {
+    "id": "INGRESS_BIND-LOAD_BROKER",
+    "source": "INGRESS_BIND",
+    "target": "LOAD_BROKER"
+   },
+   {
+    "id": "INGRESS_BIND-LOAD_DECISIONS",
+    "source": "INGRESS_BIND",
+    "target": "LOAD_DECISIONS"
+   },
+   {
+    "id": "LOAD_BROKER-PREPARE_BIND",
+    "source": "LOAD_BROKER",
+    "target": "PREPARE_BIND"
+   },
+   {
+    "id": "LOAD_DECISIONS-PREPARE_BIND",
+    "source": "LOAD_DECISIONS",
+    "target": "PREPARE_BIND"
+   },
+   {
+    "id": "PREPARE_BIND-BIND_GATE",
+    "source": "PREPARE_BIND",
+    "target": "BIND_GATE"
+   },
+   {
+    "id": "BIND_GATE-REFUSE_BIND",
+    "source": "BIND_GATE",
+    "target": "REFUSE_BIND"
+   },
+   {
+    "id": "BIND_GATE-ALREADY_BOUND",
+    "source": "BIND_GATE",
+    "target": "ALREADY_BOUND"
+   },
+   {
+    "id": "BIND_GATE-RUN_BIND",
+    "source": "BIND_GATE",
+    "target": "RUN_BIND"
+   },
+   {
+    "id": "RUN_BIND-INDEX_SETTLE",
+    "source": "RUN_BIND",
+    "target": "INDEX_SETTLE"
+   },
+   {
+    "id": "INDEX_SETTLE-FIND_BOUND",
+    "source": "INDEX_SETTLE",
+    "target": "FIND_BOUND"
+   },
+   {
+    "id": "FIND_BOUND-CHOOSE_BOUND",
+    "source": "FIND_BOUND",
+    "target": "CHOOSE_BOUND"
+   },
+   {
+    "id": "CHOOSE_BOUND-PROJECT_GATE",
+    "source": "CHOOSE_BOUND",
+    "target": "PROJECT_GATE"
+   },
+   {
+    "id": "PROJECT_GATE-PROJECTION_DEFERRED",
+    "source": "PROJECT_GATE",
+    "target": "PROJECTION_DEFERRED"
+   },
+   {
+    "id": "PROJECT_GATE-PROJECT_BIND",
+    "source": "PROJECT_GATE",
+    "target": "PROJECT_BIND"
+   }
+  ]
+ }
+}
