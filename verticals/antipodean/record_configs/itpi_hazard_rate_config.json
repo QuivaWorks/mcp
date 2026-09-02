@@ -1,0 +1,29 @@
+{
+  "id": "itpi_hazard_rate_config",
+  "name": "ITPI Rate by Hazard Class",
+  "description": "Publisher-side (Antipodean) ITPI rating table, loaded by P22 from verticals/antipodean/reference/. Held as records rather than inlined in the engine flow so a rate change is an edit, not a deploy. 21 of the sheet's 100 classes carry a rate; the other 79 read 'Not in use' and are not loaded. Class 99 carries 1.0 for both sections, which is a sentinel rather than a rate \u2014 no occupation in Rates.csv is assigned it. Classes 1-20 are exactly linear (rate_pi = 0.00473 x (class + 1)) and rate_pl is exactly 1.5% of rate_pi, but they are stored as supplied rather than computed: the sheet is the authority and it may stop being linear.",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "hazard_class": {
+        "type": "number",
+        "description": "1-20, or 99."
+      },
+      "rate_pi": {
+        "type": "number",
+        "description": "Cover Section A (professional indemnity) rate."
+      },
+      "rate_pl": {
+        "type": "number",
+        "description": "Cover Section B (public liability) rate."
+      }
+    }
+  },
+  "index_fields": [
+    {
+      "field": "hazard_class",
+      "type": "numeric"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "config_id": "itpi_excess_factor_config",
+  "csv": "../itpi-excess-factors.csv",
+  "contract": {
+    "file": "../../../../../evari-olympus/.worktrees/antipodean-delivery-plan/docs/antipodean spec/contracts/02-index-fields.json",
+    "config": "itpi_excess_factor_config"
+  },
+  "space_id": "ANTIPODEAN",
+  "identity_fields": [
+    "excess"
+  ],
+  "columns": [
+    {
+      "csv": "excess",
+      "key": "excess",
+      "as": "number"
+    },
+    {
+      "csv": "factor",
+      "key": "factor",
+      "as": "number"
+    }
+  ]
+}

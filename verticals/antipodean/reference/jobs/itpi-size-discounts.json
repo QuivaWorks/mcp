@@ -1,0 +1,33 @@
+{
+  "config_id": "itpi_size_discount_config",
+  "csv": "../itpi-size-discounts.csv",
+  "contract": {
+    "file": "../../../../../evari-olympus/.worktrees/antipodean-delivery-plan/docs/antipodean spec/contracts/02-index-fields.json",
+    "config": "itpi_size_discount_config"
+  },
+  "space_id": "ANTIPODEAN",
+  "identity_fields": [
+    "band_id"
+  ],
+  "columns": [
+    {
+      "csv": "band_id",
+      "key": "band_id"
+    },
+    {
+      "csv": "revenue_min",
+      "key": "revenue_min",
+      "as": "number"
+    },
+    {
+      "csv": "revenue_max",
+      "key": "revenue_max",
+      "as": "number"
+    },
+    {
+      "csv": "discount_percent",
+      "key": "discount_percent",
+      "as": "number"
+    }
+  ]
+}

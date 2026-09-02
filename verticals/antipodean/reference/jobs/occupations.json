@@ -1,0 +1,150 @@
+{
+  "config_id": "occupation_config",
+  "csv": "../occupations.csv",
+  "contract": {
+    "file": "../../../../../evari-olympus/.worktrees/antipodean-delivery-plan/docs/antipodean spec/contracts/02-index-fields.json",
+    "config": "occupation_config"
+  },
+  "space_id": "ANTIPODEAN",
+  "identity_fields": [
+    "occupation_code"
+  ],
+  "columns": [
+    {
+      "csv": "occupation_code",
+      "key": "occupation_code"
+    },
+    {
+      "csv": "occupation_label",
+      "key": "occupation_label"
+    },
+    {
+      "csv": "occupation_category",
+      "key": "occupation_category"
+    },
+    {
+      "csv": "occupation_active",
+      "key": "occupation_active"
+    },
+    {
+      "csv": "itpi_eligibility",
+      "key": "itpi_eligibility"
+    },
+    {
+      "csv": "itpi_question_set",
+      "key": "itpi_question_set"
+    },
+    {
+      "csv": "itpi_hazard_class",
+      "key": "itpi_hazard_class"
+    },
+    {
+      "csv": "itpi_min_excess",
+      "key": "itpi_min_excess",
+      "as": "number"
+    },
+    {
+      "csv": "itpi_min_premium",
+      "key": "itpi_min_premium",
+      "as": "number"
+    },
+    {
+      "csv": "itpi_default_limit_pi",
+      "key": "itpi_default_limit_pi",
+      "as": "number"
+    },
+    {
+      "csv": "itpi_default_ri_pi",
+      "key": "itpi_default_ri_pi"
+    },
+    {
+      "csv": "itpi_default_limit_ppl",
+      "key": "itpi_default_limit_ppl",
+      "as": "number"
+    },
+    {
+      "csv": "itpi_endorsements",
+      "key": "itpi_endorsements",
+      "as": "list",
+      "separator": ";"
+    },
+    {
+      "csv": "itpi_wording",
+      "key": "itpi_wording"
+    },
+    {
+      "csv": "ah_eligibility",
+      "key": "ah_eligibility"
+    },
+    {
+      "csv": "ah_question_set",
+      "key": "ah_question_set"
+    },
+    {
+      "csv": "ah_hazard_class",
+      "key": "ah_hazard_class"
+    },
+    {
+      "csv": "ah_min_excess",
+      "key": "ah_min_excess",
+      "as": "number"
+    },
+    {
+      "csv": "ah_min_premium",
+      "key": "ah_min_premium",
+      "as": "number"
+    },
+    {
+      "csv": "ah_default_limit",
+      "key": "ah_default_limit"
+    },
+    {
+      "csv": "ah_endorsements",
+      "key": "ah_endorsements",
+      "as": "list",
+      "separator": ";"
+    },
+    {
+      "csv": "ah_wording",
+      "key": "ah_wording"
+    },
+    {
+      "csv": "gp_eligibility",
+      "key": "gp_eligibility"
+    },
+    {
+      "csv": "gp_question_set",
+      "key": "gp_question_set"
+    },
+    {
+      "csv": "gp_hazard_class",
+      "key": "gp_hazard_class"
+    },
+    {
+      "csv": "gp_min_excess",
+      "key": "gp_min_excess",
+      "as": "number"
+    },
+    {
+      "csv": "gp_min_premium",
+      "key": "gp_min_premium",
+      "as": "number"
+    },
+    {
+      "csv": "gp_default_limit",
+      "key": "gp_default_limit",
+      "as": "number"
+    },
+    {
+      "csv": "gp_endorsements",
+      "key": "gp_endorsements",
+      "as": "list",
+      "separator": ";"
+    },
+    {
+      "csv": "gp_wording",
+      "key": "gp_wording"
+    }
+  ],
+  "parent_folder_column": "occupation_category"
+}
