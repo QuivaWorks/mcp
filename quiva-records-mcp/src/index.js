@@ -247,9 +247,28 @@ tool(
   async ({ config_id }) => client.get(`/records/${encodeURIComponent(config_id)}`)
 );
 
+// A payload filter narrows on a field the config DECLARED in index_fields. A
+// field the index does not carry returns an empty page with a 200, which looks
+// exactly like a filter that legitimately matched nothing — so check
+// get_record_config().index_fields before believing an empty result.
+const filterCondition = z
+  .object({
+    field: z.string().describe('Payload field, named as declared in index_fields'),
+    keyword: z.string().optional().describe('Exact match on a keyword field'),
+    term: z.string().optional().describe('Token match on a text field'),
+    operator: z.string().optional().describe('"and" (default) or "or" for a nested group'),
+    exact: z.number().optional(),
+    min: z.number().optional(),
+    max: z.number().optional(),
+    date_start: z.string().optional(),
+    date_end: z.string().optional(),
+    conditions: z.array(z.any()).optional().describe('Nested group; max depth 4'),
+  })
+  .passthrough();
+
 tool(
   'query_records',
-  'Search records by folder and/or space (index-backed). Requires folder OR space_id, and a Bearer-JWT credential (used to derive the tenant) — an API key alone is rejected here. Optionally narrow by config_id(s) and page with limit/offset. Sorted by created_at.',
+  'Search records by folder and/or space (index-backed). Requires folder OR space_id, and a Bearer-JWT credential (used to derive the tenant) — an API key alone is rejected here. Narrow by config_id(s), by a payload `filter` over DECLARED index_fields, and page with limit/offset. Sorted by created_at unless sort_by is given.',
   {
     folder: z.string().optional().describe('Folder id (folder or space_id required)'),
     space_id: z.string().optional().describe('Space id (folder or space_id required)'),
@@ -257,10 +276,15 @@ tool(
       .union([z.string(), z.array(z.string())])
       .optional()
       .describe('One config id → AND filter; multiple → OR group'),
+    filter: z
+      .union([z.array(filterCondition), z.object({ conditions: z.array(filterCondition), sort_by: z.string().optional() }).passthrough()])
+      .optional()
+      .describe('Conditions over declared index_fields — an array, or { conditions, sort_by }. Max depth 4, 50 conditions'),
+    sort_by: z.string().optional().describe('Declared index field to sort by, "-field" to reverse'),
     limit: z.number().int().positive().optional(),
     offset: z.number().int().nonnegative().optional(),
   },
-  async ({ folder, space_id, config_id, limit, offset }) => {
+  async ({ folder, space_id, config_id, filter, sort_by, limit, offset }) => {
     if (!folder && !space_id) {
       throw new Error('folder or space_id is required for query_records');
     }
@@ -268,6 +292,10 @@ tool(
     if (config_id !== undefined) {
       query.config_id = Array.isArray(config_id) ? config_id.join(',') : config_id;
     }
+    // The service takes the filter as JSON in the query string; a bare array is
+    // its shorthand for "just the conditions".
+    if (filter !== undefined) query.filter = JSON.stringify(filter);
+    if (sort_by !== undefined) query.sort_by = sort_by;
     return client.get('/records', query);
   }
 );
