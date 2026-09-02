@@ -1,6 +1,6 @@
 {
     "name": "quote-expiry",
-    "description": "Flow 10. The quote_validity_expiry per-entity timer (contract artefact 5 concern \"quote-expire\", name quote-expire:<quoteId>). A wake-up, not a decision: it re-reads every decision on the quote and every policy carrying that quote_id, and lapses only an OPEN, unsuperseded decision whose quote_validity_expiry has passed with no bind \u2014 a bound quote is proved twice over (a policy record, or a BOUND/ISSUED decision) and is never lapsed. The lapse is APPEND-ONLY per contract artefact 3: a new decision instance carrying origin_flow flow-10 and supersedes_decision_id records it, and the expiring instance gains decision_status SUPERSEDED plus the superseded_by forward pointer, so it leaves the decision_status:OPEN referral queue. It then moves the referral task filed under that decision id to \"lapsed\" (contract artefact 4 status 7), never touching one a person has already approved or declined. It deliberately does NOT write quote_outcome_config: that record is materialised by the return projection (plan 1.5), not by a publisher flow. Timer payload: {quote_id, decision_id?}. NOTE: nothing schedules this concern yet \u2014 artefact 5 A5-3 leaves the storing record open and decision_config has no quote_expire_timer_topic property.",
+    "description": "Flow 10. The quote_validity_expiry per-entity timer (contract artefact 5 concern \"quote-expire\", name quote-expire:<quoteId>). A wake-up, not a decision: it re-reads every decision on the quote and every policy carrying that quote_id, and lapses only an OPEN, unsuperseded decision whose quote_validity_expiry has passed with no bind — a bound quote is proved twice over (a policy record, or a BOUND/ISSUED decision) and is never lapsed. The lapse is APPEND-ONLY per contract artefact 3: a new decision instance carrying origin_flow flow-10 and supersedes_decision_id records it, and the expiring instance gains decision_status SUPERSEDED plus the superseded_by forward pointer, so it leaves the decision_status:OPEN referral queue. It then moves the referral task filed under that decision id to \"lapsed\" (contract artefact 4 status 7), never touching one a person has already approved or declined. It deliberately does NOT write quote_outcome_config: that record is materialised by the return projection (plan 1.5), not by a publisher flow. Timer payload: {quote_id, decision_id?}. NOTE: nothing schedules this concern yet — artefact 5 A5-3 leaves the storing record open and decision_config has no quote_expire_timer_topic property.",
     "config": {
         "static": {
             "api": "https://api.microstrate.io",
@@ -100,7 +100,7 @@
                     "name": "Lapse only an OPEN, unsuperseded, unbound, expired quote",
                     "node_type": "eval",
                     "payload": {
-                        "code": "(function () {\n  function iso(d) { return d.toISOString().replace(/\\.\\d{3}Z$/, 'Z'); }\n  function dedupe(resp) {\n    var rows = (resp && resp.data && resp.data.results) ? resp.data.results : [];\n    var seen = {}, out = [];\n    for (var i = 0; i < rows.length; i++) {\n      var r = rows[i];\n      if (!r || !r.id || seen[r.id]) continue;\n      seen[r.id] = 1; out.push(r);\n    }\n    return out;\n  }\n  var decisions = dedupe(dec);\n  var policies = dedupe(pol);\n\n  // A bound quote is never lapsed. Two independent proofs, because either one\n  // alone can be stale: a policy record on this quote_id, or a BOUND decision.\n  var bound = policies.length > 0;\n  for (var b = 0; b < decisions.length; b++) {\n    var bd = decisions[b].data || {};\n    if (bd.outcome === 'BOUND' || bd.decision_status === 'ISSUED') bound = true;\n  }\n\n  // decision_seq is THE ordering key \u2014 never submission_version, never\n  // decided_at (two publisher-side flows are not one clock).\n  var target = null;\n  for (var i = 0; i < decisions.length; i++) {\n    var d = decisions[i].data || {};\n    if (d.decision_status !== 'OPEN') continue;\n    if (d.superseded_by) continue;\n    if (hint && decisions[i].id !== hint) { /* a hint narrows but never widens */ }\n    if (!target) { target = decisions[i]; continue; }\n    var a = Number((target.data || {}).decision_seq || 0);\n    var c = Number(d.decision_seq || 0);\n    if (c > a) { target = decisions[i]; }\n    else if (c === a && String(d.decided_at || '') > String((target.data || {}).decided_at || '')) { target = decisions[i]; }\n  }\n  var td = target ? (target.data || {}) : {};\n  var expiry = td.quote_validity_expiry ? new Date(td.quote_validity_expiry) : null;\n  var expired = !!(expiry && !isNaN(expiry.getTime()) && Date.now() >= expiry.getTime());\n\n  var reasons = [];\n  if (!target) reasons.push('no_open_unsuperseded_decision');\n  if (bound) reasons.push('quote_is_bound');\n  if (target && !expired) reasons.push('quote_validity_expiry_not_reached');\n\n  var lapseSeq = Number((seq && (seq.value !== undefined ? seq.value : seq.count)) || 0);\n  var nowIso = iso(new Date());\n  return {\n    should_lapse: reasons.length === 0,\n    skip_reasons: reasons,\n    quote_id: String((trg && trg.quote_id) || ''),\n    decision_id: target ? String(target.id) : '',\n    submission_id: String(td.submission_id || ''),\n    submission_version: String(td.submission_version || ''),\n    product_code: String(td.product_code || ''),\n    product_version: String(td.product_version || ''),\n    distributor_account_id: String(td.distributor_account_id || ''),\n    outcome_carried: String(td.outcome || ''),\n    quote_validity_expiry: String(td.quote_validity_expiry || ''),\n    decisions_seen: decisions.length,\n    policies_seen: policies.length,\n    lapsed_at: nowIso,\n    // The append-only chain: a NEW instance records the lapse, and the\n    // predecessor gains the forward pointer. Nothing rewrites a decision's\n    // meaning in place.\n    lapse_record: {\n      quote_id: String((trg && trg.quote_id) || ''),\n      submission_id: String(td.submission_id || ''),\n      submission_version: String(td.submission_version || ''),\n      product_code: String(td.product_code || ''),\n      product_version: String(td.product_version || ''),\n      distributor_account_id: String(td.distributor_account_id || ''),\n      outcome: String(td.outcome || ''),\n      decision_status: 'SUPERSEDED',\n      origin_flow: 'flow-10',\n      decided_by: 'system-quote-expiry',\n      decided_at: nowIso,\n      decision_seq: lapseSeq,\n      quote_validity_expiry: String(td.quote_validity_expiry || ''),\n      supersedes_decision_id: target ? String(target.id) : '',\n      premium_basis: String(td.premium_basis || ''),\n      base_premium: Number(td.base_premium || 0),\n      total_payable: Number(td.total_payable || 0),\n      underwriter_notes: 'Lapsed by flow 10 quote-expiry: quote_validity_expiry '\n        + String(td.quote_validity_expiry || '') + ' passed with no bind.'\n    }\n  };\n})();",
+                        "code": "(function () {\n  function iso(d) { return d.toISOString().replace(/\\.\\d{3}Z$/, 'Z'); }\n  function dedupe(resp) {\n    var rows = (resp && resp.data && resp.data.results) ? resp.data.results : [];\n    var seen = {}, out = [];\n    for (var i = 0; i < rows.length; i++) {\n      var r = rows[i];\n      if (!r || !r.id || seen[r.id]) continue;\n      seen[r.id] = 1; out.push(r);\n    }\n    return out;\n  }\n  var decisions = dedupe(dec);\n  var policies = dedupe(pol);\n\n  // A bound quote is never lapsed. Two independent proofs, because either one\n  // alone can be stale: a policy record on this quote_id, or a BOUND decision.\n  var bound = policies.length > 0;\n  for (var b = 0; b < decisions.length; b++) {\n    var bd = decisions[b].data || {};\n    if (bd.outcome === 'BOUND' || bd.decision_status === 'ISSUED') bound = true;\n  }\n\n  // decision_seq is THE ordering key — never submission_version, never\n  // decided_at (two publisher-side flows are not one clock).\n  var target = null;\n  for (var i = 0; i < decisions.length; i++) {\n    var d = decisions[i].data || {};\n    if (d.decision_status !== 'OPEN') continue;\n    if (d.superseded_by) continue;\n    if (hint && decisions[i].id !== hint) { /* a hint narrows but never widens */ }\n    if (!target) { target = decisions[i]; continue; }\n    var a = Number((target.data || {}).decision_seq || 0);\n    var c = Number(d.decision_seq || 0);\n    if (c > a) { target = decisions[i]; }\n    else if (c === a && String(d.decided_at || '') > String((target.data || {}).decided_at || '')) { target = decisions[i]; }\n  }\n  var td = target ? (target.data || {}) : {};\n  var expiry = td.quote_validity_expiry ? new Date(td.quote_validity_expiry) : null;\n  var expired = !!(expiry && !isNaN(expiry.getTime()) && Date.now() >= expiry.getTime());\n\n  var reasons = [];\n  if (!target) reasons.push('no_open_unsuperseded_decision');\n  if (bound) reasons.push('quote_is_bound');\n  if (target && !expired) reasons.push('quote_validity_expiry_not_reached');\n\n  var lapseSeq = Number((seq && (seq.value !== undefined ? seq.value : seq.count)) || 0);\n  var nowIso = iso(new Date());\n  return {\n    should_lapse: reasons.length === 0,\n    skip_reasons: reasons,\n    quote_id: String((trg && trg.quote_id) || ''),\n    decision_id: target ? String(target.id) : '',\n    submission_id: String(td.submission_id || ''),\n    submission_version: String(td.submission_version || ''),\n    product_code: String(td.product_code || ''),\n    product_version: String(td.product_version || ''),\n    distributor_account_id: String(td.distributor_account_id || ''),\n    outcome_carried: String(td.outcome || ''),\n    quote_validity_expiry: String(td.quote_validity_expiry || ''),\n    decisions_seen: decisions.length,\n    policies_seen: policies.length,\n    lapsed_at: nowIso,\n    // The append-only chain: a NEW instance records the lapse, and the\n    // predecessor gains the forward pointer. Nothing rewrites a decision's\n    // meaning in place.\n    lapse_record: {\n      quote_id: String((trg && trg.quote_id) || ''),\n      submission_id: String(td.submission_id || ''),\n      submission_version: String(td.submission_version || ''),\n      product_code: String(td.product_code || ''),\n      product_version: String(td.product_version || ''),\n      distributor_account_id: String(td.distributor_account_id || ''),\n      outcome: String(td.outcome || ''),\n      decision_status: 'SUPERSEDED',\n      origin_flow: 'flow-10',\n      decided_by: 'system-quote-expiry',\n      decided_at: nowIso,\n      decision_seq: lapseSeq,\n      quote_validity_expiry: String(td.quote_validity_expiry || ''),\n      supersedes_decision_id: target ? String(target.id) : '',\n      premium_basis: String(td.premium_basis || ''),\n      base_premium: Number(td.base_premium || 0),\n      total_payable: Number(td.total_payable || 0),\n      underwriter_notes: 'Lapsed by flow 10 quote-expiry: quote_validity_expiry '\n        + String(td.quote_validity_expiry || '') + ' passed with no bind.'\n    }\n  };\n})();",
                         "params": {
                             "dec": "$.FIND_DECISIONS",
                             "pol": "$.FIND_POLICY",
@@ -182,7 +182,7 @@
                 "id": "FIND_TASKS",
                 "data": {
                     "id": "FIND_TASKS",
-                    "name": "The referral task filed under the decision id",
+                    "name": "The referral task under the legacy folder handle",
                     "node_type": "http",
                     "payload": {
                         "method": "GET",
@@ -204,9 +204,10 @@
                     "name": "Pick an unresolved referral task, if any",
                     "node_type": "eval",
                     "payload": {
-                        "code": "(function () {\n  var rows = (t && t.data && t.data.results) ? t.data.results\n           : ((t && t.results) ? t.results : []);\n  // artefact 4: a referral task's folder is the DECISION record id, because\n  // flow 11 needs an exact-match handle a task delta can never carry.\n  var found = null;\n  for (var i = 0; i < rows.length; i++) {\n    var x = rows[i];\n    var tags = x.tags || [];\n    var isReferral = false;\n    for (var j = 0; j < tags.length; j++) { if (tags[j] === 'referral') isReferral = true; }\n    // Never touch a task a person has already resolved. approved/declined are a\n    // person's decision and flow 11's trigger; lapsing one would be a lie.\n    if (!isReferral) continue;\n    if (x.status === 'approved' || x.status === 'declined' || x.status === 'lapsed') continue;\n    found = x; break;\n  }\n  return {\n    task_found: !!found,\n    task_id: found ? String(found.id) : '',\n    task_status_before: found ? String(found.status || '') : '',\n    candidates: rows.length\n  };\n})();",
+                        "code": "(function () {\n  function rowsOf(r) {\n    if (!r || typeof r !== 'object') return [];\n    if (r.data && r.data.results) return r.data.results;\n    if (r.results) return r.results;\n    return [];\n  }\n  // artefact 4, settled: `source` is the decision handle and `folder` is the\n  // brokerage. Both are read because flow 1's migration is not retroactive --\n  // a referral task raised before it still carries the decision id in `folder`,\n  // and lapsing is exactly the moment an old one surfaces. Source first, so a\n  // migrated task is never matched by a brokerage that happens to share the id.\n  var bySource = rowsOf(ts);\n  var byFolder = rowsOf(t);\n  var seen = {}, rows = [];\n  for (var a = 0; a < bySource.length; a++) { rows.push(bySource[a]); seen[String(bySource[a].id)] = 1; }\n  for (var b = 0; b < byFolder.length; b++) { if (!seen[String(byFolder[b].id)]) rows.push(byFolder[b]); }\n\n  var found = null;\n  for (var i = 0; i < rows.length; i++) {\n    var x = rows[i];\n    var tags = x.tags || [];\n    var isReferral = false;\n    for (var j = 0; j < tags.length; j++) { if (tags[j] === 'referral') isReferral = true; }\n    // Never touch a task a person has already resolved. approved/declined are a\n    // person's decision and flow 11's trigger; lapsing one would be a lie.\n    if (!isReferral) continue;\n    if (x.status === 'approved' || x.status === 'declined' || x.status === 'lapsed') continue;\n    found = x; break;\n  }\n  return {\n    task_found: !!found,\n    task_id: found ? String(found.id) : '',\n    task_status_before: found ? String(found.status || '') : '',\n    matched_via: found ? (seen[String(found.id)] ? 'source' : 'folder(legacy)') : '',\n    candidates: rows.length\n  };\n})();",
                         "params": {
-                            "t": "$.FIND_TASKS"
+                            "t": "$.FIND_TASKS",
+                            "ts": "$.FIND_TASKS_BY_SOURCE"
                         }
                     }
                 }
@@ -246,6 +247,25 @@
                         "status": "lapsed"
                     },
                     "operation": "set_task_status"
+                }
+            },
+            {
+                "id": "FIND_TASKS_BY_SOURCE",
+                "data": {
+                    "id": "FIND_TASKS_BY_SOURCE",
+                    "name": "The referral task by its decision handle",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "GET",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/workspaces/space/ANTIPODEAN/tasks",
+                        "query": {
+                            "source": "$.ASSESS.decision_id"
+                        },
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        }
+                    }
                 }
             }
         ],
@@ -309,6 +329,24 @@
                 "id": "e12",
                 "source": "TASK_GATE",
                 "target": "LAPSE_TASK"
+            },
+            {
+                "id": "MARK_SUPERSEDED-FIND_TASKS_BY_SOURCE",
+                "source": "MARK_SUPERSEDED",
+                "target": "FIND_TASKS_BY_SOURCE",
+                "sourceHandle": "MARK_SUPERSEDED",
+                "targetHandle": "FIND_TASKS_BY_SOURCE",
+                "type": "custom",
+                "edgeType": "custom"
+            },
+            {
+                "id": "FIND_TASKS_BY_SOURCE-PICK_TASK",
+                "source": "FIND_TASKS_BY_SOURCE",
+                "target": "PICK_TASK",
+                "sourceHandle": "FIND_TASKS_BY_SOURCE",
+                "targetHandle": "PICK_TASK",
+                "type": "custom",
+                "edgeType": "custom"
             }
         ]
     }

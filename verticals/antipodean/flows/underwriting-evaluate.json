@@ -607,7 +607,10 @@
       },
       "incomplete_broker_text": "We need a few more answers before we can quote. Your application has been referred for underwriter review.",
       "manual_broker_text": "Your application has been referred for underwriter review.",
-      "referral_task_title_prefix": "Underwriting Review"
+      "referral_task_title_prefix": "Underwriting Review",
+      "quote_expire_concern": "quote-expire",
+      "quote_expiry_flow_subject": "ms.hub.config.workflow.3788449144.2572884549",
+      "note_a5_3": "Artefact 5 A5-3 registered the quote-expire timer as PROVISIONAL: its entity and storing record were unsettled, so nothing scheduled it and a quote never lapsed. Settled here. Entity = quote_id. Storing record = decision_config.quote_expire_timer_topic (added 2026-09-02). Scheduled on ACCEPT and on REFER, never on DECLINE -- flow 10 lapses the referral task beside the decision, and only a REFER has one, so scheduling on ACCEPT alone would leave that branch of flow 10 unreachable."
     },
     "result": "$.DECIDE",
     "nodes": [
@@ -703,7 +706,7 @@
           "id": "NORMALISE_FACTS",
           "node_type": "eval",
           "payload": {
-            "code": "(function () {\n  // §5.1(2): an unmatched JSONPath resolves to [], and `[] = 'no'` fires a\n  // DECLINE nobody intended. Every rule fact is normalised here, once.\n  var d = (sub && sub.data) ? sub.data : (sub || {});\n  var SENT = cfgSentinel;                 // \"__unanswered\"\n  var NUM_SENT = cfgNumericSentinel;      // -1: below every threshold in the CSV\n  var out = {};\n\n  function blank(v) {\n    return v === undefined || v === null || v === '' ||\n           (Array.isArray(v) && v.length === 0);\n  }\n\n  var unansweredInScope = [];\n  var selected = Array.isArray(d.selected_products) ? d.selected_products.slice() : [];\n  out.selected_products = selected;\n\n  function inScope(prefix) {\n    var prods = sectionProducts[prefix];\n    if (!prods) return false;\n    if (prods.indexOf('*') >= 0) return true;\n    for (var i = 0; i < prods.length; i++) {\n      if (selected.indexOf(prods[i]) >= 0) return true;\n    }\n    return false;\n  }\n\n  for (var i = 0; i < factCatalogue.length; i++) {\n    var fc = factCatalogue[i];\n    var raw = d[fc.key];\n    var scoped = inScope(fc.section);\n    if (blank(raw)) {\n      out[fc.key] = (fc.kind === 'number') ? NUM_SENT : SENT;\n      if (scoped) unansweredInScope.push(fc.key);\n    } else if (fc.kind === 'array') {\n      // selected_products is the gate fact and MUST stay an array: `in` cannot\n      // read a lowercased string, and a broken gate fires nothing at all, which\n      // reads on screen exactly like a correctly-gated ITL-only submission.\n      out[fc.key] = Array.isArray(raw) ? raw.slice() : [String(raw)];\n    } else if (fc.kind === 'number') {\n      var n = Number(String(raw).replace(/[$,\\s]/g, ''));\n      out[fc.key] = isNaN(n) ? NUM_SENT : n;\n      if (isNaN(n) && scoped) unansweredInScope.push(fc.key);\n    } else {\n      out[fc.key] = String(raw).trim().toLowerCase();\n    }\n  }\n\n  out.meta_unanswered_in_scope = unansweredInScope;\n  out.meta_submission_id = d.submission_id || (sub && sub.id) || '';\n  out.meta_quote_id = d.quote_id || '';\n  out.meta_submission_version = d.version || d.submitted_version || '';\n  out.meta_product_version = d.product_version || '';\n  out.meta_distributor_account_id = d.distributor_account_id || '';\n  out.meta_broker_id = d.broker_id || '';\n  out.meta_policyholder_name = d.gen_policyholder_name || '';\n\n  // Rating inputs. gen_occupation stores the occupation_code, never the label.\n  var occ = blank(d.gen_occupation) ? '' : String(d.gen_occupation).trim();\n  out.meta_occupation_code = occ;\n  // Built here, as one already-resolved string, so the http node never has to\n  // pipe-concatenate a digit-leading literal into a query value: a JSON number\n  // reaches Go as float64 and \"16110170\" would go on the wire as 1.611017e+07.\n  out.meta_occupation_filter = JSON.stringify([{ field: 'occupation_code', keyword: occ }]);\n\n  var rev = Number(d.gen_total_revenue);\n  out.meta_total_revenue = isNaN(rev) ? 0 : rev;\n\n  // product_selections is an untyped array of objects: {product_code, limit_pi,\n  // limit_pl, excess}. It is not indexable and has no item schema, so read it\n  // defensively and fall back to the occupation's own minimum excess.\n  var sels = Array.isArray(d.product_selections) ? d.product_selections : [];\n  out.meta_product_selections = sels;\n  var itl = null;\n  for (var j = 0; j < sels.length; j++) {\n    var s = sels[j] || {};\n    if (String(s.product_code || s.code || '').toUpperCase() === 'ITL') { itl = s; break; }\n  }\n  out.meta_itl_selection = itl;\n  out.meta_requested_excess = (itl && itl.excess !== undefined && itl.excess !== null && itl.excess !== '')\n    ? Number(itl.excess) : null;\n\n  return out;\n})();\n",
+            "code": "(function () {\n  // §5.1(2): an unmatched JSONPath resolves to [], and `[] = 'no'` fires a\n  // DECLINE nobody intended. Every rule fact is normalised here, once.\n  var d = (sub && sub.data) ? sub.data : (sub || {});\n  var SENT = cfgSentinel;                 // \"__unanswered\"\n  var NUM_SENT = cfgNumericSentinel;      // -1: below every threshold in the CSV\n  var out = {};\n\n  function blank(v) {\n    return v === undefined || v === null || v === '' ||\n           (Array.isArray(v) && v.length === 0);\n  }\n\n  var unansweredInScope = [];\n  var selected = Array.isArray(d.selected_products) ? d.selected_products.slice() : [];\n  out.selected_products = selected;\n\n  function inScope(prefix) {\n    var prods = sectionProducts[prefix];\n    if (!prods) return false;\n    if (prods.indexOf('*') >= 0) return true;\n    for (var i = 0; i < prods.length; i++) {\n      if (selected.indexOf(prods[i]) >= 0) return true;\n    }\n    return false;\n  }\n\n  for (var i = 0; i < factCatalogue.length; i++) {\n    var fc = factCatalogue[i];\n    var raw = d[fc.key];\n    var scoped = inScope(fc.section);\n    if (blank(raw)) {\n      out[fc.key] = (fc.kind === 'number') ? NUM_SENT : SENT;\n      if (scoped) unansweredInScope.push(fc.key);\n    } else if (fc.kind === 'array') {\n      // selected_products is the gate fact and MUST stay an array: `in` cannot\n      // read a lowercased string, and a broken gate fires nothing at all, which\n      // reads on screen exactly like a correctly-gated ITL-only submission.\n      out[fc.key] = Array.isArray(raw) ? raw.slice() : [String(raw)];\n    } else if (fc.kind === 'number') {\n      var n = Number(String(raw).replace(/[$,\\s]/g, ''));\n      out[fc.key] = isNaN(n) ? NUM_SENT : n;\n      if (isNaN(n) && scoped) unansweredInScope.push(fc.key);\n    } else {\n      out[fc.key] = String(raw).trim().toLowerCase();\n    }\n  }\n\n  out.meta_unanswered_in_scope = unansweredInScope;\n  out.meta_submission_id = d.submission_id || (sub && sub.id) || '';\n  out.meta_quote_id = d.quote_id || '';\n  out.meta_submission_version = d.version || d.submitted_version || '';\n  out.meta_product_version = d.product_version || '';\n  out.meta_distributor_account_id = d.distributor_account_id || '';\n  out.meta_broker_id = d.broker_id || '';\n  // artefact 4, settled: a referral task's `folder` is the BROKERAGE. It must\n  // never be empty -- the board groups on it, and a task in no folder is a task\n  // nobody finds. A submission that names no broker still belongs to the\n  // account that sent it; one that names neither is named as such rather than\n  // filed under nothing.\n  out.meta_task_folder = out.meta_broker_id || out.meta_distributor_account_id || 'unassigned';\n  out.meta_policyholder_name = d.gen_policyholder_name || '';\n\n  // Rating inputs. gen_occupation stores the occupation_code, never the label.\n  var occ = blank(d.gen_occupation) ? '' : String(d.gen_occupation).trim();\n  out.meta_occupation_code = occ;\n  // Built here, as one already-resolved string, so the http node never has to\n  // pipe-concatenate a digit-leading literal into a query value: a JSON number\n  // reaches Go as float64 and \"16110170\" would go on the wire as 1.611017e+07.\n  out.meta_occupation_filter = JSON.stringify([{ field: 'occupation_code', keyword: occ }]);\n\n  var rev = Number(d.gen_total_revenue);\n  out.meta_total_revenue = isNaN(rev) ? 0 : rev;\n\n  // product_selections is an untyped array of objects: {product_code, limit_pi,\n  // limit_pl, excess}. It is not indexable and has no item schema, so read it\n  // defensively and fall back to the occupation's own minimum excess.\n  var sels = Array.isArray(d.product_selections) ? d.product_selections : [];\n  out.meta_product_selections = sels;\n  var itl = null;\n  for (var j = 0; j < sels.length; j++) {\n    var s = sels[j] || {};\n    if (String(s.product_code || s.code || '').toUpperCase() === 'ITL') { itl = s; break; }\n  }\n  out.meta_itl_selection = itl;\n  out.meta_requested_excess = (itl && itl.excess !== undefined && itl.excess !== null && itl.excess !== '')\n    ? Number(itl.excess) : null;\n\n  return out;\n})();\n",
             "params": {
               "sub": "$.LOAD_SUBMISSION.data",
               "cfgSentinel": "$.static.unanswered_sentinel",
@@ -1771,7 +1774,7 @@
           "id": "DECIDE",
           "node_type": "eval",
           "payload": {
-            "code": "(function () {\n  // §5.1 [R]: non-firing rules are ABSENT from the rules node's output, not\n  // false. DECIDE therefore keys on PRESENCE and never on 41 keys coming back.\n  var fired = [], declines = [], refers = [];\n  var brokerReasons = [], uwReasons = [];\n  var seenBroker = {};\n\n  for (var name in r) {\n    if (!Object.prototype.hasOwnProperty.call(r, name)) continue;\n    var outcome = r[name];\n    if (outcome === undefined || outcome === null || outcome === '') continue;\n    fired.push(name);\n    var meta = cat[name] || {};\n    if (outcome === 'DECLINE') declines.push(name); else if (outcome === 'REFER') refers.push(name);\n    if (meta.uw) uwReasons.push(meta.rule_id + ': ' + meta.uw);\n    if (meta.broker && !seenBroker[meta.broker]) { seenBroker[meta.broker] = 1; brokerReasons.push(meta.broker); }\n  }\n\n  // Wave 4's answer to artefact 1's open A-11: an unanswered question that is\n  // IN SCOPE for a selected product forces REFER. It never forces DECLINE (a\n  // missing answer is not an adverse answer) and it never auto-accepts.\n  var incomplete = f.meta_unanswered_in_scope || [];\n  for (var i = 0; i < incomplete.length; i++) {\n    refers.push('INCOMPLETE_SUBMISSION:' + incomplete[i]);\n    uwReasons.push('INCOMPLETE_SUBMISSION: ' + incomplete[i] + ' is unanswered and in scope for the selected products.');\n  }\n  if (incomplete.length && !seenBroker[incompleteBrokerText]) {\n    seenBroker[incompleteBrokerText] = 1; brokerReasons.push(incompleteBrokerText);\n  }\n\n  // No rate table exists for Allied Health or General Property (§4.2). Wave 4\n  // does not invent one and does not fail the run: it REFERS, with a named\n  // reason, so the submission still produces a decision record and a task.\n  var unrateable = (p && p.unrateable_products) ? p.unrateable_products : [];\n  for (var j = 0; j < unrateable.length; j++) {\n    refers.push('NO_RATE_TABLE:' + unrateable[j]);\n    uwReasons.push('NO_RATE_TABLE: no rate table exists for ' + unrateable[j] + '. Price manually.');\n  }\n  var rateErrors = (p && p.errors) ? p.errors : [];\n  for (var k = 0; k < rateErrors.length; k++) {\n    refers.push('RATING_UNAVAILABLE:' + rateErrors[k]);\n    uwReasons.push('RATING_UNAVAILABLE: ' + rateErrors[k]);\n  }\n  if ((unrateable.length || rateErrors.length) && !seenBroker[manualBrokerText]) {\n    seenBroker[manualBrokerText] = 1; brokerReasons.push(manualBrokerText);\n  }\n\n  // DECLINE beats REFER. Non-negotiable precedence (§5.1, G2).\n  var outcome = declines.length ? 'DECLINE' : (refers.length ? 'REFER' : 'ACCEPT');\n\n  var now = new Date();\n  var decidedAt = now.toISOString().replace(/\\.\\d{3}Z$/, 'Z');\n  var expiry = new Date(now.getTime() + validityDays * 86400000).toISOString().replace(/\\.\\d{3}Z$/, 'Z');\n\n  var record = {\n    quote_id: f.meta_quote_id,\n    submission_id: f.meta_submission_id,\n    submission_version: String(f.meta_submission_version || ''),\n    product_version: String(f.meta_product_version || ''),\n    distributor_account_id: String(f.meta_distributor_account_id || ''),\n    product_code: (f.selected_products && f.selected_products.length) ? f.selected_products[0] : '',\n    outcome: outcome,\n    decision_status: (outcome === 'ACCEPT' || outcome === 'DECLINE') ? 'OPEN' : 'OPEN',\n    origin_flow: 'flow-1',\n    decided_by: 'engine',\n    decided_at: decidedAt,\n    decision_seq: Number((seq && (seq.value !== undefined ? seq.value : seq.count)) || 0),\n    quote_validity_expiry: expiry,\n    sanctions_state: 'not_run',\n    referral_reasons: refers,\n    decline_reasons: declines,\n    broker_reasons: brokerReasons,\n    underwriter_reasons: uwReasons,\n    premium_basis: (outcome === 'ACCEPT' && p && p.rateable) ? p.premium_basis : 'NOT_RATED',\n    base_premium: (outcome === 'ACCEPT' && p && p.rateable) ? p.base_premium : 0,\n    gst: (outcome === 'ACCEPT' && p && p.rateable) ? p.gst : 0,\n    fsl_levy: 0,\n    stamp_duty: 0,\n    broker_commission: 0,\n    total_payable: (outcome === 'ACCEPT' && p && p.rateable) ? p.total_payable : 0,\n    terms: { premium_breakdown: (p && p.breakdown) || {}, rating_provisional: !!(p && p.rateable) }\n  };\n\n  return {\n    outcome: outcome,\n    fired: fired,\n    decline_reasons: declines,\n    referral_reasons: refers,\n    broker_reasons: brokerReasons,\n    underwriter_reasons: uwReasons,\n    ahc_rules_fired: fired.filter(function (n) { return n.indexOf('DEC_AHC_') === 0; }),\n    itcl_rules_fired: fired.filter(function (n) { return n.indexOf('ITCL_') > 0; }),\n    decision_record: record\n  };\n})();\n",
+            "code": "(function () {\n  // §5.1 [R]: non-firing rules are ABSENT from the rules node's output, not\n  // false. DECIDE therefore keys on PRESENCE and never on 41 keys coming back.\n  var fired = [], declines = [], refers = [];\n  var brokerReasons = [], uwReasons = [];\n  var seenBroker = {};\n\n  for (var name in r) {\n    if (!Object.prototype.hasOwnProperty.call(r, name)) continue;\n    var outcome = r[name];\n    if (outcome === undefined || outcome === null || outcome === '') continue;\n    fired.push(name);\n    var meta = cat[name] || {};\n    if (outcome === 'DECLINE') declines.push(name); else if (outcome === 'REFER') refers.push(name);\n    if (meta.uw) uwReasons.push(meta.rule_id + ': ' + meta.uw);\n    if (meta.broker && !seenBroker[meta.broker]) { seenBroker[meta.broker] = 1; brokerReasons.push(meta.broker); }\n  }\n\n  // Wave 4's answer to artefact 1's open A-11: an unanswered question that is\n  // IN SCOPE for a selected product forces REFER. It never forces DECLINE (a\n  // missing answer is not an adverse answer) and it never auto-accepts.\n  var incomplete = f.meta_unanswered_in_scope || [];\n  for (var i = 0; i < incomplete.length; i++) {\n    refers.push('INCOMPLETE_SUBMISSION:' + incomplete[i]);\n    uwReasons.push('INCOMPLETE_SUBMISSION: ' + incomplete[i] + ' is unanswered and in scope for the selected products.');\n  }\n  if (incomplete.length && !seenBroker[incompleteBrokerText]) {\n    seenBroker[incompleteBrokerText] = 1; brokerReasons.push(incompleteBrokerText);\n  }\n\n  // No rate table exists for Allied Health or General Property (§4.2). Wave 4\n  // does not invent one and does not fail the run: it REFERS, with a named\n  // reason, so the submission still produces a decision record and a task.\n  var unrateable = (p && p.unrateable_products) ? p.unrateable_products : [];\n  for (var j = 0; j < unrateable.length; j++) {\n    refers.push('NO_RATE_TABLE:' + unrateable[j]);\n    uwReasons.push('NO_RATE_TABLE: no rate table exists for ' + unrateable[j] + '. Price manually.');\n  }\n  var rateErrors = (p && p.errors) ? p.errors : [];\n  for (var k = 0; k < rateErrors.length; k++) {\n    refers.push('RATING_UNAVAILABLE:' + rateErrors[k]);\n    uwReasons.push('RATING_UNAVAILABLE: ' + rateErrors[k]);\n  }\n  if ((unrateable.length || rateErrors.length) && !seenBroker[manualBrokerText]) {\n    seenBroker[manualBrokerText] = 1; brokerReasons.push(manualBrokerText);\n  }\n\n  // DECLINE beats REFER. Non-negotiable precedence (§5.1, G2).\n  var outcome = declines.length ? 'DECLINE' : (refers.length ? 'REFER' : 'ACCEPT');\n\n  var now = new Date();\n  var decidedAt = now.toISOString().replace(/\\.\\d{3}Z$/, 'Z');\n  var expiry = new Date(now.getTime() + validityDays * 86400000).toISOString().replace(/\\.\\d{3}Z$/, 'Z');\n\n  var record = {\n    quote_id: f.meta_quote_id,\n    submission_id: f.meta_submission_id,\n    submission_version: Number(f.meta_submission_version || 0),\n    product_version: String(f.meta_product_version || ''),\n    distributor_account_id: String(f.meta_distributor_account_id || ''),\n    product_code: (f.selected_products && f.selected_products.length) ? f.selected_products[0] : '',\n    outcome: outcome,\n    decision_status: (outcome === 'ACCEPT' || outcome === 'DECLINE') ? 'OPEN' : 'OPEN',\n    origin_flow: 'flow-1',\n    decided_by: 'engine',\n    decided_at: decidedAt,\n    decision_seq: Number((seq && (seq.value !== undefined ? seq.value : seq.count)) || 0),\n    quote_validity_expiry: expiry,\n    sanctions_state: 'not_run',\n    referral_reasons: refers,\n    decline_reasons: declines,\n    broker_reasons: brokerReasons,\n    underwriter_reasons: uwReasons,\n    premium_basis: (outcome === 'ACCEPT' && p && p.rateable) ? p.premium_basis : 'NOT_RATED',\n    base_premium: (outcome === 'ACCEPT' && p && p.rateable) ? p.base_premium : 0,\n    gst: (outcome === 'ACCEPT' && p && p.rateable) ? p.gst : 0,\n    fsl_levy: 0,\n    stamp_duty: 0,\n    broker_commission: 0,\n    total_payable: (outcome === 'ACCEPT' && p && p.rateable) ? p.total_payable : 0,\n    terms: { premium_breakdown: (p && p.breakdown) || {}, rating_provisional: !!(p && p.rateable) }\n  };\n\n  // A quote that can still be taken up is a quote that can lapse. ACCEPT and\n  // REFER both leave one live and both carry a validity expiry; a DECLINE\n  // leaves nothing to expire. Artefact 5 A5-3 left the trigger unsettled, and\n  // this is the answer: flow 10 lapses an OPEN decision and lapses the referral\n  // task beside it, and only a REFER ever has one — so scheduling on ACCEPT\n  // alone would leave that whole branch of flow 10 unreachable.\n  var schedulesExpiry = (outcome === 'ACCEPT' || outcome === 'REFER') && expiry !== '';\n\n  return {\n    outcome: outcome,\n    schedules_expiry: schedulesExpiry,\n    // artefact 5: the name is <concern>:<quoteId>, and the topic is derived\n    // from it. Never sent as `topic` — the caller's topic is discarded.\n    expire_timer_name: 'quote-expire:' + String(f.meta_quote_id || ''),\n    quote_validity_expiry: expiry,\n    fired: fired,\n    decline_reasons: declines,\n    referral_reasons: refers,\n    broker_reasons: brokerReasons,\n    underwriter_reasons: uwReasons,\n    ahc_rules_fired: fired.filter(function (n) { return n.indexOf('DEC_AHC_') === 0; }),\n    itcl_rules_fired: fired.filter(function (n) { return n.indexOf('ITCL_') > 0; }),\n    decision_record: record\n  };\n})();\n",
             "params": {
               "r": "$.UW_RULES",
               "f": "$.NORMALISE_FACTS",
@@ -1843,11 +1846,100 @@
             "tags": [
               "referral"
             ],
-            "folder": "$.CREATE_DECISION.data.id",
-            "description": "Referral raised by flow 1 (underwriting-evaluate).\n\nDecision record: |$.CREATE_DECISION.data.id|\nSubmission: |$.NORMALISE_FACTS.meta_submission_id|\nOutcome: |$.DECIDE.outcome|\n\nReferral reasons (underwriter):\n|$.DECIDE.underwriter_reasons|\n\nMove this task to Approved or Declined; flow 11 (referral-decide) reads that move."
+            "folder": "$.NORMALISE_FACTS.meta_task_folder",
+            "description": "Referral raised by flow 1 (underwriting-evaluate).\n\nDecision record: |$.CREATE_DECISION.data.id|\nSubmission: |$.NORMALISE_FACTS.meta_submission_id|\nOutcome: |$.DECIDE.outcome|\n\nReferral reasons (underwriter):\n|$.DECIDE.underwriter_reasons|\n\nMove this task to Approved or Declined; flow 11 (referral-decide) reads that move.",
+            "source": "$.CREATE_DECISION.data.id",
+            "source_detail": "decision_config",
+            "metadata": {
+              "decision_id": "$.CREATE_DECISION.data.id",
+              "broker_id": "$.NORMALISE_FACTS.meta_task_folder",
+              "submission_id": "$.NORMALISE_FACTS.meta_submission_id",
+              "quote_id": "$.NORMALISE_FACTS.meta_quote_id"
+            }
           },
           "name": "Raise referral task",
           "subject": "microstrate.workspaces.post.task"
+        }
+      },
+      {
+        "id": "EXPIRY_GATE",
+        "data": {
+          "id": "EXPIRY_GATE",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.DECIDE.schedules_expiry",
+                  true
+                ]
+              },
+              "outcome": "SCHEDULE_EXPIRY"
+            },
+            {
+              "outcome": "RESOLVE_SUCCESS"
+            }
+          ],
+          "name": "Does this quote expire?"
+        }
+      },
+      {
+        "id": "SCHEDULE_EXPIRY",
+        "data": {
+          "id": "SCHEDULE_EXPIRY",
+          "node_type": "quiva-endpoint",
+          "payload": {
+            "name": "$.DECIDE.expire_timer_name",
+            "description": "Lapse this quote when its validity window closes",
+            "trigger_on": "$.DECIDE.quote_validity_expiry",
+            "payload": {
+              "subject": "$.static.quote_expiry_flow_subject",
+              "trigger": {
+                "quote_id": "$.NORMALISE_FACTS.meta_quote_id",
+                "concern": "$.static.quote_expire_concern",
+                "decision_id": "$.CREATE_DECISION.data.id"
+              }
+            }
+          },
+          "name": "Schedule quote-expire (quote_validity_expiry)",
+          "subject": "microstrate.hub.post.schedule-flow"
+        }
+      },
+      {
+        "id": "READ_EXPIRY_TOPIC",
+        "data": {
+          "id": "READ_EXPIRY_TOPIC",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function () {\n  // ASSERT-2a: the schedule's returned Topic is the ONLY string\n  // microstrate.hub.delete.unschedule-flow accepts. Deriving it locally is a\n  // repair tool for flow 13, never the contract -- so if the schedule came back\n  // without one the timer is uncancellable and that is worth failing loudly for,\n  // not storing an empty string that reads as \"deliberately not scheduled\".\n  function topicOf(resp) {\n    if (!resp || typeof resp !== 'object') return '';\n    if (typeof resp.topic === 'string') return resp.topic;\n    if (resp.data && typeof resp.data.topic === 'string') return resp.data.topic;\n    if (resp.results && resp.results.length && resp.results[0].topic) return resp.results[0].topic;\n    return '';\n  }\n  var t = topicOf(sched);\n  if (!t) {\n    throw new Error('underwriting-evaluate: the quote-expire schedule returned no topic - the timer would be uncancellable at bind');\n  }\n  return { quote_expire_timer_topic: t, expires_on: String(when || '') };\n})();",
+            "params": {
+              "sched": "$.SCHEDULE_EXPIRY",
+              "when": "$.DECIDE.quote_validity_expiry"
+            }
+          },
+          "name": "ASSERT-2a: keep the returned topic"
+        }
+      },
+      {
+        "id": "STAMP_EXPIRY_TOPIC",
+        "data": {
+          "id": "STAMP_EXPIRY_TOPIC",
+          "node_type": "http",
+          "payload": {
+            "url": "https://api.microstrate.io/records/decision_config/|$.CREATE_DECISION.data.id",
+            "method": "PUT",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token",
+              "Content-Type": "application/json"
+            },
+            "data": {
+              "data": {
+                "quote_expire_timer_topic": "$.READ_EXPIRY_TOPIC.quote_expire_timer_topic"
+              }
+            }
+          },
+          "name": "Stamp the topic on the decision"
         }
       }
     ],
@@ -1975,6 +2067,42 @@
         "target": "RAISE_REFERRAL_TASK",
         "sourceHandle": "OUTCOME",
         "targetHandle": "RAISE_REFERRAL_TASK",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "CREATE_DECISION-EXPIRY_GATE",
+        "source": "CREATE_DECISION",
+        "target": "EXPIRY_GATE",
+        "sourceHandle": "CREATE_DECISION",
+        "targetHandle": "EXPIRY_GATE",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "EXPIRY_GATE-SCHEDULE_EXPIRY",
+        "source": "EXPIRY_GATE",
+        "target": "SCHEDULE_EXPIRY",
+        "sourceHandle": "EXPIRY_GATE",
+        "targetHandle": "SCHEDULE_EXPIRY",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "SCHEDULE_EXPIRY-READ_EXPIRY_TOPIC",
+        "source": "SCHEDULE_EXPIRY",
+        "target": "READ_EXPIRY_TOPIC",
+        "sourceHandle": "SCHEDULE_EXPIRY",
+        "targetHandle": "READ_EXPIRY_TOPIC",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "READ_EXPIRY_TOPIC-STAMP_EXPIRY_TOPIC",
+        "source": "READ_EXPIRY_TOPIC",
+        "target": "STAMP_EXPIRY_TOPIC",
+        "sourceHandle": "READ_EXPIRY_TOPIC",
+        "targetHandle": "STAMP_EXPIRY_TOPIC",
         "type": "custom",
         "edgeType": "custom"
       }

@@ -41,6 +41,17 @@
           }
         }
       },
+      "quote_expire_timer_topic": {
+        "type": "string",
+        "title": "quote-expire timer topic",
+        "description": "The stored, derived topic for the 'quote-expire:<quoteId>' schedule \u2014 the ONLY thing microstrate.hub.delete.unschedule-flow accepts (contract artefact 5 timer 5). Written on the decision that stamped quote_validity_expiry, and read by flow 2 quote-bind to cancel the timer when the quote binds. Three states: absent/null = never scheduled or the stamp write failed; empty string = deliberately not scheduled because quote_validity_expiry was already past; non-empty = the live topic.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "quote-expire timer topic"
+          }
+        }
+      },
       "product_version": {
         "type": "string",
         "title": "Product version",
@@ -64,7 +75,7 @@
         }
       },
       "submission_version": {
-        "type": "string",
+        "type": "number",
         "title": "Submission version",
         "description": "Descriptive only \u2014 NOT the ordering key. See decision_seq (contract artefact 3 \u00a75, \u00a78.9).",
         "ui": {
