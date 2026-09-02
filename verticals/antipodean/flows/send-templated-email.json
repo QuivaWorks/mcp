@@ -1,0 +1,133 @@
+{
+  "name": "send-templated-email",
+  "description": "Shared sub-flow: the SendGrid v3 shape kept in one place. Input contract: {to, to_name?, subject, body_html, email_class (transactional|commercial), idempotency_key?}. Called by flow (subject) nodes with await:true.",
+  "config": {
+    "nodes": [
+      {
+        "id": "TRIGGER",
+        "data": {
+          "id": "TRIGGER",
+          "name": "Sub-flow input",
+          "node_type": "trigger",
+          "trigger_type": "manual",
+          "payload": {}
+        }
+      },
+      {
+        "id": "VALIDATE",
+        "data": {
+          "id": "VALIDATE",
+          "name": "Validate input contract",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": "and",
+                "input": [
+                  {
+                    "operator": "notEmpty",
+                    "input": [
+                      "$.trigger.to"
+                    ]
+                  },
+                  {
+                    "operator": "notEmpty",
+                    "input": [
+                      "$.trigger.subject"
+                    ]
+                  },
+                  {
+                    "operator": "notEmpty",
+                    "input": [
+                      "$.trigger.body_html"
+                    ]
+                  },
+                  {
+                    "operator": "in",
+                    "input": [
+                      "$.trigger.email_class",
+                      [
+                        "transactional",
+                        "commercial"
+                      ]
+                    ]
+                  }
+                ]
+              },
+              "outcome": "SEND_EMAIL"
+            },
+            {
+              "outcome": "REJECT"
+            }
+          ]
+        }
+      },
+      {
+        "id": "SEND_EMAIL",
+        "data": {
+          "id": "SEND_EMAIL",
+          "name": "Send via durable outbox",
+          "node_type": "quiva-endpoint",
+          "subject": "microstrate.email.post.send",
+          "payload": {
+            "class": "$.trigger.email_class",
+            "idempotency_key": "$.trigger.idempotency_key",
+            "message": {
+              "personalizations": [
+                {
+                  "to": [
+                    {
+                      "email": "$.trigger.to",
+                      "name": "$.trigger.to_name"
+                    }
+                  ]
+                }
+              ],
+              "from": {
+                "email": "underwriting@antipodean.quiva.ai",
+                "name": "Antipodean Underwriting"
+              },
+              "subject": "$.trigger.subject",
+              "content": [
+                {
+                  "type": "text/html",
+                  "value": "$.trigger.body_html"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": "REJECT",
+        "data": {
+          "id": "REJECT",
+          "name": "Reject invalid input",
+          "node_type": "error",
+          "payload": {
+            "status_code": 422,
+            "message": "send-templated-email: requires to, subject, body_html and email_class in [transactional, commercial]"
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "source": "TRIGGER",
+        "target": "VALIDATE"
+      },
+      {
+        "id": "e2",
+        "source": "VALIDATE",
+        "target": "SEND_EMAIL"
+      },
+      {
+        "id": "e3",
+        "source": "VALIDATE",
+        "target": "REJECT"
+      }
+    ],
+    "result": "$.SEND_EMAIL"
+  }
+}
