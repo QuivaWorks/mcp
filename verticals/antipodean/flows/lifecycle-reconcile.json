@@ -1,0 +1,378 @@
+{
+  "name": "lifecycle-reconcile",
+  "description": "Flow 13. The weekly BACKSTOP over the indexed fields (plan 5.3): the lifecycle is driven by per-entity timers and record events, and this scan exists only to find the cases those lost. Six index scans - timers pending/failed, void deadline passed with the notice unsent, invoices past due and unpaid, ISSUED decisions past validity, policies still ACTIVE past expiry, and ageing board work - then one de-duplicating report. A NON-EMPTY result is an exception report and is emailed; an empty one is a silent success and is still visible in the run result. Schedule trigger, trigger_every 168h, installed at publish time. Every filter is a POSITIVE match against the STORED case of a keyword field: the index has no negation, and a lowercased keyword returns a silent zero.",
+  "config": {
+    "edges": [
+      {
+        "source": "TRIGGER",
+        "target": "WINDOW",
+        "id": "e_TRIGGER_WINDOW",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.2108100130.e_TRIGGER_WINDOW",
+        "modified": 1788354934
+      },
+      {
+        "source": "WINDOW",
+        "target": "SCAN_TIMERS",
+        "id": "e_WINDOW_SCAN_TIMERS",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.2108100130.e_WINDOW_SCAN_TIMERS",
+        "modified": 1788354934
+      },
+      {
+        "source": "SCAN_TIMERS",
+        "target": "REPORT",
+        "id": "e_SCAN_TIMERS_REPORT",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.2108100130.e_SCAN_TIMERS_REPORT",
+        "modified": 1788354934
+      },
+      {
+        "source": "WINDOW",
+        "target": "SCAN_VOID",
+        "id": "e_WINDOW_SCAN_VOID",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.2108100130.e_WINDOW_SCAN_VOID",
+        "modified": 1788354934
+      },
+      {
+        "source": "SCAN_VOID",
+        "target": "REPORT",
+        "id": "e_SCAN_VOID_REPORT",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.2108100130.e_SCAN_VOID_REPORT",
+        "modified": 1788354934
+      },
+      {
+        "source": "WINDOW",
+        "target": "SCAN_INVOICES",
+        "id": "e_WINDOW_SCAN_INVOICES",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.2108100130.e_WINDOW_SCAN_INVOICES",
+        "modified": 1788354934
+      },
+      {
+        "source": "SCAN_INVOICES",
+        "target": "REPORT",
+        "id": "e_SCAN_INVOICES_REPORT",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.2108100130.e_SCAN_INVOICES_REPORT",
+        "modified": 1788354934
+      },
+      {
+        "source": "WINDOW",
+        "target": "SCAN_QUOTES",
+        "id": "e_WINDOW_SCAN_QUOTES",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.2108100130.e_WINDOW_SCAN_QUOTES",
+        "modified": 1788354934
+      },
+      {
+        "source": "SCAN_QUOTES",
+        "target": "REPORT",
+        "id": "e_SCAN_QUOTES_REPORT",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.2108100130.e_SCAN_QUOTES_REPORT",
+        "modified": 1788354934
+      },
+      {
+        "source": "WINDOW",
+        "target": "SCAN_EXPIRED",
+        "id": "e_WINDOW_SCAN_EXPIRED",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.2108100130.e_WINDOW_SCAN_EXPIRED",
+        "modified": 1788354934
+      },
+      {
+        "source": "SCAN_EXPIRED",
+        "target": "REPORT",
+        "id": "e_SCAN_EXPIRED_REPORT",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.2108100130.e_SCAN_EXPIRED_REPORT",
+        "modified": 1788354934
+      },
+      {
+        "source": "WINDOW",
+        "target": "SCAN_TASKS",
+        "id": "e_WINDOW_SCAN_TASKS",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.2108100130.e_WINDOW_SCAN_TASKS",
+        "modified": 1788354934
+      },
+      {
+        "source": "SCAN_TASKS",
+        "target": "REPORT",
+        "id": "e_SCAN_TASKS_REPORT",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.2108100130.e_SCAN_TASKS_REPORT",
+        "modified": 1788354934
+      },
+      {
+        "source": "REPORT",
+        "target": "BR_ANY",
+        "id": "e_REPORT_BR_ANY",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.2108100130.e_REPORT_BR_ANY",
+        "modified": 1788354934
+      },
+      {
+        "source": "BR_ANY",
+        "target": "SEND_REPORT",
+        "id": "e_BR_ANY_SEND_REPORT",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.2108100130.e_BR_ANY_SEND_REPORT",
+        "modified": 1788354934
+      }
+    ],
+    "nodes": [
+      {
+        "data": {
+          "id": "TRIGGER",
+          "name": "lifecycle-reconcile weekly",
+          "description": "The weekly backstop (plan 5.3). trigger_every is installed at PUBLISH time, not at write time.",
+          "node_type": "trigger",
+          "trigger_type": "schedule",
+          "payload": {
+            "trigger": {
+              "source": "schedule"
+            },
+            "trigger_every": "168h",
+            "trigger_on": "2026-09-02T13:14:29Z"
+          }
+        },
+        "id": "TRIGGER",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.2108100130.TRIGGER",
+        "modified": 1788354934
+      },
+      {
+        "data": {
+          "id": "WINDOW",
+          "name": "Now, and the five index filters",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function () {\n  // One place builds every filter STRING, for the same reason flow 11's PREP\n  // does: a filter written as a literal object in an http node's query value is\n  // JSON.parsed by the flows MCP and reaches the wire as a Go map rendering.\n  //\n  // Two index rules govern every condition below and both fail SILENTLY:\n  //  - a keyword field matches the STORED case, so ACTIVE/ISSUED are upper and\n  //    pending/unpaid/scheduled are lower, exactly as the writer wrote them.\n  //    (Only ANALYSED text fields want lowercase; there are none here.)\n  //  - there is no negation. \"not paid\" is an OR over unpaid|overdue, and a\n  //    payment state added later drops out of this report without saying so.\n  var now = new Date();\n  var iso = function (d) { return d.toISOString().replace(/\\.\\d{3}Z$/, 'Z'); };\n  var plusDays = function (n) { return iso(new Date(now.getTime() + n * 86400000)); };\n  var f = function (o) { return JSON.stringify(o); };\n  var nowIso = iso(now);\n\n  return {\n    now: nowIso,\n    renewal_window_end: plusDays(Number(renewalWindowDays) || 100),\n    // 1. the timer was never scheduled, or was silently lost.\n    filter_timers: f({ conditions: [\n      { field: 'policy_status', keyword: 'ACTIVE' },\n      { operator: 'OR', conditions: [\n        { field: 'timers_scheduled', keyword: 'pending' },\n        { field: 'timers_scheduled', keyword: 'failed' } ] } ] }),\n    // 2. the void deadline passed and the notice was never sent. The stamp is\n    //    read positively (voidance_notice_state = pending) because the absence\n    //    of voidance_notice_sent_at is not a query.\n    filter_void: f({ conditions: [\n      { field: 'policy_status', keyword: 'ACTIVE' },\n      { field: 'void_due_date', date_end: nowIso },\n      { field: 'voidance_notice_state', keyword: 'pending' } ] }),\n    // 3. an invoice past its due date that is still not paid.\n    filter_invoices: f({ conditions: [\n      { operator: 'OR', conditions: [\n        { field: 'payment_status', keyword: 'unpaid' },\n        { field: 'payment_status', keyword: 'overdue' } ] },\n      { field: 'due_date', date_end: nowIso } ] }),\n    // 4. an issued quote past its validity that the quote-expiry timer never\n    //    lapsed.\n    filter_quotes: f({ conditions: [\n      { field: 'decision_status', keyword: 'ISSUED' },\n      { field: 'quote_validity_expiry', date_end: nowIso } ] }),\n    // 5. a policy still ACTIVE after its own expiration date.\n    filter_expired: f({ conditions: [\n      { field: 'policy_status', keyword: 'ACTIVE' },\n      { field: 'expiration_date', date_end: nowIso } ] })\n  };\n})()\n",
+            "params": {
+              "renewalWindowDays": "$.static.renewal_window_days"
+            }
+          }
+        },
+        "id": "WINDOW",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.2108100130.WINDOW",
+        "modified": 1788354934
+      },
+      {
+        "data": {
+          "id": "SCAN_TIMERS",
+          "name": "ACTIVE policies with timers pending or failed",
+          "node_type": "http",
+          "payload": {
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token",
+              "accept": "application/json"
+            },
+            "method": "GET",
+            "query": {
+              "config_id": "policy_config",
+              "filter": "$.WINDOW.filter_timers",
+              "limit": "$.static.scan_limit",
+              "space_id": "$.static.space_id"
+            },
+            "timeout": 20000,
+            "url": "https://api.microstrate.io/records"
+          }
+        },
+        "id": "SCAN_TIMERS",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.2108100130.SCAN_TIMERS",
+        "modified": 1788354934
+      },
+      {
+        "data": {
+          "id": "SCAN_VOID",
+          "name": "ACTIVE policies past void_due_date, notice pending",
+          "node_type": "http",
+          "payload": {
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token",
+              "accept": "application/json"
+            },
+            "method": "GET",
+            "query": {
+              "config_id": "policy_config",
+              "filter": "$.WINDOW.filter_void",
+              "limit": "$.static.scan_limit",
+              "space_id": "$.static.space_id"
+            },
+            "timeout": 20000,
+            "url": "https://api.microstrate.io/records"
+          }
+        },
+        "id": "SCAN_VOID",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.2108100130.SCAN_VOID",
+        "modified": 1788354934
+      },
+      {
+        "data": {
+          "id": "SCAN_INVOICES",
+          "name": "Invoices past due and not paid",
+          "node_type": "http",
+          "payload": {
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token",
+              "accept": "application/json"
+            },
+            "method": "GET",
+            "query": {
+              "config_id": "invoice_config",
+              "filter": "$.WINDOW.filter_invoices",
+              "limit": "$.static.scan_limit",
+              "space_id": "$.static.space_id"
+            },
+            "timeout": 20000,
+            "url": "https://api.microstrate.io/records"
+          }
+        },
+        "id": "SCAN_INVOICES",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.2108100130.SCAN_INVOICES",
+        "modified": 1788354934
+      },
+      {
+        "data": {
+          "id": "SCAN_QUOTES",
+          "name": "ISSUED decisions past validity",
+          "node_type": "http",
+          "payload": {
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token",
+              "accept": "application/json"
+            },
+            "method": "GET",
+            "query": {
+              "config_id": "decision_config",
+              "filter": "$.WINDOW.filter_quotes",
+              "limit": "$.static.scan_limit",
+              "space_id": "$.static.space_id"
+            },
+            "timeout": 20000,
+            "url": "https://api.microstrate.io/records"
+          }
+        },
+        "id": "SCAN_QUOTES",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.2108100130.SCAN_QUOTES",
+        "modified": 1788354934
+      },
+      {
+        "data": {
+          "id": "SCAN_EXPIRED",
+          "name": "Policies still ACTIVE past expiration_date",
+          "node_type": "http",
+          "payload": {
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token",
+              "accept": "application/json"
+            },
+            "method": "GET",
+            "query": {
+              "config_id": "policy_config",
+              "filter": "$.WINDOW.filter_expired",
+              "limit": "$.static.scan_limit",
+              "space_id": "$.static.space_id"
+            },
+            "timeout": 20000,
+            "url": "https://api.microstrate.io/records"
+          }
+        },
+        "id": "SCAN_EXPIRED",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.2108100130.SCAN_EXPIRED",
+        "modified": 1788354934
+      },
+      {
+        "data": {
+          "id": "SCAN_TASKS",
+          "name": "Open underwriting work on the board",
+          "node_type": "http",
+          "payload": {
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token",
+              "accept": "application/json"
+            },
+            "method": "GET",
+            "query": {
+              "limit": "$.static.scan_limit",
+              "status": "$.static.ageing_statuses"
+            },
+            "timeout": 20000,
+            "url": "https://api.microstrate.io/workspaces/space/|$.static.space_id|/tasks"
+          }
+        },
+        "id": "SCAN_TASKS",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.2108100130.SCAN_TASKS",
+        "modified": 1788354934
+      },
+      {
+        "data": {
+          "id": "REPORT",
+          "name": "De-duplicate, age, and write the exception report",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function () {\n  var esc = function (s) {\n    return String(s === undefined || s === null ? '' : s)\n      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n  };\n\n  // The index can return one record TWICE across an update (a pending and a\n  // scheduled row for one id) and total_hits counts both, so every count here\n  // is taken AFTER de-duplicating by record id. total_hits is reported beside\n  // it precisely so a divergence is visible rather than averaged away.\n  var norm = function (resp) {\n    var body = (resp && resp.data) ? resp.data : {};\n    var rows = Array.isArray(body.results) ? body.results : [];\n    var seen = {}, out = [];\n    for (var i = 0; i < rows.length; i++) {\n      var id = rows[i] && rows[i].id;\n      if (!id || seen[id]) continue;\n      seen[id] = 1; out.push(rows[i]);\n    }\n    return { rows: out, unique: out.length, index_total_hits: body.total_hits, page_size: rows.length };\n  };\n\n  var d = function (v) { var t = Date.parse(v); return isNaN(t) ? null : t; };\n  var days = function (from, to) { return Math.floor((to - from) / 86400000); };\n  var nowMs = Date.parse(now);\n\n  var P = norm(timers), V = norm(voids), I = norm(invoices),\n      Q = norm(quotes), X = norm(expired);\n\n  // Tasks are aged in code, not in the index: the index has no negation and the\n  // task list is not a records query. awaiting_broker ages on a longer clock\n  // than intake work (contract artefact 4).\n  var taskBody = (tasks && tasks.data) ? tasks.data : {};\n  var taskRows = Array.isArray(taskBody.results) ? taskBody.results : [];\n  var seenTask = {}, agedTasks = [];\n  for (var j = 0; j < taskRows.length; j++) {\n    var t = taskRows[j]; if (!t || !t.id || seenTask[t.id]) continue; seenTask[t.id] = 1;\n    var created = d(t.created_at); if (created === null) continue;\n    var age = days(created, nowMs);\n    var limit = t.status === 'awaiting_broker' ? Number(awaitingBrokerDays) : Number(openDays);\n    if (age >= limit) {\n      agedTasks.push({ id: t.id, status: t.status, age_days: age, threshold: limit, title: t.title || '' });\n    }\n  }\n\n  var sections = [\n    { key: 'timers_never_scheduled', label: 'ACTIVE policies whose timers are pending or failed',\n      rows: P.rows.map(function (r) { return { id: r.id, ref: (r.data || {}).policy_number, detail: 'timers_scheduled=' + (r.data || {}).timers_scheduled }; }),\n      hits: P.index_total_hits, unique: P.unique },\n    { key: 'void_notice_unsent', label: 'ACTIVE policies past void_due_date with the notice still pending',\n      rows: V.rows.map(function (r) { return { id: r.id, ref: (r.data || {}).policy_number, detail: 'void_due_date=' + (r.data || {}).void_due_date }; }),\n      hits: V.index_total_hits, unique: V.unique },\n    { key: 'invoices_overdue', label: 'Invoices past due_date and not paid',\n      rows: I.rows.map(function (r) { return { id: r.id, ref: (r.data || {}).invoice_number, detail: 'due ' + (r.data || {}).due_date + ', ' + (r.data || {}).payment_status + ', paid ' + (r.data || {}).amount_paid + ' of ' + (r.data || {}).amount_due }; }),\n      hits: I.index_total_hits, unique: I.unique },\n    { key: 'issued_quotes_past_validity', label: 'ISSUED decisions past quote_validity_expiry that never lapsed',\n      rows: Q.rows.map(function (r) { return { id: r.id, ref: (r.data || {}).quote_id, detail: 'valid until ' + (r.data || {}).quote_validity_expiry }; }),\n      hits: Q.index_total_hits, unique: Q.unique },\n    { key: 'policies_active_past_expiry', label: 'Policies still ACTIVE after their expiration_date',\n      rows: X.rows.map(function (r) { return { id: r.id, ref: (r.data || {}).policy_number, detail: 'expired ' + (r.data || {}).expiration_date }; }),\n      hits: X.index_total_hits, unique: X.unique },\n    { key: 'tasks_ageing', label: 'Open underwriting work past its ageing threshold',\n      rows: agedTasks.map(function (t) { return { id: t.id, ref: t.status, detail: t.age_days + ' days old (threshold ' + t.threshold + '): ' + t.title }; }),\n      hits: agedTasks.length, unique: agedTasks.length }\n  ];\n\n  var total = 0, html = '', summary = [];\n  for (var s = 0; s < sections.length; s++) {\n    var sec = sections[s];\n    total += sec.rows.length;\n    summary.push(sec.key + '=' + sec.rows.length);\n    html += '<h3>' + esc(sec.label) + ' \u2014 ' + sec.rows.length + '</h3>';\n    if (!sec.rows.length) { html += '<p>None.</p>'; continue; }\n    html += '<ul>';\n    for (var k = 0; k < sec.rows.length; k++) {\n      html += '<li><code>' + esc(sec.rows[k].id) + '</code> ' + esc(sec.rows[k].ref) + ' \u2014 ' + esc(sec.rows[k].detail) + '</li>';\n    }\n    html += '</ul>';\n    if (sec.hits !== undefined && sec.hits !== null && sec.hits !== sec.unique) {\n      html += '<p><em>index total_hits ' + esc(sec.hits) + ' differs from ' + sec.unique +\n              ' unique record ids \u2014 the index returned a record more than once.</em></p>';\n    }\n  }\n\n  var body =\n    '<p>Weekly lifecycle reconciliation for ' + esc(now) + '. This is a BACKSTOP, not the mechanism: ' +\n    'the lifecycle is driven by per-entity timers and record events. Anything listed here is a case ' +\n    'where a timer was never scheduled, was silently lost, or fired against a state nothing then acted on.</p>' +\n    html +\n    '<p>Scanned: policy_config, invoice_config, decision_config and the ANTIPODEAN task board. ' +\n    'Every filter is a positive match \u2014 the index has no negation, so a status added later drops out of ' +\n    'this report without saying so.</p>';\n\n  return {\n    now: now,\n    exception_count: total,\n    has_exceptions: total > 0,\n    summary: summary.join(' '),\n    sections: sections,\n    email_subject: 'Antipodean lifecycle reconciliation \u2014 ' + total + ' exception' + (total === 1 ? '' : 's') + ' \u2014 ' + now.slice(0, 10),\n    email_body_html: body,\n    idempotency_key: 'lifecycle-reconcile-' + now.slice(0, 13)\n  };\n})()\n",
+            "params": {
+              "awaitingBrokerDays": "$.static.awaiting_broker_ageing_days",
+              "expired": "$.SCAN_EXPIRED",
+              "invoices": "$.SCAN_INVOICES",
+              "now": "$.WINDOW.now",
+              "openDays": "$.static.open_ageing_days",
+              "quotes": "$.SCAN_QUOTES",
+              "tasks": "$.SCAN_TASKS",
+              "timers": "$.SCAN_TIMERS",
+              "voids": "$.SCAN_VOID"
+            }
+          }
+        },
+        "id": "REPORT",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.2108100130.REPORT",
+        "modified": 1788354934
+      },
+      {
+        "data": {
+          "id": "BR_ANY",
+          "name": "Only a non-empty result is an exception report",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "input": [
+                  "$.REPORT.has_exceptions",
+                  true
+                ],
+                "operator": "="
+              },
+              "outcome": "SEND_REPORT"
+            },
+            {
+              "outcome": "RESOLVE_SUCCESS"
+            }
+          ]
+        },
+        "id": "BR_ANY",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.2108100130.BR_ANY",
+        "modified": 1788354934
+      },
+      {
+        "data": {
+          "id": "SEND_REPORT",
+          "name": "Email the exception report",
+          "subject": "ms.hub.config.workflow.3788449144.127773145",
+          "node_type": "flow",
+          "payload": {
+            "body_html": "$.REPORT.email_body_html",
+            "email_class": "transactional",
+            "idempotency_key": "$.REPORT.idempotency_key",
+            "subject": "$.REPORT.email_subject",
+            "to": "$.static.report_to",
+            "to_name": "$.static.report_to_name"
+          },
+          "await": true
+        },
+        "id": "SEND_REPORT",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.2108100130.SEND_REPORT",
+        "modified": 1788354934
+      }
+    ],
+    "static": {
+      "ageing_statuses": "open,in_review,awaiting_broker",
+      "awaiting_broker_ageing_days": 21,
+      "open_ageing_days": 7,
+      "renewal_window_days": 100,
+      "report_to": "brack.norris+antipodean-ops@gmail.com",
+      "report_to_name": "Antipodean Underwriting Operations",
+      "scan_limit": 300,
+      "space_id": "ANTIPODEAN"
+    },
+    "result": "$.REPORT"
+  }
+}
