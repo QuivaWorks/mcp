@@ -8,12 +8,14 @@
     "properties": {
       "gen_occupation": {
         "title": "What is your occupation?",
-        "description": "Occupation code from the reference table. Resolved by the `occupation-lookup` flow (plan A-06); the human-readable description lands in gen_occupation_label.",
+        "description": "Occupation code from the reference table. Resolved by the `lookup-resolve` flow, kind `occupation` (contract artefact 7; closed A-06); the human-readable description lands in gen_occupation_label.",
         "type": "string",
         "ui": {
           "inputType": "lookup",
           "props": {
             "debounceMs": 300,
+            "displayKey": "occupation_label",
+            "displayRef": "gen_occupation_label",
             "helpText": {
               "markdown": "Select the occupation that best describes your business activity. Type at least 3 characters. Matching is on the start of each word, so \"software dev\" finds \"Software Development\"; \"cme\" does not find \"Acme\"."
             },
@@ -22,6 +24,7 @@
             "noteKey": "note",
             "optionsPath": "options",
             "params": {
+              "kind": "occupation",
               "limit": 25
             },
             "placeholder": "Start typing an occupation, e.g. \"physio\"",
@@ -33,7 +36,7 @@
               "gen_occupation_label": "occupation_label"
             },
             "queryKey": "query",
-            "source": "https://vwqpwsvi9dms.microstrate.io/occupation-lookup",
+            "source": "https://VWqPwSvI9DMS.microstrate.io/antipodean-lookup",
             "textKey": "text",
             "valueKey": "value"
           }
@@ -2355,27 +2358,27 @@
       },
       "gen_occupation_label": {
         "title": "Occupation (description)",
-        "description": "Derived from the occupation lookup (flow `occupation-lookup`). Written by prefill when a row is picked; not placed on the form.",
+        "description": "Derived from the occupation lookup (flow `lookup-resolve`, kind `occupation`). Written by prefill when a row is picked; not placed on the form.",
         "type": "string"
       },
       "gen_occupation_category": {
         "title": "Occupation ANZSIC category",
-        "description": "Derived from the occupation lookup (flow `occupation-lookup`). Written by prefill when a row is picked; not placed on the form.",
+        "description": "Derived from the occupation lookup (flow `lookup-resolve`, kind `occupation`). Written by prefill when a row is picked; not placed on the form.",
         "type": "string"
       },
       "gen_occupation_itpi_eligibility": {
         "title": "ITPI eligibility for the selected occupation",
-        "description": "Derived from the occupation lookup (flow `occupation-lookup`). Written by prefill when a row is picked; not placed on the form.",
+        "description": "Derived from the occupation lookup (flow `lookup-resolve`, kind `occupation`). Written by prefill when a row is picked; not placed on the form.",
         "type": "string"
       },
       "gen_occupation_ah_eligibility": {
         "title": "Allied Health eligibility for the selected occupation",
-        "description": "Derived from the occupation lookup (flow `occupation-lookup`). Written by prefill when a row is picked; not placed on the form.",
+        "description": "Derived from the occupation lookup (flow `lookup-resolve`, kind `occupation`). Written by prefill when a row is picked; not placed on the form.",
         "type": "string"
       },
       "gen_occupation_gp_eligibility": {
         "title": "General Property eligibility for the selected occupation",
-        "description": "Derived from the occupation lookup (flow `occupation-lookup`). Written by prefill when a row is picked; not placed on the form.",
+        "description": "Derived from the occupation lookup (flow `lookup-resolve`, kind `occupation`). Written by prefill when a row is picked; not placed on the form.",
         "type": "string"
       }
     }
@@ -2727,6 +2730,8 @@
                           "inputType": "lookup",
                           "props": {
                             "debounceMs": 300,
+                            "displayKey": "occupation_label",
+                            "displayRef": "gen_occupation_label",
                             "helpText": {
                               "markdown": "Select the occupation that best describes your business activity. Type at least 3 characters. Matching is on the start of each word, so \"software dev\" finds \"Software Development\"; \"cme\" does not find \"Acme\"."
                             },
@@ -2735,6 +2740,7 @@
                             "noteKey": "note",
                             "optionsPath": "options",
                             "params": {
+                              "kind": "occupation",
                               "limit": 25
                             },
                             "placeholder": "Start typing an occupation, e.g. \"physio\"",
@@ -2746,7 +2752,7 @@
                               "gen_occupation_label": "occupation_label"
                             },
                             "queryKey": "query",
-                            "source": "https://vwqpwsvi9dms.microstrate.io/occupation-lookup",
+                            "source": "https://VWqPwSvI9DMS.microstrate.io/antipodean-lookup",
                             "textKey": "text",
                             "valueKey": "value"
                           },
