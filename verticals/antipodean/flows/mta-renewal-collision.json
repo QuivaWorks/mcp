@@ -1,0 +1,277 @@
+{
+  "name": "mta-renewal-collision",
+  "description": "Flow 8. Processes an MTA moving to BOUND or REFERRED and detects a collision with the T-100 renewal window (spec 4.6.3): MTA bound after T-100 invalidates the existing renewal quote (task raised, tag renewal); MTA in progress/referred within the window marks the renewal Pending Expiring Endorsement for manual review (task raised, tag renewal). Below T-100, no collision: mta_config/policy_config are updated with no task. Gateway trigger. Payload: {policy_id, mta_id, new_mta_status (BOUND|REFERRED), change_description, effective_date, premium_adjustment}.",
+  "config": {
+    "nodes": [
+      {
+        "id": "TRIGGER",
+        "data": {
+          "id": "TRIGGER",
+          "name": "MTA status change",
+          "node_type": "trigger",
+          "trigger_type": "gateway",
+          "payload": {}
+        }
+      },
+      {
+        "id": "VALIDATE_INPUT",
+        "data": {
+          "id": "VALIDATE_INPUT",
+          "name": "policy_id, mta_id, new_mta_status present and valid",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": "and",
+                "input": [
+                  {
+                    "operator": "notEmpty",
+                    "input": [
+                      "$.trigger.policy_id"
+                    ]
+                  },
+                  {
+                    "operator": "notEmpty",
+                    "input": [
+                      "$.trigger.mta_id"
+                    ]
+                  },
+                  {
+                    "operator": "in",
+                    "input": [
+                      "$.trigger.new_mta_status",
+                      [
+                        "BOUND",
+                        "REFERRED"
+                      ]
+                    ]
+                  }
+                ]
+              },
+              "outcome": "GET_POLICY"
+            },
+            {
+              "outcome": "REJECT_INPUT"
+            }
+          ]
+        }
+      },
+      {
+        "id": "REJECT_INPUT",
+        "data": {
+          "id": "REJECT_INPUT",
+          "name": "Missing/invalid required input",
+          "node_type": "error",
+          "payload": {
+            "status_code": 422,
+            "message": "mta-renewal-collision requires policy_id, mta_id and new_mta_status in [BOUND, REFERRED]"
+          }
+        }
+      },
+      {
+        "id": "GET_POLICY",
+        "data": {
+          "id": "GET_POLICY",
+          "name": "Read the policy",
+          "node_type": "http",
+          "payload": {
+            "method": "GET",
+            "base_url": "https://api.microstrate.io",
+            "url": "/records/policy_config/|$.trigger.policy_id",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            }
+          }
+        }
+      },
+      {
+        "id": "DECIDE_COLLISION",
+        "data": {
+          "id": "DECIDE_COLLISION",
+          "name": "Test T-100 against expiration_date; classify collision",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function(){ var expiry = new Date(expirationDate); var daysToExpiry = (expiry.getTime() - Date.now()) / 86400000; var pastT100 = daysToExpiry <= 100; var collisionType = 'none'; if (newStatus === 'BOUND' && pastT100) collisionType = 'invalidation'; else if (newStatus === 'REFERRED' && pastT100) collisionType = 'pending_review'; var mtaState = newStatus === 'BOUND' ? 'bound' : 'referred'; var nextRevision = (typeof revisionIndex === 'number' ? revisionIndex : 0) + (newStatus === 'BOUND' ? 1 : 0); return { days_to_expiry: Math.round(daysToExpiry), past_t100: pastT100, collision_type: collisionType, mta_state: mtaState, next_revision_index: nextRevision, policy_number: policyNumber }; })();",
+            "params": {
+              "expirationDate": "$.GET_POLICY.data.data.expiration_date",
+              "newStatus": "$.trigger.new_mta_status",
+              "revisionIndex": "$.GET_POLICY.data.data.revision_index",
+              "policyNumber": "$.GET_POLICY.data.data.policy_number"
+            }
+          }
+        }
+      },
+      {
+        "id": "UPDATE_MTA",
+        "data": {
+          "id": "UPDATE_MTA",
+          "name": "Write the MTA record",
+          "node_type": "http",
+          "payload": {
+            "method": "PUT",
+            "base_url": "https://api.microstrate.io",
+            "url": "/records/mta_config/|$.trigger.mta_id",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "data": {
+                "mta_status": "$.trigger.new_mta_status",
+                "effective_date": "$.trigger.effective_date",
+                "premium_adjustment": "$.trigger.premium_adjustment",
+                "change_description": "$.trigger.change_description",
+                "policy_id": "$.trigger.policy_id",
+                "policy_number": "$.DECIDE_COLLISION.policy_number",
+                "revision_index": "$.DECIDE_COLLISION.next_revision_index"
+              },
+              "completed": true
+            }
+          }
+        }
+      },
+      {
+        "id": "UPDATE_POLICY_MTA_STATE",
+        "data": {
+          "id": "UPDATE_POLICY_MTA_STATE",
+          "name": "Reflect MTA state on the policy",
+          "node_type": "http",
+          "payload": {
+            "method": "PUT",
+            "base_url": "https://api.microstrate.io",
+            "url": "/records/policy_config/|$.trigger.policy_id",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "data": {
+                "active_mta_id": "$.trigger.mta_id",
+                "mta_state": "$.DECIDE_COLLISION.mta_state",
+                "revision_index": "$.DECIDE_COLLISION.next_revision_index"
+              },
+              "completed": true
+            }
+          }
+        }
+      },
+      {
+        "id": "COND_COLLISION",
+        "data": {
+          "id": "COND_COLLISION",
+          "name": "Branch on collision type",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.DECIDE_COLLISION.collision_type",
+                  "invalidation"
+                ]
+              },
+              "outcome": "RAISE_TASK_INVALIDATION"
+            },
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.DECIDE_COLLISION.collision_type",
+                  "pending_review"
+                ]
+              },
+              "outcome": "RAISE_TASK_PENDING"
+            },
+            {
+              "outcome": "RESOLVE_SUCCESS"
+            }
+          ]
+        }
+      },
+      {
+        "id": "RAISE_TASK_INVALIDATION",
+        "data": {
+          "id": "RAISE_TASK_INVALIDATION",
+          "name": "Renewal quote invalidated by late MTA",
+          "node_type": "task",
+          "operation": "create_task",
+          "payload": {
+            "space_id": "ANTIPODEAN",
+            "title": "Renewal invalidated \u2014 MTA bound after T-100 on |$.DECIDE_COLLISION.policy_number",
+            "description": "spec 4.6.3: an endorsement (MTA |$.trigger.mta_id|) was bound on the expiring term after T-100. The existing renewal quote for this policy is invalidated and must be re-generated against the revised baseline (flow 6, renewal-generate).",
+            "priority": "medium",
+            "tags": [
+              "renewal"
+            ],
+            "folder": "$.trigger.policy_id"
+          }
+        }
+      },
+      {
+        "id": "RAISE_TASK_PENDING",
+        "data": {
+          "id": "RAISE_TASK_PENDING",
+          "name": "Pending Expiring Endorsement \u2014 manual review",
+          "node_type": "task",
+          "operation": "create_task",
+          "payload": {
+            "space_id": "ANTIPODEAN",
+            "title": "Pending Expiring Endorsement \u2014 |$.DECIDE_COLLISION.policy_number",
+            "description": "spec 4.6.3: MTA |$.trigger.mta_id| is currently in progress / referred within the T-100 renewal window. Mark the renewal quote 'Pending Expiring Endorsement' and queue for manual underwriter review before dispatch.",
+            "priority": "medium",
+            "tags": [
+              "renewal"
+            ],
+            "folder": "$.trigger.policy_id"
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "source": "TRIGGER",
+        "target": "VALIDATE_INPUT"
+      },
+      {
+        "id": "e2",
+        "source": "VALIDATE_INPUT",
+        "target": "GET_POLICY"
+      },
+      {
+        "id": "e3",
+        "source": "VALIDATE_INPUT",
+        "target": "REJECT_INPUT"
+      },
+      {
+        "id": "e4",
+        "source": "GET_POLICY",
+        "target": "DECIDE_COLLISION"
+      },
+      {
+        "id": "e5",
+        "source": "DECIDE_COLLISION",
+        "target": "UPDATE_MTA"
+      },
+      {
+        "id": "e6",
+        "source": "UPDATE_MTA",
+        "target": "UPDATE_POLICY_MTA_STATE"
+      },
+      {
+        "id": "e7",
+        "source": "UPDATE_POLICY_MTA_STATE",
+        "target": "COND_COLLISION"
+      },
+      {
+        "id": "e8",
+        "source": "COND_COLLISION",
+        "target": "RAISE_TASK_INVALIDATION"
+      },
+      {
+        "id": "e9",
+        "source": "COND_COLLISION",
+        "target": "RAISE_TASK_PENDING"
+      }
+    ],
+    "result": "$.DECIDE_COLLISION"
+  }
+}

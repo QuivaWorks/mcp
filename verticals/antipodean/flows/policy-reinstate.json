@@ -1,0 +1,290 @@
+{
+  "name": "policy-reinstate",
+  "description": "Flow 5. VOIDED -> ACTIVE with a fresh void_due_date, reschedules the policy-void timer under the frozen name policy-void:<policyId> (contract artefact 5), and stamps the reinstatement justification onto policy_config audit fields (void_override_reason/by/at) since no record-edit audit trail exists anywhere on the platform. The target subject for policy-void (flow 4) is resolved dynamically at run time from GET /hub/workflows (name match), never hardcoded, and the run refuses to schedule (fails loud) if that flow is not yet published rather than risk a silent dead timer (see traps register: a bad schedule-flow subject is never validated and 200s). Gateway trigger. Payload: {policy_id, justification, reinstated_by}.",
+  "config": {
+    "nodes": [
+      {
+        "id": "TRIGGER",
+        "data": {
+          "id": "TRIGGER",
+          "name": "Reinstate request",
+          "node_type": "trigger",
+          "trigger_type": "gateway",
+          "payload": {}
+        }
+      },
+      {
+        "id": "VALIDATE_INPUT",
+        "data": {
+          "id": "VALIDATE_INPUT",
+          "name": "policy_id and justification present",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": "and",
+                "input": [
+                  {
+                    "operator": "notEmpty",
+                    "input": [
+                      "$.trigger.policy_id"
+                    ]
+                  },
+                  {
+                    "operator": "notEmpty",
+                    "input": [
+                      "$.trigger.justification"
+                    ]
+                  }
+                ]
+              },
+              "outcome": "GET_POLICY"
+            },
+            {
+              "outcome": "REJECT_INPUT"
+            }
+          ]
+        }
+      },
+      {
+        "id": "REJECT_INPUT",
+        "data": {
+          "id": "REJECT_INPUT",
+          "name": "Missing required input",
+          "node_type": "error",
+          "payload": {
+            "status_code": 422,
+            "message": "policy-reinstate requires policy_id and justification (no audit trail on a record edit exists anywhere, so this is the only record of why)"
+          }
+        }
+      },
+      {
+        "id": "GET_POLICY",
+        "data": {
+          "id": "GET_POLICY",
+          "name": "Read the policy",
+          "node_type": "http",
+          "payload": {
+            "method": "GET",
+            "base_url": "https://api.microstrate.io",
+            "url": "/records/policy_config/|$.trigger.policy_id",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            }
+          }
+        }
+      },
+      {
+        "id": "CHECK_VOIDED",
+        "data": {
+          "id": "CHECK_VOIDED",
+          "name": "Gate: must currently be VOIDED",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.GET_POLICY.data.data.policy_status",
+                  "VOIDED"
+                ]
+              },
+              "outcome": "LOOKUP_FLOWS"
+            },
+            {
+              "outcome": "REJECT_STATE"
+            }
+          ]
+        }
+      },
+      {
+        "id": "REJECT_STATE",
+        "data": {
+          "id": "REJECT_STATE",
+          "name": "Policy is not VOIDED",
+          "node_type": "error",
+          "payload": {
+            "status_code": 409,
+            "message": "policy-reinstate: policy is not in VOIDED status; nothing to reinstate"
+          }
+        }
+      },
+      {
+        "id": "LOOKUP_FLOWS",
+        "data": {
+          "id": "LOOKUP_FLOWS",
+          "name": "Resolve the policy-void flow's published subject",
+          "node_type": "http",
+          "payload": {
+            "method": "GET",
+            "base_url": "https://api.microstrate.io",
+            "url": "/hub/workflows",
+            "query": {
+              "collection_topic": "3788449144",
+              "version": "published"
+            },
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            }
+          }
+        }
+      },
+      {
+        "id": "DECIDE",
+        "data": {
+          "id": "DECIDE",
+          "name": "Compute fresh void_due_date and resolve target subject",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function(){ var found = null; for (var i=0;i<(flows||[]).length;i++){ if (flows[i].name === 'policy-void') { found = flows[i].subject; break; } } var days = (voidAfterDays === undefined || voidAfterDays === null) ? 61 : voidAfterDays; var nowIso = new Date().toISOString(); var due = new Date(Date.now() + days*24*60*60*1000).toISOString(); return { found: !!found, subject: found || '', void_due_date: due, now: nowIso, name: 'policy-void:' + policyId }; })();",
+            "params": {
+              "flows": "$.LOOKUP_FLOWS.results",
+              "voidAfterDays": "$.GET_POLICY.data.data.void_after_days",
+              "policyId": "$.trigger.policy_id"
+            }
+          }
+        }
+      },
+      {
+        "id": "COND_SUBJECT",
+        "data": {
+          "id": "COND_SUBJECT",
+          "name": "Gate: policy-void flow must be published",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.DECIDE.found",
+                  true
+                ]
+              },
+              "outcome": "SCHEDULE_VOID"
+            },
+            {
+              "outcome": "REJECT_NO_VOID_FLOW"
+            }
+          ]
+        }
+      },
+      {
+        "id": "REJECT_NO_VOID_FLOW",
+        "data": {
+          "id": "REJECT_NO_VOID_FLOW",
+          "name": "policy-void flow not published",
+          "node_type": "error",
+          "payload": {
+            "status_code": 500,
+            "message": "policy-reinstate: the policy-void flow is not published in this collection, so the void timer cannot be rescheduled"
+          }
+        }
+      },
+      {
+        "id": "SCHEDULE_VOID",
+        "data": {
+          "id": "SCHEDULE_VOID",
+          "name": "Reschedule policy-void:<policyId>",
+          "node_type": "quiva-endpoint",
+          "subject": "microstrate.hub.post.schedule-flow",
+          "payload": {
+            "name": "$.DECIDE.name",
+            "description": "Rescheduled by policy-reinstate on reinstatement",
+            "trigger_on": "$.DECIDE.void_due_date",
+            "payload": {
+              "subject": "$.DECIDE.subject",
+              "trigger": {
+                "policy_id": "$.trigger.policy_id"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "STAMP",
+        "data": {
+          "id": "STAMP",
+          "name": "Write ACTIVE, fresh void_due_date, topic, audit fields",
+          "node_type": "http",
+          "payload": {
+            "method": "PUT",
+            "base_url": "https://api.microstrate.io",
+            "url": "/records/policy_config/|$.trigger.policy_id",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "data": {
+                "policy_status": "ACTIVE",
+                "void_due_date": "$.DECIDE.void_due_date",
+                "policy_void_timer_topic": "$.SCHEDULE_VOID.topic",
+                "void_override_reason": "$.trigger.justification",
+                "void_override_by": "$.trigger.reinstated_by",
+                "void_override_at": "$.DECIDE.now"
+              },
+              "completed": true
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "source": "TRIGGER",
+        "target": "VALIDATE_INPUT"
+      },
+      {
+        "id": "e2",
+        "source": "VALIDATE_INPUT",
+        "target": "GET_POLICY"
+      },
+      {
+        "id": "e3",
+        "source": "VALIDATE_INPUT",
+        "target": "REJECT_INPUT"
+      },
+      {
+        "id": "e4",
+        "source": "GET_POLICY",
+        "target": "CHECK_VOIDED"
+      },
+      {
+        "id": "e5",
+        "source": "CHECK_VOIDED",
+        "target": "LOOKUP_FLOWS"
+      },
+      {
+        "id": "e6",
+        "source": "CHECK_VOIDED",
+        "target": "REJECT_STATE"
+      },
+      {
+        "id": "e7",
+        "source": "LOOKUP_FLOWS",
+        "target": "DECIDE"
+      },
+      {
+        "id": "e8",
+        "source": "DECIDE",
+        "target": "COND_SUBJECT"
+      },
+      {
+        "id": "e9",
+        "source": "COND_SUBJECT",
+        "target": "SCHEDULE_VOID"
+      },
+      {
+        "id": "e10",
+        "source": "COND_SUBJECT",
+        "target": "REJECT_NO_VOID_FLOW"
+      },
+      {
+        "id": "e11",
+        "source": "SCHEDULE_VOID",
+        "target": "STAMP"
+      }
+    ],
+    "result": "$.STAMP"
+  }
+}

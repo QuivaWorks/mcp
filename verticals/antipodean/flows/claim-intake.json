@@ -1,0 +1,187 @@
+{
+  "name": "claim-intake",
+  "description": "Flow 9. Digital claim lodgement (spec 4.7): mints CLM-{PRODUCT}-{YYYY}-{unique} derived from the record id (numbergen counters are unreachable from a flow, per the traps register), creates claim_config with broker_id/product_code/policy_number read authoritatively off the policy record rather than trusted from the caller, and spawns an urgent Claims Action task (tag claim, priority highest, folder=claim record id). Gateway trigger. Payload: {policy_id, incident_description, date_of_loss, claimant_details?, estimated_loss?, documents?}.",
+  "config": {
+    "nodes": [
+      {
+        "id": "TRIGGER",
+        "data": {
+          "id": "TRIGGER",
+          "name": "Claim lodgement",
+          "node_type": "trigger",
+          "trigger_type": "gateway",
+          "payload": {}
+        }
+      },
+      {
+        "id": "VALIDATE_INPUT",
+        "data": {
+          "id": "VALIDATE_INPUT",
+          "name": "policy_id, incident_description, date_of_loss present",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": "and",
+                "input": [
+                  {
+                    "operator": "notEmpty",
+                    "input": [
+                      "$.trigger.policy_id"
+                    ]
+                  },
+                  {
+                    "operator": "notEmpty",
+                    "input": [
+                      "$.trigger.incident_description"
+                    ]
+                  },
+                  {
+                    "operator": "notEmpty",
+                    "input": [
+                      "$.trigger.date_of_loss"
+                    ]
+                  }
+                ]
+              },
+              "outcome": "GET_POLICY"
+            },
+            {
+              "outcome": "REJECT_INPUT"
+            }
+          ]
+        }
+      },
+      {
+        "id": "REJECT_INPUT",
+        "data": {
+          "id": "REJECT_INPUT",
+          "name": "Missing required input",
+          "node_type": "error",
+          "payload": {
+            "status_code": 422,
+            "message": "claim-intake requires policy_id, incident_description and date_of_loss"
+          }
+        }
+      },
+      {
+        "id": "GET_POLICY",
+        "data": {
+          "id": "GET_POLICY",
+          "name": "Read the policy (authoritative broker_id/product_code)",
+          "node_type": "http",
+          "payload": {
+            "method": "GET",
+            "base_url": "https://api.microstrate.io",
+            "url": "/records/policy_config/|$.trigger.policy_id",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            }
+          }
+        }
+      },
+      {
+        "id": "MINT_CLAIM_NUMBER",
+        "data": {
+          "id": "MINT_CLAIM_NUMBER",
+          "name": "Derive CLM-{PRODUCT}-{YYYY}-{unique} from the policy",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function(){ var year = new Date().getFullYear(); var suffix = (policyId || '').replace(/[^a-zA-Z0-9]/g,'').toUpperCase().slice(-6); if (suffix.length < 6) suffix = (suffix + Date.now().toString(36).toUpperCase()).slice(0,6); return { claim_number: 'CLM-' + product + '-' + year + '-' + suffix, now: new Date().toISOString() }; })();",
+            "params": {
+              "product": "$.GET_POLICY.data.data.product_code",
+              "policyId": "$.trigger.policy_id"
+            }
+          }
+        }
+      },
+      {
+        "id": "CREATE_CLAIM",
+        "data": {
+          "id": "CREATE_CLAIM",
+          "name": "Create the claim record",
+          "node_type": "http",
+          "payload": {
+            "method": "POST",
+            "base_url": "https://api.microstrate.io",
+            "url": "/records/claim_config",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "space_id": "ANTIPODEAN",
+              "completed": true,
+              "data": {
+                "claim_number": "$.MINT_CLAIM_NUMBER.claim_number",
+                "policy_id": "$.trigger.policy_id",
+                "policy_number": "$.GET_POLICY.data.data.policy_number",
+                "broker_id": "$.GET_POLICY.data.data.broker_id",
+                "product_code": "$.GET_POLICY.data.data.product_code",
+                "claim_status": "NOTIFIED",
+                "claim_open": "true",
+                "date_notified": "$.MINT_CLAIM_NUMBER.now",
+                "date_of_loss": "$.trigger.date_of_loss",
+                "incident_description": "$.trigger.incident_description",
+                "claimant_details": "$.trigger.claimant_details",
+                "estimated_loss": "$.trigger.estimated_loss",
+                "documents": "$.trigger.documents"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "RAISE_TASK",
+        "data": {
+          "id": "RAISE_TASK",
+          "name": "Spawn urgent Claims Action task",
+          "node_type": "task",
+          "operation": "create_task",
+          "payload": {
+            "space_id": "ANTIPODEAN",
+            "title": "Claim notified \u2014 |$.MINT_CLAIM_NUMBER.claim_number",
+            "description": "spec 4.7: digital claim intake for policy |$.GET_POLICY.data.data.policy_number|. Date of loss: |$.trigger.date_of_loss|. |$.trigger.incident_description|",
+            "priority": "highest",
+            "tags": [
+              "claim"
+            ],
+            "folder": "$.CREATE_CLAIM.data.id"
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "source": "TRIGGER",
+        "target": "VALIDATE_INPUT"
+      },
+      {
+        "id": "e2",
+        "source": "VALIDATE_INPUT",
+        "target": "GET_POLICY"
+      },
+      {
+        "id": "e3",
+        "source": "VALIDATE_INPUT",
+        "target": "REJECT_INPUT"
+      },
+      {
+        "id": "e4",
+        "source": "GET_POLICY",
+        "target": "MINT_CLAIM_NUMBER"
+      },
+      {
+        "id": "e5",
+        "source": "MINT_CLAIM_NUMBER",
+        "target": "CREATE_CLAIM"
+      },
+      {
+        "id": "e6",
+        "source": "CREATE_CLAIM",
+        "target": "RAISE_TASK"
+      }
+    ],
+    "result": "$.CREATE_CLAIM"
+  }
+}
