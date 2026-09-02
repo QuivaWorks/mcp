@@ -1,0 +1,49 @@
+{
+ "_comment": [
+  "The gateway mapping that puts `occupation-lookup` on a URL the browser can POST to.",
+  "This is not a flow definition -- build-flows.mjs loads flows by explicit name, so this",
+  "file is inert to it. It is the reproducible record of the three API calls that made the",
+  "route, because there is no other place in this repo that records a mapping.",
+  "",
+  "The mapping lives on the ACCOUNT's own gateway, not on api.microstrate.io. A tenant",
+  "cannot write to the platform gateway, so a tenant flow is always served from",
+  "`<gateway-id>.microstrate.io`. Find the id with `GET /gateway/all`; on the",
+  "antipodean_build staging account (9227248058) it is VWqPwSvI9DMS, so the browser POSTs",
+  "to https://vwqpwsvi9dms.microstrate.io/occupation-lookup.",
+  "",
+  "Three calls, in order. All three are required -- see `traps` below.",
+  "  1. POST   /gateway/{gateway_id}/mapping                                    <- `mapping`",
+  "  2. POST   /gateway/{gateway_id}/mapping/version?method=post&path=%2F...    <- `mapping_version`",
+  "  3. PATCH  /gateway/{gateway_id}/mapping/details?method=post&path=%2F...    <- `mapping_traffic_patch`",
+  "Then force a route-table rebuild (see `traps`)."
+ ],
+ "gateway_id": "VWqPwSvI9DMS",
+ "url": "https://vwqpwsvi9dms.microstrate.io/occupation-lookup",
+ "mapping": {
+  "gateway": "ms.gateway.VWqPwSvI9DMS.gateway",
+  "method": "POST",
+  "path": "/occupation-lookup",
+  "is_public": false,
+  "timeout": 30000,
+  "limit": { "request": 600, "time": 1000 }
+ },
+ "mapping_version": {
+  "resource_type": "flow",
+  "resource": "ms.hub.config.workflow.3788449144.2763075451",
+  "invocation_type": "RequestResponse",
+  "active": true,
+  "description": "Occupation type-ahead for the quote form"
+ },
+ "mapping_traffic_patch": {
+  "traffic_distribution": { "1": 100 },
+  "timeout": 30000,
+  "limit": { "request": 600, "time": 1000 },
+  "is_public": false
+ },
+ "traps": [
+  "POST /gateway/{id}/mapping does NOT set traffic_distribution, and cerberus skips every version whose weight is 0 (`if mapping.TrafficDistribution[v.Version] == 0 { continue }`, gateway_api.go). The route then mounts with an empty version list, PickRandomItem returns nothing, and the request dies in the recoverer as a 500 with an EMPTY BODY. The PATCH in step 3 is what makes the route work at all.",
+  "The mapping can be in the data plane and not in effect. Both writes above land on the gateway stream, but the route stayed a plain-text `404 page not found` for over five minutes. `bcli publish ms.gateway.<id>.reload` is the documented fix and bcli cannot reach a sub-account. What worked over HTTP: `PATCH /gateway/{gateway_id}` with any harmless field (a description) -- that writes ms.gateway.<id>.gateway, which cerberus's stream consumer turns into a per-gateway config rebuild. The route served on the next request.",
+  "A mapping version with no authorization middleware gets DenyClientAuthorizer by default, so a `client`-role session is refused. Brokers onboarded as `client` need an explicit authorization middleware on the version before they can use this route.",
+  "invocation_type must be RequestResponse or the gateway does not await the run and the browser gets nothing to read."
+ ]
+}

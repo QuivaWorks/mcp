@@ -7,17 +7,35 @@
     "type": "object",
     "properties": {
       "gen_occupation": {
-        "type": "string",
         "title": "What is your occupation?",
-        "description": "Select the occupation that best describes your business activity OPTIONS UNRESOLVED (md §7 A-06): Options come from the rating table, which is not in any supplied file. props.options is UNRESOLVED — see md §7 A-06. Gate G2f requires every enum input to carry props.options, so this key blocks that gate until the occupation list is supplied (P22 loads it; P17 serves it).",
+        "description": "Occupation code from the reference table. Resolved by the `occupation-lookup` flow (plan A-06); the human-readable description lands in gen_occupation_label.",
+        "type": "string",
         "ui": {
-          "inputType": "dropdown",
+          "inputType": "lookup",
           "props": {
-            "label": "What is your occupation?",
+            "debounceMs": 300,
             "helpText": {
-              "markdown": "Select the occupation that best describes your business activity"
+              "markdown": "Select the occupation that best describes your business activity. Type at least 3 characters. Matching is on the start of each word, so \"software dev\" finds \"Software Development\"; \"cme\" does not find \"Acme\"."
             },
-            "options": []
+            "label": "What is your occupation?",
+            "minChars": 3,
+            "noteKey": "note",
+            "optionsPath": "options",
+            "params": {
+              "limit": 25
+            },
+            "placeholder": "Start typing an occupation, e.g. \"physio\"",
+            "prefill": {
+              "gen_occupation_ah_eligibility": "ah_eligibility",
+              "gen_occupation_category": "occupation_category",
+              "gen_occupation_gp_eligibility": "gp_eligibility",
+              "gen_occupation_itpi_eligibility": "itpi_eligibility",
+              "gen_occupation_label": "occupation_label"
+            },
+            "queryKey": "query",
+            "source": "https://vwqpwsvi9dms.microstrate.io/occupation-lookup",
+            "textKey": "text",
+            "valueKey": "value"
           }
         }
       },
@@ -2334,6 +2352,31 @@
             }
           }
         }
+      },
+      "gen_occupation_label": {
+        "title": "Occupation (description)",
+        "description": "Derived from the occupation lookup (flow `occupation-lookup`). Written by prefill when a row is picked; not placed on the form.",
+        "type": "string"
+      },
+      "gen_occupation_category": {
+        "title": "Occupation ANZSIC category",
+        "description": "Derived from the occupation lookup (flow `occupation-lookup`). Written by prefill when a row is picked; not placed on the form.",
+        "type": "string"
+      },
+      "gen_occupation_itpi_eligibility": {
+        "title": "ITPI eligibility for the selected occupation",
+        "description": "Derived from the occupation lookup (flow `occupation-lookup`). Written by prefill when a row is picked; not placed on the form.",
+        "type": "string"
+      },
+      "gen_occupation_ah_eligibility": {
+        "title": "Allied Health eligibility for the selected occupation",
+        "description": "Derived from the occupation lookup (flow `occupation-lookup`). Written by prefill when a row is picked; not placed on the form.",
+        "type": "string"
+      },
+      "gen_occupation_gp_eligibility": {
+        "title": "General Property eligibility for the selected occupation",
+        "description": "Derived from the occupation lookup (flow `occupation-lookup`). Written by prefill when a row is picked; not placed on the form.",
+        "type": "string"
       }
     }
   },
@@ -2681,13 +2724,31 @@
                         {
                           "type": "field",
                           "field": "gen_occupation",
-                          "inputType": "dropdown",
+                          "inputType": "lookup",
                           "props": {
-                            "label": "What is your occupation?",
+                            "debounceMs": 300,
                             "helpText": {
-                              "markdown": "Select the occupation that best describes your business activity"
+                              "markdown": "Select the occupation that best describes your business activity. Type at least 3 characters. Matching is on the start of each word, so \"software dev\" finds \"Software Development\"; \"cme\" does not find \"Acme\"."
                             },
-                            "options": []
+                            "label": "What is your occupation?",
+                            "minChars": 3,
+                            "noteKey": "note",
+                            "optionsPath": "options",
+                            "params": {
+                              "limit": 25
+                            },
+                            "placeholder": "Start typing an occupation, e.g. \"physio\"",
+                            "prefill": {
+                              "gen_occupation_ah_eligibility": "ah_eligibility",
+                              "gen_occupation_category": "occupation_category",
+                              "gen_occupation_gp_eligibility": "gp_eligibility",
+                              "gen_occupation_itpi_eligibility": "itpi_eligibility",
+                              "gen_occupation_label": "occupation_label"
+                            },
+                            "queryKey": "query",
+                            "source": "https://vwqpwsvi9dms.microstrate.io/occupation-lookup",
+                            "textKey": "text",
+                            "valueKey": "value"
                           },
                           "rules": [
                             {
