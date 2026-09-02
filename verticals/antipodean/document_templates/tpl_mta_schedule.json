@@ -1,0 +1,38 @@
+{
+  "key": "tpl_mta_schedule",
+  "label": "Endorsement Schedule",
+  "source": {
+    "key": "obj://microstrate-documents/antipodean.tpl_mta_schedule.docx",
+    "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  },
+  "output": {
+    "name": "endorsement-{mta_reference}",
+    "content_type": "application/pdf",
+    "bucket": "microstrate-documents",
+    "folder": "antipodean.mta"
+  },
+  "_notes": {
+    "source_file": "tpl_mta_schedule.docx sits beside this config in the repo. It is NOT deployed by the vertical \u2014 only this config is. Upload the DOCX to the target account first with a POST (not PUT) to /api/default-storage/object/microstrate-documents/antipodean.tpl_mta_schedule.docx; a PUT returns 200 and stores nothing.",
+    "placeholders": [
+      "change_description",
+      "effective_date",
+      "mta_reference",
+      "mta_status",
+      "policy_number",
+      "premium_adjustment",
+      "revision_index"
+    ],
+    "scalar_tags": [
+      "{change_description}",
+      "{effective_date}",
+      "{mta_reference}",
+      "{mta_status}",
+      "{policy_number}",
+      "{premium_adjustment}",
+      "{revision_index}"
+    ],
+    "loop_arrays": [],
+    "payload_contract": "A trigger payload MUST supply every scalar key below and, for each loop, an array under the loop's own name. Any placeholder with no matching key renders as an EMPTY STRING, silently, and the job still reports success (docxtemplater nullGetter -> ''). Names are exactly as extracted from the committed .docx by verify_merge_tags.py; re-extract after ANY edit to the DOCX \u2014 never hand-edit this list.",
+    "source_record": "mta_config. Generated when an MTA binds."
+  }
+}
