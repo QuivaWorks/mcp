@@ -61,7 +61,7 @@
           "id": "BIND_INPUTS",
           "node_type": "eval",
           "payload": {
-            "code": "(function () {\n  var rec = (dec && dec.data) ? dec.data : {};\n  var id = (dec && dec.id) ? dec.id : '';\n  var now = new Date();\n  function iso(d) { return d.toISOString().replace(/\\.\\d{3}Z$/, 'Z'); }\n  function day(d) { return d.toISOString().slice(0, 10); }\n  function addDays(d, n) { return new Date(d.getTime() + n * 86400000); }\n\n  var year = now.getUTCFullYear();\n  var product = String(rec.product_code || 'GEN').toUpperCase().replace(/[^A-Z0-9]/g, '');\n  var quoteId = String(rec.quote_id || '');\n\n  var inception = trg && trg.inception_date ? new Date(trg.inception_date) : now;\n  if (isNaN(inception.getTime())) inception = now;\n  var termDays = Number(termDaysCfg) || 365;\n  var expiration = addDays(inception, termDays);\n\n  return {\n    decision_id: id,\n    quote_id: quoteId,\n    submission_id: String(rec.submission_id || ''),\n    product_code: product,\n    broker_id: String(rec.broker_id || (trg && trg.broker_id) || ''),\n    distributor_account_id: String(rec.distributor_account_id || ''),\n    outcome: String(rec.outcome || ''),\n    premium_basis: String(rec.premium_basis || ''),\n    base_premium: Number(rec.base_premium || 0),\n    total_payable: Number(rec.total_payable || 0),\n    // §5.4: counter names cannot contain hyphens\n    // (numbergen-service/validate/validate.go:9). Per-year counters mean no\n    // annual reset is ever needed.\n    policy_counter_name: 'P_' + product + '_' + year,\n    invoice_counter_name: 'I_' + product + '_' + year,\n    // §5.4 idempotency: records enforce no uniqueness, so a duplicate bind must\n    // be caught before the counter is touched, never after.\n    policy_filter: JSON.stringify([{ field: 'quote_id', keyword: quoteId }]),\n    bind_date: iso(now),\n    bind_day: day(now),\n    inception_date: iso(inception),\n    expiration_date: iso(expiration),\n    issue_date: iso(now),\n    due_date: iso(addDays(now, 45)),\n    void_deadline: iso(addDays(now, 60)),\n    void_after_days: Number(voidAfterDays) || 61,\n    void_due_date: iso(addDays(now, Number(voidAfterDays) || 61)),\n    // §4.4: neither entity stored a bind date; everything below is anchored on\n    // bind_date, which artefact 1 added to policy_config for exactly this.\n    on_invoice_overdue: iso(addDays(now, Number(overdueDays) || 46)),\n    on_policy_void: iso(addDays(now, Number(voidAfterDays) || 61)),\n    on_renewal_generate: iso(addDays(expiration, -100)),\n    on_renewal_dispatch: iso(addDays(expiration, -90)),\n    renewal_timers_in_past: (addDays(expiration, -100).getTime() <= now.getTime()) ||\n                            (addDays(expiration, -90).getTime() <= now.getTime()),\n    policyholder_name: String(rec.policyholder_name || (trg && trg.policyholder_name) || ''),\n    broker_email: String((trg && trg.broker_email) || ''),\n    // A '@' in a subject breaks consumer delivery and acks, and a dotted ref_id\n    // misroutes on positional subject parsing. Nothing user-typed reaches a\n    // subject token in this flow, but the screening name is sanitised anyway\n    // because it is the one free-text field the flow carries forward.\n    screening_name: String(rec.policyholder_name || (trg && trg.policyholder_name) || '')\n                      .replace(/[@.]/g, ' ').replace(/\\s+/g, ' ').trim()\n  };\n})();\n",
+            "code": "(function () {\n  var rec = (dec && dec.data) ? dec.data : {};\n  var id = (dec && dec.id) ? dec.id : '';\n  var now = new Date();\n  function iso(d) { return d.toISOString().replace(/\\.\\d{3}Z$/, 'Z'); }\n  function day(d) { return d.toISOString().slice(0, 10); }\n  function addDays(d, n) { return new Date(d.getTime() + n * 86400000); }\n\n  var year = now.getUTCFullYear();\n  var product = String(rec.product_code || 'GEN').toUpperCase().replace(/[^A-Z0-9]/g, '');\n  var quoteId = String(rec.quote_id || '');\n\n  var inception = trg && trg.inception_date ? new Date(trg.inception_date) : now;\n  if (isNaN(inception.getTime())) inception = now;\n  var termDays = Number(termDaysCfg) || 365;\n  var expiration = addDays(inception, termDays);\n\n  return {\n    decision_id: id,\n    quote_id: quoteId,\n    submission_id: String(rec.submission_id || ''),\n    product_code: product,\n    broker_id: String(rec.broker_id || (trg && trg.broker_id) || ''),\n    distributor_account_id: String(rec.distributor_account_id || ''),\n    // Both of these exist to be copied onto the BOUND decision. Without them\n    // the bind outcome is undeliverable (no distributor to project it to) and\n    // unorderable against the decisions that preceded it.\n    submission_version: Number(rec.submission_version || 0),\n    // artefact 5 timer 5: the bind is what cancels the quote-expire timer, and\n    // the stored topic is the only string unschedule-flow accepts.\n    quote_expire_timer_topic: String(rec.quote_expire_timer_topic || ''),\n    has_expire_timer: String(rec.quote_expire_timer_topic || '') !== '',\n    outcome: String(rec.outcome || ''),\n    premium_basis: String(rec.premium_basis || ''),\n    base_premium: Number(rec.base_premium || 0),\n    total_payable: Number(rec.total_payable || 0),\n    // §5.4: counter names cannot contain hyphens\n    // (numbergen-service/validate/validate.go:9). Per-year counters mean no\n    // annual reset is ever needed.\n    policy_counter_name: 'P_' + product + '_' + year,\n    invoice_counter_name: 'I_' + product + '_' + year,\n    // §5.4 idempotency: records enforce no uniqueness, so a duplicate bind must\n    // be caught before the counter is touched, never after.\n    policy_filter: JSON.stringify([{ field: 'quote_id', keyword: quoteId }]),\n    bind_date: iso(now),\n    bind_day: day(now),\n    inception_date: iso(inception),\n    expiration_date: iso(expiration),\n    issue_date: iso(now),\n    due_date: iso(addDays(now, 45)),\n    void_deadline: iso(addDays(now, 60)),\n    void_after_days: Number(voidAfterDays) || 61,\n    void_due_date: iso(addDays(now, Number(voidAfterDays) || 61)),\n    // §4.4: neither entity stored a bind date; everything below is anchored on\n    // bind_date, which artefact 1 added to policy_config for exactly this.\n    on_invoice_overdue: iso(addDays(now, Number(overdueDays) || 46)),\n    on_policy_void: iso(addDays(now, Number(voidAfterDays) || 61)),\n    on_renewal_generate: iso(addDays(expiration, -100)),\n    on_renewal_dispatch: iso(addDays(expiration, -90)),\n    renewal_timers_in_past: (addDays(expiration, -100).getTime() <= now.getTime()) ||\n                            (addDays(expiration, -90).getTime() <= now.getTime()),\n    policyholder_name: String(rec.policyholder_name || (trg && trg.policyholder_name) || ''),\n    broker_email: String((trg && trg.broker_email) || ''),\n    // A '@' in a subject breaks consumer delivery and acks, and a dotted ref_id\n    // misroutes on positional subject parsing. Nothing user-typed reaches a\n    // subject token in this flow, but the screening name is sanitised anyway\n    // because it is the one free-text field the flow carries forward.\n    screening_name: String(rec.policyholder_name || (trg && trg.policyholder_name) || '')\n                      .replace(/[@.]/g, ' ').replace(/\\s+/g, ' ').trim()\n  };\n})();\n",
             "params": {
               "dec": "$.LOAD_DECISION.data",
               "trg": "$.trigger",
@@ -561,7 +561,10 @@
                 "premium_basis": "$.BIND_INPUTS.premium_basis",
                 "base_premium": "$.BIND_INPUTS.base_premium",
                 "total_payable": "$.BIND_INPUTS.total_payable",
-                "supersedes_decision_id": "$.BIND_INPUTS.decision_id"
+                "supersedes_decision_id": "$.BIND_INPUTS.decision_id",
+                "distributor_account_id": "$.BIND_INPUTS.distributor_account_id",
+                "submission_version": "$.BIND_INPUTS.submission_version",
+                "decision_seq": "$.BOUND_SEQ.decision_seq"
               }
             }
           },
@@ -602,6 +605,89 @@
             }
           },
           "name": "Bind response"
+        }
+      },
+      {
+        "id": "EXPIRE_TIMER_GATE",
+        "data": {
+          "id": "EXPIRE_TIMER_GATE",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.BIND_INPUTS.has_expire_timer",
+                  true
+                ]
+              },
+              "outcome": "UNSCHED_QUOTE_EXPIRE"
+            },
+            {
+              "outcome": "RESOLVE_SUCCESS"
+            }
+          ],
+          "name": "Is there a quote-expire timer to cancel?"
+        }
+      },
+      {
+        "id": "UNSCHED_QUOTE_EXPIRE",
+        "data": {
+          "id": "UNSCHED_QUOTE_EXPIRE",
+          "node_type": "quiva-endpoint",
+          "payload": {
+            "topic": "$.BIND_INPUTS.quote_expire_timer_topic"
+          },
+          "name": "Cancel quote-expire: this quote bound",
+          "subject": "microstrate.hub.delete.unschedule-flow"
+        }
+      },
+      {
+        "id": "CLEAR_EXPIRE_TOPIC",
+        "data": {
+          "id": "CLEAR_EXPIRE_TOPIC",
+          "node_type": "http",
+          "payload": {
+            "url": "https://api.microstrate.io/records/decision_config/|$.BIND_INPUTS.decision_id",
+            "method": "PUT",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token",
+              "Content-Type": "application/json"
+            },
+            "data": {
+              "data": {
+                "quote_expire_timer_topic": ""
+              }
+            }
+          },
+          "name": "Clear the cancelled topic"
+        }
+      },
+      {
+        "id": "MINT_BOUND_SEQ",
+        "data": {
+          "id": "MINT_BOUND_SEQ",
+          "node_type": "quiva-endpoint",
+          "name": "Mint decision_seq for the BOUND instance",
+          "subject": "microstrate.numbergen.put.increment",
+          "payload": {
+            "name": "DECISION_SEQ",
+            "amount": 1
+          }
+        }
+      },
+      {
+        "id": "BOUND_SEQ",
+        "data": {
+          "id": "BOUND_SEQ",
+          "node_type": "eval",
+          "name": "Normalise the minted sequence",
+          "payload": {
+            "code": "(function () {\n  function val(x) {\n    if (x === null || x === undefined) return 0;\n    if (typeof x === 'object') {\n      if (x.value !== undefined) return x.value;\n      if (x.count !== undefined) return x.count;\n      if (x.data && x.data.value !== undefined) return x.data.value;\n    }\n    return x;\n  }\n  var n = Number(val(seq));\n  if (!n || isNaN(n)) {\n    throw new Error('quote-bind: decision_seq did not mint - the BOUND decision would sort before every decision it supersedes');\n  }\n  return { decision_seq: n };\n})();",
+            "params": {
+              "seq": "$.MINT_BOUND_SEQ"
+            }
+          }
         }
       }
     ],
@@ -882,6 +968,60 @@
         "target": "RESPOND",
         "sourceHandle": "WELCOME_PACK",
         "targetHandle": "RESPOND",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "CREATE_BOUND_DECISION-EXPIRE_TIMER_GATE",
+        "source": "CREATE_BOUND_DECISION",
+        "target": "EXPIRE_TIMER_GATE",
+        "sourceHandle": "CREATE_BOUND_DECISION",
+        "targetHandle": "EXPIRE_TIMER_GATE",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "EXPIRE_TIMER_GATE-UNSCHED_QUOTE_EXPIRE",
+        "source": "EXPIRE_TIMER_GATE",
+        "target": "UNSCHED_QUOTE_EXPIRE",
+        "sourceHandle": "EXPIRE_TIMER_GATE",
+        "targetHandle": "UNSCHED_QUOTE_EXPIRE",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "UNSCHED_QUOTE_EXPIRE-CLEAR_EXPIRE_TOPIC",
+        "source": "UNSCHED_QUOTE_EXPIRE",
+        "target": "CLEAR_EXPIRE_TOPIC",
+        "sourceHandle": "UNSCHED_QUOTE_EXPIRE",
+        "targetHandle": "CLEAR_EXPIRE_TOPIC",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "STAMP_TIMERS-MINT_BOUND_SEQ",
+        "source": "STAMP_TIMERS",
+        "target": "MINT_BOUND_SEQ",
+        "sourceHandle": "STAMP_TIMERS",
+        "targetHandle": "MINT_BOUND_SEQ",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "MINT_BOUND_SEQ-BOUND_SEQ",
+        "source": "MINT_BOUND_SEQ",
+        "target": "BOUND_SEQ",
+        "sourceHandle": "MINT_BOUND_SEQ",
+        "targetHandle": "BOUND_SEQ",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "BOUND_SEQ-CREATE_BOUND_DECISION",
+        "source": "BOUND_SEQ",
+        "target": "CREATE_BOUND_DECISION",
+        "sourceHandle": "BOUND_SEQ",
+        "targetHandle": "CREATE_BOUND_DECISION",
         "type": "custom",
         "edgeType": "custom"
       }
