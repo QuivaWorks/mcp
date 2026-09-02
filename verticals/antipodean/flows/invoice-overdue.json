@@ -1,0 +1,250 @@
+{
+    "name": "invoice-overdue",
+    "description": "Flow 3. The bind+46d per-entity timer (contract artefact 5 concern \"invoice-overdue\", name invoice-overdue:<policyId>). A wake-up, not a decision: it re-reads the policy and its invoices from the platform, and acts only if the policy is still ACTIVE and an invoice is still unpaid past its due date. Moves policy_status ACTIVE -> OVERDUE, the invoice to payment_status overdue, and sends the transactional overdue notice to the broker of record (broker_config.primary_contact_email, falling back to the ops address in config.static). Idempotent structurally: a second fire finds OVERDUE and does nothing. Timer payload: {policy_id, concern, quote_id}.",
+    "config": {
+        "static": {
+            "api": "https://api.microstrate.io",
+            "space_id": "ANTIPODEAN",
+            "concern": "invoice-overdue",
+            "self_subject": "ms.hub.config.workflow.3788449144.2948463293",
+            "fallback_notice_email": "operations@antipodean-underwriting.test",
+            "note_result": "config.result points at ASSESS because every branch runs it. A result naming a node only one branch reaches 504s an awaited run while the run succeeds."
+        },
+        "result": "$.ASSESS",
+        "nodes": [
+            {
+                "id": "TRIGGER",
+                "data": {
+                    "id": "TRIGGER",
+                    "name": "invoice-overdue timer (bind + 46d)",
+                    "node_type": "trigger",
+                    "payload": {},
+                    "trigger_type": "webhook"
+                }
+            },
+            {
+                "id": "GET_POLICY",
+                "data": {
+                    "id": "GET_POLICY",
+                    "name": "Re-read the policy",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "GET",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records/policy_config/|$.trigger.policy_id",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "PREP",
+                "data": {
+                    "id": "PREP",
+                    "name": "Build the exact-match filters",
+                    "node_type": "eval",
+                    "payload": {
+                        "code": "(function () {\n  // Timer wake-up, not a decision (plan 5.3 rule 1). Everything this flow acts\n  // on is re-read from the platform; nothing is trusted from the timer payload\n  // beyond the entity id the timer was named for.\n  var p = (pol && pol.data) ? pol.data : {};\n  var policyId = String((trg && trg.policy_id) || '');\n  if (!policyId) { throw new Error('invoice-overdue: the timer payload carries no policy_id'); }\n  var brokerId = String(p.broker_id || '');\n  return {\n    policy_id: policyId,\n    broker_id: brokerId,\n    policy_number: String(p.policy_number || ''),\n    policy_status: String(p.policy_status || ''),\n    // The index reads min:0 / max:0 as \"not supplied\" and has no negation, so\n    // every filter here is a positive exact keyword match.\n    invoice_filter: JSON.stringify({ conditions: [{ field: 'policy_id', keyword: policyId }] }),\n    broker_filter: JSON.stringify({ conditions: [{ field: 'broker_id', keyword: brokerId || '__no_broker__' }] }),\n    now: new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z')\n  };\n})();",
+                        "params": {
+                            "pol": "$.GET_POLICY.data",
+                            "trg": "$.trigger"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "FIND_INVOICE",
+                "data": {
+                    "id": "FIND_INVOICE",
+                    "name": "Invoices for this policy",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "GET",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        },
+                        "query": {
+                            "config_id": "invoice_config",
+                            "space_id": "ANTIPODEAN",
+                            "filter": "$.PREP.invoice_filter",
+                            "limit": "50"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "GET_BROKER",
+                "data": {
+                    "id": "GET_BROKER",
+                    "name": "Broker of record",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "GET",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        },
+                        "query": {
+                            "config_id": "broker_config",
+                            "space_id": "ANTIPODEAN",
+                            "filter": "$.PREP.broker_filter",
+                            "limit": "5"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "ASSESS",
+                "data": {
+                    "id": "ASSESS",
+                    "name": "Re-check the predicate before acting",
+                    "node_type": "eval",
+                    "payload": {
+                        "code": "(function () {\n  var p = (pol && pol.data) ? pol.data : {};\n  var rows = (inv && inv.data && inv.data.results) ? inv.data.results : [];\n  // The index can return one record twice across an update and total_hits counts\n  // both, so de-duplicate by record id before deciding anything.\n  var seen = {}, list = [];\n  for (var i = 0; i < rows.length; i++) {\n    var r = rows[i];\n    if (!r || !r.id || seen[r.id]) continue;\n    seen[r.id] = 1; list.push(r);\n  }\n  var open = [];\n  for (var j = 0; j < list.length; j++) {\n    var d = list[j].data || {};\n    if (d.payment_status === 'unpaid' || d.payment_status === 'overdue') open.push(list[j]);\n  }\n  open.sort(function (a, b) {\n    return String((a.data || {}).due_date || '') < String((b.data || {}).due_date || '') ? -1 : 1;\n  });\n  var chosen = open.length ? open[0] : null;\n  var cd = chosen ? (chosen.data || {}) : {};\n  var nowMs = Date.now();\n  var dueMs = cd.due_date ? new Date(cd.due_date).getTime() : NaN;\n  var pastDue = !isNaN(dueMs) && nowMs >= dueMs;\n\n  var brows = (brk && brk.data && brk.data.results) ? brk.data.results : [];\n  var to = '', toName = '';\n  for (var k = 0; k < brows.length; k++) {\n    var bd = brows[k].data || {};\n    if (bd.primary_contact_email) { to = String(bd.primary_contact_email); toName = String(bd.brokerage_name || bd.primary_contact_name || ''); break; }\n  }\n  // The recipient always resolves, so \"who to tell\" can never be the reason the\n  // status transition is skipped.\n  if (!to) { to = String(fallback || ''); toName = 'Antipodean Operations'; }\n\n  var reasons = [];\n  // Idempotency is structural: the transition ACTIVE -> OVERDUE is the guard.\n  // A second fire finds OVERDUE and does nothing. There is no\n  // overdue_notice_sent_at field on policy_config to gate on (reported).\n  if (p.policy_status !== 'ACTIVE') reasons.push('policy_status_is_' + String(p.policy_status || 'absent'));\n  if (!chosen) reasons.push('no_unpaid_or_overdue_invoice');\n  if (chosen && !pastDue) reasons.push('due_date_not_reached');\n\n  var daysOverdue = (!isNaN(dueMs)) ? Math.floor((nowMs - dueMs) / 86400000) : 0;\n  return {\n    should_act: reasons.length === 0,\n    skip_reasons: reasons,\n    policy_id: String((trg && trg.policy_id) || ''),\n    policy_number: String(p.policy_number || ''),\n    policy_status_before: String(p.policy_status || ''),\n    invoice_id: chosen ? String(chosen.id) : '',\n    invoice_number: String(cd.invoice_number || ''),\n    invoice_status_before: String(cd.payment_status || ''),\n    due_date: String(cd.due_date || ''),\n    void_deadline: String(cd.void_deadline || ''),\n    amount_due: Number(cd.amount_due || 0),\n    amount_due_text: (Number(cd.amount_due || 0)).toFixed(2),\n    days_overdue: daysOverdue,\n    days_overdue_text: String(daysOverdue),\n    notice_to: to,\n    notice_to_name: toName,\n    invoice_candidates: list.length,\n    assessed_at: new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z')\n  };\n})();",
+                        "params": {
+                            "pol": "$.GET_POLICY.data",
+                            "inv": "$.FIND_INVOICE",
+                            "brk": "$.GET_BROKER",
+                            "trg": "$.trigger",
+                            "fallback": "$.static.fallback_notice_email"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "GATE",
+                "data": {
+                    "id": "GATE",
+                    "name": "Act only if still ACTIVE and still unpaid",
+                    "node_type": "condition",
+                    "payload": [
+                        {
+                            "condition": {
+                                "operator": "=",
+                                "input": [
+                                    "$.ASSESS.should_act",
+                                    true
+                                ]
+                            },
+                            "outcome": "STAMP_POLICY"
+                        },
+                        {
+                            "outcome": "RESOLVE_SUCCESS"
+                        }
+                    ]
+                }
+            },
+            {
+                "id": "STAMP_POLICY",
+                "data": {
+                    "id": "STAMP_POLICY",
+                    "name": "policy_status -> OVERDUE",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "PUT",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records/policy_config/|$.ASSESS.policy_id",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        },
+                        "data": {
+                            "data": {
+                                "policy_status": "OVERDUE"
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "id": "STAMP_INVOICE",
+                "data": {
+                    "id": "STAMP_INVOICE",
+                    "name": "payment_status -> overdue",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "PUT",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records/invoice_config/|$.ASSESS.invoice_id",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        },
+                        "data": {
+                            "data": {
+                                "payment_status": "overdue"
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "id": "NOTIFY",
+                "data": {
+                    "id": "NOTIFY",
+                    "name": "Overdue notice to the broker of record",
+                    "node_type": "flow",
+                    "payload": {
+                        "to": "$.ASSESS.notice_to",
+                        "to_name": "$.ASSESS.notice_to_name",
+                        "subject": "Overdue: invoice |$.ASSESS.invoice_number| on policy |$.ASSESS.policy_number|",
+                        "email_class": "transactional",
+                        "idempotency_key": "invoice-overdue-|$.ASSESS.invoice_id",
+                        "body_html": "<p>Invoice <strong>|$.ASSESS.invoice_number|</strong> for policy <strong>|$.ASSESS.policy_number|</strong> is now overdue.</p><p>Amount due AUD |$.ASSESS.amount_due_text|, originally due |$.ASSESS.due_date|, |$.ASSESS.days_overdue_text| day(s) ago.</p><p>The policy has been moved to OVERDUE. If the premium remains unpaid it will be voided ab initio on |$.ASSESS.void_deadline|.</p>"
+                    },
+                    "subject": "ms.hub.config.workflow.3788449144.127773145",
+                    "await": true
+                }
+            }
+        ],
+        "edges": [
+            {
+                "id": "e1",
+                "source": "TRIGGER",
+                "target": "GET_POLICY"
+            },
+            {
+                "id": "e2",
+                "source": "GET_POLICY",
+                "target": "PREP"
+            },
+            {
+                "id": "e3",
+                "source": "PREP",
+                "target": "FIND_INVOICE"
+            },
+            {
+                "id": "e4",
+                "source": "FIND_INVOICE",
+                "target": "GET_BROKER"
+            },
+            {
+                "id": "e5",
+                "source": "GET_BROKER",
+                "target": "ASSESS"
+            },
+            {
+                "id": "e6",
+                "source": "ASSESS",
+                "target": "GATE"
+            },
+            {
+                "id": "e7",
+                "source": "GATE",
+                "target": "STAMP_POLICY"
+            },
+            {
+                "id": "e8",
+                "source": "STAMP_POLICY",
+                "target": "STAMP_INVOICE"
+            },
+            {
+                "id": "e9",
+                "source": "STAMP_INVOICE",
+                "target": "NOTIFY"
+            }
+        ]
+    }
+}
