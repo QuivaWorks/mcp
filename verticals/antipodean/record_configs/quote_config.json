@@ -6274,7 +6274,74 @@
           ]
         }
       }
-    ]
+    ],
+    "flow": {
+      "id": "new-business-quote",
+      "title": "New business quote",
+      "intro": "We will take this a page at a time. Each page saves on its own, so you can stop and come back. Only the product sections you select are asked.",
+      "form": "default",
+      "sections": [
+        {
+          "title": "Cover selection",
+          "say": "Which Antipodean products is this quote for? Your selection decides which question sets follow."
+        },
+        {
+          "title": "About the business",
+          "start_field": "gen_occupation",
+          "say": "Now the business itself — occupation, size and where its revenue comes from. The state splits must add up to 100."
+        },
+        {
+          "title": "Claims and history",
+          "start_field": "clm_insurance_declined",
+          "say": "Insurance, claims and conduct history for the last five years."
+        },
+        {
+          "title": "Information Technology Combined Liability (ITL)",
+          "start_field": "itcl01_staff_qualified",
+          "say": "The ITL question set — delivery controls, the sectors you work in, and your use of AI."
+        },
+        {
+          "title": "Allied Health — AHCL01",
+          "start_field": "ahcl01_staff_qualified",
+          "say": "Allied health class 1."
+        },
+        {
+          "title": "Allied Health — AHCL02",
+          "start_field": "ahcl02_ahpra_registered",
+          "say": "Allied health class 2."
+        },
+        {
+          "title": "Allied Health — AHCL03",
+          "start_field": "ahcl03_qualified",
+          "say": "Allied health class 3."
+        },
+        {
+          "title": "Allied Health — AHCL04",
+          "start_field": "ahcl04_practitioners_licensed",
+          "say": "Allied health class 4."
+        },
+        {
+          "title": "Allied Health — AHCL05",
+          "start_field": "ahcl05_practitioners_licensed",
+          "say": "Allied health class 5."
+        },
+        {
+          "title": "General Property (GPI)",
+          "start_field": "gp01_cover_limit",
+          "say": "General Property — the limit and excess you want, and the items you want specified."
+        },
+        {
+          "title": "Cyber & Privacy Liability (CPL)",
+          "start_field": "cpl_limit_pi",
+          "say": "Cyber and Privacy Liability — limits and excess."
+        },
+        {
+          "title": "Attachments and submission",
+          "start_field": "attachments",
+          "say": "Anything to attach, any notes for the underwriter, and then submit."
+        }
+      ]
+    }
   },
   "index_fields": [
     {
