@@ -1,0 +1,890 @@
+{
+  "name": "quote-bind",
+  "description": "Flow 2. Sanctions screen, idempotency gate, create policy + invoice, schedule the four per-entity timers under contract artefact 5's <concern>:<policyId> names, assert four distinct returned topics, stamp them on the policy, stamp BOUND, send the welcome pack.",
+  "config": {
+    "static": {
+      "api": "https://api.microstrate.io",
+      "space_id": "ANTIPODEAN",
+      "timer_concerns": [
+        "invoice-overdue",
+        "policy-void",
+        "renewal-generate",
+        "renewal-dispatch"
+      ],
+      "timer_flow_subjects": {
+        "invoice-overdue": "ms.hub.config.workflow.3788449144.2948463293",
+        "policy-void": "ms.hub.config.workflow.3788449144.950582440",
+        "renewal-generate": "ms.hub.config.workflow.3788449144.754421245",
+        "renewal-dispatch": "ms.hub.config.workflow.3788449144.1497961748"
+      },
+      "term_days": 365,
+      "invoice_overdue_days": 46,
+      "void_after_days": 61,
+      "sanctions_provider": "none-configured (local denylist screen — see SANCTIONS_SCREEN)",
+      "sanctions_denylist": [
+        "OFAC TEST ENTITY",
+        "SANCTIONED HOLDINGS",
+        "BLOCKED PERSON PTY LTD"
+      ],
+      "email_from_name": "Antipodean Underwriting"
+    },
+    "result": "$.BIND_INPUTS",
+    "nodes": [
+      {
+        "id": "TRIGGER_BIND",
+        "data": {
+          "id": "TRIGGER_BIND",
+          "node_type": "trigger",
+          "payload": {},
+          "name": "Bind requested (gateway)"
+        }
+      },
+      {
+        "id": "LOAD_DECISION",
+        "data": {
+          "id": "LOAD_DECISION",
+          "node_type": "http",
+          "payload": {
+            "url": "https://api.microstrate.io/records/decision_config/|$.trigger.decision_id",
+            "method": "GET",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token",
+              "Content-Type": "application/json"
+            }
+          },
+          "name": "Load decision"
+        }
+      },
+      {
+        "id": "BIND_INPUTS",
+        "data": {
+          "id": "BIND_INPUTS",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function () {\n  var rec = (dec && dec.data) ? dec.data : {};\n  var id = (dec && dec.id) ? dec.id : '';\n  var now = new Date();\n  function iso(d) { return d.toISOString().replace(/\\.\\d{3}Z$/, 'Z'); }\n  function day(d) { return d.toISOString().slice(0, 10); }\n  function addDays(d, n) { return new Date(d.getTime() + n * 86400000); }\n\n  var year = now.getUTCFullYear();\n  var product = String(rec.product_code || 'GEN').toUpperCase().replace(/[^A-Z0-9]/g, '');\n  var quoteId = String(rec.quote_id || '');\n\n  var inception = trg && trg.inception_date ? new Date(trg.inception_date) : now;\n  if (isNaN(inception.getTime())) inception = now;\n  var termDays = Number(termDaysCfg) || 365;\n  var expiration = addDays(inception, termDays);\n\n  return {\n    decision_id: id,\n    quote_id: quoteId,\n    submission_id: String(rec.submission_id || ''),\n    product_code: product,\n    broker_id: String(rec.broker_id || (trg && trg.broker_id) || ''),\n    distributor_account_id: String(rec.distributor_account_id || ''),\n    outcome: String(rec.outcome || ''),\n    premium_basis: String(rec.premium_basis || ''),\n    base_premium: Number(rec.base_premium || 0),\n    total_payable: Number(rec.total_payable || 0),\n    // §5.4: counter names cannot contain hyphens\n    // (numbergen-service/validate/validate.go:9). Per-year counters mean no\n    // annual reset is ever needed.\n    policy_counter_name: 'P_' + product + '_' + year,\n    invoice_counter_name: 'I_' + product + '_' + year,\n    // §5.4 idempotency: records enforce no uniqueness, so a duplicate bind must\n    // be caught before the counter is touched, never after.\n    policy_filter: JSON.stringify([{ field: 'quote_id', keyword: quoteId }]),\n    bind_date: iso(now),\n    bind_day: day(now),\n    inception_date: iso(inception),\n    expiration_date: iso(expiration),\n    issue_date: iso(now),\n    due_date: iso(addDays(now, 45)),\n    void_deadline: iso(addDays(now, 60)),\n    void_after_days: Number(voidAfterDays) || 61,\n    void_due_date: iso(addDays(now, Number(voidAfterDays) || 61)),\n    // §4.4: neither entity stored a bind date; everything below is anchored on\n    // bind_date, which artefact 1 added to policy_config for exactly this.\n    on_invoice_overdue: iso(addDays(now, Number(overdueDays) || 46)),\n    on_policy_void: iso(addDays(now, Number(voidAfterDays) || 61)),\n    on_renewal_generate: iso(addDays(expiration, -100)),\n    on_renewal_dispatch: iso(addDays(expiration, -90)),\n    renewal_timers_in_past: (addDays(expiration, -100).getTime() <= now.getTime()) ||\n                            (addDays(expiration, -90).getTime() <= now.getTime()),\n    policyholder_name: String(rec.policyholder_name || (trg && trg.policyholder_name) || ''),\n    broker_email: String((trg && trg.broker_email) || ''),\n    // A '@' in a subject breaks consumer delivery and acks, and a dotted ref_id\n    // misroutes on positional subject parsing. Nothing user-typed reaches a\n    // subject token in this flow, but the screening name is sanitised anyway\n    // because it is the one free-text field the flow carries forward.\n    screening_name: String(rec.policyholder_name || (trg && trg.policyholder_name) || '')\n                      .replace(/[@.]/g, ' ').replace(/\\s+/g, ' ').trim()\n  };\n})();\n",
+            "params": {
+              "dec": "$.LOAD_DECISION.data",
+              "trg": "$.trigger",
+              "termDaysCfg": "$.static.term_days",
+              "overdueDays": "$.static.invoice_overdue_days",
+              "voidAfterDays": "$.static.void_after_days"
+            }
+          },
+          "name": "Derive bind inputs"
+        }
+      },
+      {
+        "id": "CHECK_EXISTING_POLICY",
+        "data": {
+          "id": "CHECK_EXISTING_POLICY",
+          "node_type": "http",
+          "payload": {
+            "url": "https://api.microstrate.io/records",
+            "method": "GET",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token",
+              "Content-Type": "application/json"
+            },
+            "query": {
+              "space_id": "ANTIPODEAN",
+              "config_id": "policy_config",
+              "filter": "$.BIND_INPUTS.policy_filter",
+              "limit": 1
+            }
+          },
+          "name": "Idempotency: existing policy?"
+        }
+      },
+      {
+        "id": "SANCTIONS_SCREEN",
+        "data": {
+          "id": "SANCTIONS_SCREEN",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function () {\n  // SANCTIONS SCREEN. No sanctions provider is configured for this account and\n  // none is named in the spec beyond §4.4's requirement that the check runs on\n  // the TRADING NAME, which §6.1's ABR call (SearchByABNv202001) does not\n  // return. So this is a deterministic local screen against a denylist held in\n  // config.static, and it is DELIBERATELY NOT an http node: an http node with\n  // options.attempts > 1 fails OPEN, and on the bind flow that is a sanctions\n  // outage becoming a bound policy (§9). Replacing this with a real provider is\n  // a change to this node plus a static list, and nothing else.\n  var name = String(subjectName || '').toUpperCase();\n  var hits = [];\n  for (var i = 0; i < denylist.length; i++) {\n    var entry = String(denylist[i] || '').toUpperCase();\n    if (entry && name.indexOf(entry) >= 0) hits.push(denylist[i]);\n  }\n  if (!name) {\n    return { state: 'hit', reason: 'NO_NAME_TO_SCREEN', matches: [], provider: providerName };\n  }\n  return {\n    state: hits.length ? 'hit' : 'clear',\n    reason: hits.length ? 'DENYLIST_MATCH' : 'NO_MATCH',\n    matches: hits,\n    provider: providerName,\n    screened_at: new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z')\n  };\n})();\n",
+            "params": {
+              "subjectName": "$.BIND_INPUTS.screening_name",
+              "denylist": "$.static.sanctions_denylist",
+              "providerName": "$.static.sanctions_provider"
+            }
+          },
+          "name": "Sanctions screen"
+        }
+      },
+      {
+        "id": "BIND_GATE",
+        "data": {
+          "id": "BIND_GATE",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": ">",
+                "input": [
+                  "$.CHECK_EXISTING_POLICY.data.total_hits",
+                  0
+                ]
+              },
+              "outcome": "RETURN_EXISTING"
+            },
+            {
+              "condition": {
+                "operator": "!=",
+                "input": [
+                  "$.BIND_INPUTS.outcome",
+                  "ACCEPT"
+                ]
+              },
+              "outcome": "REFUSE_NOT_ACCEPTED"
+            },
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.SANCTIONS_SCREEN.state",
+                  "hit"
+                ]
+              },
+              "outcome": [
+                "SANCTIONS_TASK",
+                "SANCTIONS_DECISION"
+              ]
+            },
+            {
+              "outcome": [
+                "MINT_POLICY_NUMBER",
+                "MINT_INVOICE_NUMBER"
+              ]
+            }
+          ],
+          "name": "Bind gate"
+        }
+      },
+      {
+        "id": "RETURN_EXISTING",
+        "data": {
+          "id": "RETURN_EXISTING",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function(){ var r=(x&&x.results&&x.results[0])||{}; return { already_bound:true, policy_id:r.id||'', policy_number:(r.data&&r.data.policy_number)||'' }; })();",
+            "params": {
+              "x": "$.CHECK_EXISTING_POLICY.data"
+            }
+          },
+          "name": "Already bound"
+        }
+      },
+      {
+        "id": "REFUSE_NOT_ACCEPTED",
+        "data": {
+          "id": "REFUSE_NOT_ACCEPTED",
+          "node_type": "error",
+          "payload": {
+            "message": "Refusing to bind: the decision this bind names is not an ACCEPT.",
+            "status_code": 409
+          },
+          "name": "Refuse: not an ACCEPT"
+        }
+      },
+      {
+        "id": "SANCTIONS_TASK",
+        "data": {
+          "id": "SANCTIONS_TASK",
+          "node_type": "quiva-endpoint",
+          "payload": {
+            "title": "Sanctions Compliance Review — |$.BIND_INPUTS.screening_name",
+            "space_id": "ANTIPODEAN",
+            "status": "open",
+            "priority": "highest",
+            "tags": [
+              "sanctions"
+            ],
+            "folder": "$.BIND_INPUTS.decision_id",
+            "description": "Bind halted on a sanctions match (spec §4.4).\n\nDecision: |$.BIND_INPUTS.decision_id|\nQuote: |$.BIND_INPUTS.quote_id|\nScreened name: |$.BIND_INPUTS.screening_name|\nProvider: |$.SANCTIONS_SCREEN.provider|"
+          },
+          "name": "Sanctions compliance task",
+          "subject": "microstrate.workspaces.post.task"
+        }
+      },
+      {
+        "id": "SANCTIONS_DECISION",
+        "data": {
+          "id": "SANCTIONS_DECISION",
+          "node_type": "http",
+          "payload": {
+            "url": "https://api.microstrate.io/records/decision_config",
+            "method": "POST",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token",
+              "Content-Type": "application/json"
+            },
+            "data": {
+              "space_id": "ANTIPODEAN",
+              "folder": "$.BIND_INPUTS.submission_id",
+              "data": {
+                "quote_id": "$.BIND_INPUTS.quote_id",
+                "submission_id": "$.BIND_INPUTS.submission_id",
+                "product_code": "$.BIND_INPUTS.product_code",
+                "outcome": "SANCTION_REFERRAL",
+                "decision_status": "OPEN",
+                "origin_flow": "flow-2",
+                "decided_by": "engine",
+                "sanctions_state": "hit",
+                "premium_basis": "NOT_RATED",
+                "decided_at": "$.BIND_INPUTS.bind_date",
+                "supersedes_decision_id": "$.BIND_INPUTS.decision_id"
+              }
+            }
+          },
+          "name": "Write SANCTION_REFERRAL"
+        }
+      },
+      {
+        "id": "MINT_POLICY_NUMBER",
+        "data": {
+          "id": "MINT_POLICY_NUMBER",
+          "node_type": "quiva-endpoint",
+          "payload": {
+            "name": "$.BIND_INPUTS.policy_counter_name",
+            "amount": 1
+          },
+          "name": "Mint policy number",
+          "subject": "microstrate.numbergen.put.increment"
+        }
+      },
+      {
+        "id": "MINT_INVOICE_NUMBER",
+        "data": {
+          "id": "MINT_INVOICE_NUMBER",
+          "node_type": "quiva-endpoint",
+          "payload": {
+            "name": "$.BIND_INPUTS.invoice_counter_name",
+            "amount": 1
+          },
+          "name": "Mint invoice number",
+          "subject": "microstrate.numbergen.put.increment"
+        }
+      },
+      {
+        "id": "FORMAT_REFS",
+        "data": {
+          "id": "FORMAT_REFS",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function () {\n  // §5.4: numbergen increment, then FORMAT in an eval. Counter names carry no\n  // hyphens; reference formats do — the sanitisation is consistent across both.\n  function n6(v) { return ('000000' + String(v)).slice(-6); }\n  function val(x) {\n    if (x === null || x === undefined) return 0;\n    if (typeof x === 'object') {\n      if (x.value !== undefined) return x.value;\n      if (x.count !== undefined) return x.count;\n      if (x.data && x.data.value !== undefined) return x.data.value;\n    }\n    return x;\n  }\n  var p = Number(val(pnum)), i = Number(val(inum));\n  if (!p || isNaN(p)) throw new Error('FORMAT_REFS: policy counter returned no number');\n  if (!i || isNaN(i)) throw new Error('FORMAT_REFS: invoice counter returned no number');\n  var year = new Date(b.bind_date).getUTCFullYear();\n  return {\n    policy_number: 'P-' + b.product_code + '-' + year + '-' + n6(p),\n    invoice_number: 'INV-' + b.product_code + '-' + year + '-' + n6(i),\n    policy_seq: p, invoice_seq: i\n  };\n})();\n",
+            "params": {
+              "pnum": "$.MINT_POLICY_NUMBER",
+              "inum": "$.MINT_INVOICE_NUMBER",
+              "b": "$.BIND_INPUTS"
+            }
+          },
+          "name": "Format references"
+        }
+      },
+      {
+        "id": "CREATE_POLICY",
+        "data": {
+          "id": "CREATE_POLICY",
+          "node_type": "http",
+          "payload": {
+            "url": "https://api.microstrate.io/records/policy_config",
+            "method": "POST",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token",
+              "Content-Type": "application/json"
+            },
+            "data": {
+              "space_id": "ANTIPODEAN",
+              "folder": "$.BIND_INPUTS.quote_id",
+              "data": {
+                "policy_number": "$.FORMAT_REFS.policy_number",
+                "quote_id": "$.BIND_INPUTS.quote_id",
+                "broker_id": "$.BIND_INPUTS.broker_id",
+                "product_code": "$.BIND_INPUTS.product_code",
+                "policy_status": "ACTIVE",
+                "bind_date": "$.BIND_INPUTS.bind_date",
+                "inception_date": "$.BIND_INPUTS.inception_date",
+                "expiration_date": "$.BIND_INPUTS.expiration_date",
+                "void_after_days": "$.static.void_after_days",
+                "void_due_date": "$.BIND_INPUTS.void_due_date",
+                "voidance_notice_state": "pending",
+                "voidance_notice_sent_at": "",
+                "auto_renewal_eligible": "true",
+                "mta_state": "none",
+                "active_mta_id": "",
+                "revision_index": 0,
+                "sanctions_state": "clear",
+                "total_payable": "$.BIND_INPUTS.total_payable",
+                "timezone_anchor": "Australia/Sydney",
+                "timers_scheduled": "pending"
+              }
+            }
+          },
+          "name": "Create policy"
+        }
+      },
+      {
+        "id": "CREATE_INVOICE",
+        "data": {
+          "id": "CREATE_INVOICE",
+          "node_type": "http",
+          "payload": {
+            "url": "https://api.microstrate.io/records/invoice_config",
+            "method": "POST",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token",
+              "Content-Type": "application/json"
+            },
+            "data": {
+              "space_id": "ANTIPODEAN",
+              "folder": "$.BIND_INPUTS.quote_id",
+              "data": {
+                "invoice_number": "$.FORMAT_REFS.invoice_number",
+                "policy_number": "$.FORMAT_REFS.policy_number",
+                "policy_id": "$.CREATE_POLICY.data.id",
+                "broker_id": "$.BIND_INPUTS.broker_id",
+                "payment_status": "unpaid",
+                "payment_type": "Payment on account",
+                "issue_date": "$.BIND_INPUTS.issue_date",
+                "due_date": "$.BIND_INPUTS.due_date",
+                "void_deadline": "$.BIND_INPUTS.void_deadline",
+                "paid_date": "",
+                "amount_due": "$.BIND_INPUTS.total_payable",
+                "amount_paid": 0
+              }
+            }
+          },
+          "name": "Create invoice"
+        }
+      },
+      {
+        "id": "TIMER_NAMES",
+        "data": {
+          "id": "TIMER_NAMES",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function () {\n  // =========================================================================\n  // TIMER_NAMES — contract artefact 5. This is the ONE place in the build where\n  // the name format \"<concern>:<entityId>\" is spelled. Every other flow that\n  // schedules, cancels or reschedules one of these timers composes its name\n  // from the same registry, never from a literal it wrote itself.\n  //\n  //   name  = \"<concern>:<policyId>\"      <- sent as ScheduleFlowRun.name\n  //   topic = \"<flowTopic>.<fnv1a32(name)>\"  <- DERIVED by the engine and\n  //           returned; the caller's own `topic` is overwritten unconditionally\n  //           (schedule.go:113-118) and it is the ONLY thing unschedule accepts.\n  //\n  // <policyId> is the RECORD ID returned by CREATE_POLICY, never policy_number:\n  // records enforce no uniqueness, so two policies can carry one number and\n  // one number is one timer, silently, under MaxMsgsPer: 1.\n  // =========================================================================\n  var policyId = (pol && pol.id) ? String(pol.id) : '';\n  if (!policyId) { throw new Error('TIMER_NAMES: CREATE_POLICY returned no record id; refusing to compose a timer name'); }\n  if (policyId.indexOf(':') >= 0 || policyId.indexOf('@') >= 0 || policyId.indexOf('.') >= 0) {\n    throw new Error('TIMER_NAMES: record id ' + policyId + ' carries a delimiter that breaks positional subject parsing');\n  }\n  var out = { policy_id: policyId, concerns: concerns.slice(), names: {} };\n  for (var i = 0; i < concerns.length; i++) {\n    out.names[concerns[i]] = concerns[i] + ':' + policyId;\n  }\n  out.name_invoice_overdue = out.names['invoice-overdue'];\n  out.name_policy_void = out.names['policy-void'];\n  out.name_renewal_generate = out.names['renewal-generate'];\n  out.name_renewal_dispatch = out.names['renewal-dispatch'];\n\n  // ASSERT-1c: the concern tokens are pairwise distinct and drawn only from the\n  // registry in config.static.\n  var seen = {};\n  for (var j = 0; j < concerns.length; j++) {\n    if (seen[concerns[j]]) throw new Error('TIMER_NAMES: duplicate concern token ' + concerns[j]);\n    seen[concerns[j]] = 1;\n  }\n  if (concerns.length !== 4) throw new Error('TIMER_NAMES: expected 4 bind-time concerns, got ' + concerns.length);\n\n  out.on_invoice_overdue = b.on_invoice_overdue;\n  out.on_policy_void = b.on_policy_void;\n  out.on_renewal_generate = b.on_renewal_generate;\n  out.on_renewal_dispatch = b.on_renewal_dispatch;\n  // Artefact 5, \"Past trigger_on\": do NOT call schedule-flow; stamp the empty\n  // string and continue. A policy whose term is under 100 days produces a T-100\n  // that has already passed.\n  out.renewal_timers_in_past = !!b.renewal_timers_in_past;\n  return out;\n})();\n",
+            "params": {
+              "pol": "$.CREATE_POLICY.data",
+              "b": "$.BIND_INPUTS",
+              "concerns": "$.static.timer_concerns"
+            }
+          },
+          "name": "Timer names (artefact 5)"
+        }
+      },
+      {
+        "id": "SCHEDULE_OVERDUE",
+        "data": {
+          "id": "SCHEDULE_OVERDUE",
+          "node_type": "quiva-endpoint",
+          "payload": {
+            "name": "$.TIMER_NAMES.name_invoice_overdue",
+            "description": "Schedule invoice-overdue (bind+46d)",
+            "trigger_on": "$.TIMER_NAMES.on_invoice_overdue",
+            "payload": {
+              "subject": "ms.hub.config.workflow.3788449144.2948463293",
+              "trigger": {
+                "policy_id": "$.TIMER_NAMES.policy_id",
+                "concern": "invoice-overdue",
+                "quote_id": "$.BIND_INPUTS.quote_id"
+              }
+            }
+          },
+          "name": "Schedule invoice-overdue (bind+46d)",
+          "subject": "microstrate.hub.post.schedule-flow"
+        }
+      },
+      {
+        "id": "SCHEDULE_VOID",
+        "data": {
+          "id": "SCHEDULE_VOID",
+          "node_type": "quiva-endpoint",
+          "payload": {
+            "name": "$.TIMER_NAMES.name_policy_void",
+            "description": "Schedule policy-void (bind+61d)",
+            "trigger_on": "$.TIMER_NAMES.on_policy_void",
+            "payload": {
+              "subject": "ms.hub.config.workflow.3788449144.950582440",
+              "trigger": {
+                "policy_id": "$.TIMER_NAMES.policy_id",
+                "concern": "policy-void",
+                "quote_id": "$.BIND_INPUTS.quote_id"
+              }
+            }
+          },
+          "name": "Schedule policy-void (bind+61d)",
+          "subject": "microstrate.hub.post.schedule-flow"
+        }
+      },
+      {
+        "id": "RENEWAL_TIMER_GATE",
+        "data": {
+          "id": "RENEWAL_TIMER_GATE",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.TIMER_NAMES.renewal_timers_in_past",
+                  true
+                ]
+              },
+              "outcome": "ASSERT_TOPICS"
+            },
+            {
+              "outcome": [
+                "SCHEDULE_RENEWAL",
+                "SCHEDULE_DISPATCH"
+              ]
+            }
+          ],
+          "name": "Renewal timers in the past?"
+        }
+      },
+      {
+        "id": "SCHEDULE_RENEWAL",
+        "data": {
+          "id": "SCHEDULE_RENEWAL",
+          "node_type": "quiva-endpoint",
+          "payload": {
+            "name": "$.TIMER_NAMES.name_renewal_generate",
+            "description": "Schedule renewal-generate (T-100)",
+            "trigger_on": "$.TIMER_NAMES.on_renewal_generate",
+            "payload": {
+              "subject": "ms.hub.config.workflow.3788449144.754421245",
+              "trigger": {
+                "policy_id": "$.TIMER_NAMES.policy_id",
+                "concern": "renewal-generate",
+                "quote_id": "$.BIND_INPUTS.quote_id"
+              }
+            }
+          },
+          "name": "Schedule renewal-generate (T-100)",
+          "subject": "microstrate.hub.post.schedule-flow"
+        }
+      },
+      {
+        "id": "SCHEDULE_DISPATCH",
+        "data": {
+          "id": "SCHEDULE_DISPATCH",
+          "node_type": "quiva-endpoint",
+          "payload": {
+            "name": "$.TIMER_NAMES.name_renewal_dispatch",
+            "description": "Schedule renewal-dispatch (T-90)",
+            "trigger_on": "$.TIMER_NAMES.on_renewal_dispatch",
+            "payload": {
+              "subject": "ms.hub.config.workflow.3788449144.1497961748",
+              "trigger": {
+                "policy_id": "$.TIMER_NAMES.policy_id",
+                "concern": "renewal-dispatch",
+                "quote_id": "$.BIND_INPUTS.quote_id"
+              }
+            }
+          },
+          "name": "Schedule renewal-dispatch (T-90)",
+          "subject": "microstrate.hub.post.schedule-flow"
+        }
+      },
+      {
+        "id": "ASSERT_TOPICS",
+        "data": {
+          "id": "ASSERT_TOPICS",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function () {\n  // =========================================================================\n  // ASSERT-1b (contract artefact 5) — runtime, on every bind, after the four\n  // schedule calls and BEFORE the stamp: the four returned topics are four\n  // distinct non-empty strings. This is the cheapest assertion in the contract\n  // and the one that matters: it catches a name or subject collision at the\n  // BIND, not at the first void sixty-one days later.\n  // =========================================================================\n  function topicOf(resp) {\n    if (!resp || typeof resp !== 'object') return '';\n    if (typeof resp.topic === 'string') return resp.topic;\n    if (resp.data && typeof resp.data.topic === 'string') return resp.data.topic;\n    if (resp.results && resp.results.length && resp.results[0].topic) return resp.results[0].topic;\n    return '';\n  }\n  var t = {\n    invoice_overdue_timer_topic: topicOf(sOverdue),\n    policy_void_timer_topic: topicOf(sVoid),\n    renewal_generate_timer_topic: skipRenewal ? '' : topicOf(sRenew),\n    renewal_dispatch_timer_topic: skipRenewal ? '' : topicOf(sDispatch)\n  };\n  var required = ['invoice_overdue_timer_topic', 'policy_void_timer_topic'];\n  if (!skipRenewal) { required.push('renewal_generate_timer_topic'); required.push('renewal_dispatch_timer_topic'); }\n\n  var live = [];\n  for (var i = 0; i < required.length; i++) {\n    var v = t[required[i]];\n    if (!v) {\n      // Fail the run. Artefact 5: do not compensate, do not retry in-node, do\n      // not compute the topic locally as a substitute. A policy that does not\n      // carry its topics can never have its timers cancelled.\n      throw new Error('ASSERT-1b FAILED: ' + required[i] + ' is empty — a timer was scheduled that nothing can ever cancel');\n    }\n    live.push(v);\n  }\n  var uniq = {};\n  for (var j = 0; j < live.length; j++) {\n    if (uniq[live[j]]) throw new Error('ASSERT-1b FAILED: two concerns returned the same topic ' + live[j] + ' — a name or target-flow collision, and one policy has silently lost a timer (MaxMsgsPer: 1)');\n    uniq[live[j]] = 1;\n  }\n  t.timers_scheduled = 'scheduled';\n  t.distinct_topics = live.length;\n  t.renewal_timers_skipped = !!skipRenewal;\n  t.names_used = names;\n  return t;\n})();\n",
+            "params": {
+              "sOverdue": "$.SCHEDULE_OVERDUE",
+              "sVoid": "$.SCHEDULE_VOID",
+              "sRenew": "$.SCHEDULE_RENEWAL",
+              "sDispatch": "$.SCHEDULE_DISPATCH",
+              "skipRenewal": "$.TIMER_NAMES.renewal_timers_in_past",
+              "names": "$.TIMER_NAMES.names"
+            }
+          },
+          "name": "ASSERT-1b: four distinct topics"
+        }
+      },
+      {
+        "id": "STAMP_TIMERS",
+        "data": {
+          "id": "STAMP_TIMERS",
+          "node_type": "http",
+          "payload": {
+            "url": "https://api.microstrate.io/records/policy_config/|$.CREATE_POLICY.data.id",
+            "method": "PUT",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token",
+              "Content-Type": "application/json"
+            },
+            "data": {
+              "data": {
+                "invoice_overdue_timer_topic": "$.ASSERT_TOPICS.invoice_overdue_timer_topic",
+                "policy_void_timer_topic": "$.ASSERT_TOPICS.policy_void_timer_topic",
+                "renewal_generate_timer_topic": "$.ASSERT_TOPICS.renewal_generate_timer_topic",
+                "renewal_dispatch_timer_topic": "$.ASSERT_TOPICS.renewal_dispatch_timer_topic",
+                "timers_scheduled": "$.ASSERT_TOPICS.timers_scheduled"
+              }
+            }
+          },
+          "name": "Stamp topics + timers_scheduled"
+        }
+      },
+      {
+        "id": "CREATE_BOUND_DECISION",
+        "data": {
+          "id": "CREATE_BOUND_DECISION",
+          "node_type": "http",
+          "payload": {
+            "url": "https://api.microstrate.io/records/decision_config",
+            "method": "POST",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token",
+              "Content-Type": "application/json"
+            },
+            "data": {
+              "space_id": "ANTIPODEAN",
+              "folder": "$.BIND_INPUTS.submission_id",
+              "data": {
+                "quote_id": "$.BIND_INPUTS.quote_id",
+                "submission_id": "$.BIND_INPUTS.submission_id",
+                "product_code": "$.BIND_INPUTS.product_code",
+                "outcome": "BOUND",
+                "decision_status": "ISSUED",
+                "origin_flow": "flow-2",
+                "decided_by": "engine",
+                "decided_at": "$.BIND_INPUTS.bind_date",
+                "bound_at": "$.BIND_INPUTS.bind_date",
+                "policy_number": "$.FORMAT_REFS.policy_number",
+                "sanctions_state": "clear",
+                "premium_basis": "$.BIND_INPUTS.premium_basis",
+                "base_premium": "$.BIND_INPUTS.base_premium",
+                "total_payable": "$.BIND_INPUTS.total_payable",
+                "supersedes_decision_id": "$.BIND_INPUTS.decision_id"
+              }
+            }
+          },
+          "name": "Stamp BOUND"
+        }
+      },
+      {
+        "id": "WELCOME_PACK",
+        "data": {
+          "id": "WELCOME_PACK",
+          "node_type": "flow",
+          "payload": {
+            "to": "$.BIND_INPUTS.broker_email",
+            "to_name": "$.BIND_INPUTS.policyholder_name",
+            "subject": "Your Antipodean policy |$.FORMAT_REFS.policy_number| is bound",
+            "email_class": "transactional",
+            "idempotency_key": "welcome-pack-|$.CREATE_POLICY.data.id",
+            "body_html": "<p>Policy |$.FORMAT_REFS.policy_number| is bound.</p><p>Inception |$.BIND_INPUTS.inception_date|, expiry |$.BIND_INPUTS.expiration_date|.</p><p>Invoice |$.FORMAT_REFS.invoice_number| is due |$.BIND_INPUTS.due_date|.</p>"
+          },
+          "name": "Welcome pack",
+          "subject": "ms.hub.config.workflow.3788449144.127773145",
+          "await": true
+        }
+      },
+      {
+        "id": "RESPOND",
+        "data": {
+          "id": "RESPOND",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function(){ function o(x){ return (x && typeof x === 'object' && !Array.isArray(x)) ? x : null; } var e=o(existing), s=o(sanc), t=o(topics); if (e && e.already_bound) return { state:'ALREADY_BOUND', policy_id:e.policy_id, policy_number:e.policy_number }; if (s && s.data && s.data.id) return { state:'SANCTION_REFERRAL', decision_id:s.data.id }; if (t && t.timers_scheduled === 'scheduled') return { state:'BOUND', policy_id:(o(pol)&&o(pol).id)||'', policy_number:(o(refs)&&o(refs).policy_number)||'', invoice_number:(o(refs)&&o(refs).invoice_number)||'', timers: t }; return { state:'UNKNOWN' }; })();",
+            "params": {
+              "existing": "$.RETURN_EXISTING",
+              "sanc": "$.SANCTIONS_DECISION.data",
+              "topics": "$.ASSERT_TOPICS",
+              "pol": "$.CREATE_POLICY.data",
+              "refs": "$.FORMAT_REFS"
+            }
+          },
+          "name": "Bind response"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "TRIGGER_BIND-LOAD_DECISION",
+        "source": "TRIGGER_BIND",
+        "target": "LOAD_DECISION",
+        "sourceHandle": "TRIGGER_BIND",
+        "targetHandle": "LOAD_DECISION",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "LOAD_DECISION-BIND_INPUTS",
+        "source": "LOAD_DECISION",
+        "target": "BIND_INPUTS",
+        "sourceHandle": "LOAD_DECISION",
+        "targetHandle": "BIND_INPUTS",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "BIND_INPUTS-CHECK_EXISTING_POLICY",
+        "source": "BIND_INPUTS",
+        "target": "CHECK_EXISTING_POLICY",
+        "sourceHandle": "BIND_INPUTS",
+        "targetHandle": "CHECK_EXISTING_POLICY",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "BIND_INPUTS-SANCTIONS_SCREEN",
+        "source": "BIND_INPUTS",
+        "target": "SANCTIONS_SCREEN",
+        "sourceHandle": "BIND_INPUTS",
+        "targetHandle": "SANCTIONS_SCREEN",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "CHECK_EXISTING_POLICY-BIND_GATE",
+        "source": "CHECK_EXISTING_POLICY",
+        "target": "BIND_GATE",
+        "sourceHandle": "CHECK_EXISTING_POLICY",
+        "targetHandle": "BIND_GATE",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "SANCTIONS_SCREEN-BIND_GATE",
+        "source": "SANCTIONS_SCREEN",
+        "target": "BIND_GATE",
+        "sourceHandle": "SANCTIONS_SCREEN",
+        "targetHandle": "BIND_GATE",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "BIND_GATE-RETURN_EXISTING",
+        "source": "BIND_GATE",
+        "target": "RETURN_EXISTING",
+        "sourceHandle": "BIND_GATE",
+        "targetHandle": "RETURN_EXISTING",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "BIND_GATE-REFUSE_NOT_ACCEPTED",
+        "source": "BIND_GATE",
+        "target": "REFUSE_NOT_ACCEPTED",
+        "sourceHandle": "BIND_GATE",
+        "targetHandle": "REFUSE_NOT_ACCEPTED",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "BIND_GATE-SANCTIONS_TASK",
+        "source": "BIND_GATE",
+        "target": "SANCTIONS_TASK",
+        "sourceHandle": "BIND_GATE",
+        "targetHandle": "SANCTIONS_TASK",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "BIND_GATE-SANCTIONS_DECISION",
+        "source": "BIND_GATE",
+        "target": "SANCTIONS_DECISION",
+        "sourceHandle": "BIND_GATE",
+        "targetHandle": "SANCTIONS_DECISION",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "BIND_GATE-MINT_POLICY_NUMBER",
+        "source": "BIND_GATE",
+        "target": "MINT_POLICY_NUMBER",
+        "sourceHandle": "BIND_GATE",
+        "targetHandle": "MINT_POLICY_NUMBER",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "BIND_GATE-MINT_INVOICE_NUMBER",
+        "source": "BIND_GATE",
+        "target": "MINT_INVOICE_NUMBER",
+        "sourceHandle": "BIND_GATE",
+        "targetHandle": "MINT_INVOICE_NUMBER",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "MINT_POLICY_NUMBER-FORMAT_REFS",
+        "source": "MINT_POLICY_NUMBER",
+        "target": "FORMAT_REFS",
+        "sourceHandle": "MINT_POLICY_NUMBER",
+        "targetHandle": "FORMAT_REFS",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "MINT_INVOICE_NUMBER-FORMAT_REFS",
+        "source": "MINT_INVOICE_NUMBER",
+        "target": "FORMAT_REFS",
+        "sourceHandle": "MINT_INVOICE_NUMBER",
+        "targetHandle": "FORMAT_REFS",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "FORMAT_REFS-CREATE_POLICY",
+        "source": "FORMAT_REFS",
+        "target": "CREATE_POLICY",
+        "sourceHandle": "FORMAT_REFS",
+        "targetHandle": "CREATE_POLICY",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "CREATE_POLICY-CREATE_INVOICE",
+        "source": "CREATE_POLICY",
+        "target": "CREATE_INVOICE",
+        "sourceHandle": "CREATE_POLICY",
+        "targetHandle": "CREATE_INVOICE",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "CREATE_INVOICE-TIMER_NAMES",
+        "source": "CREATE_INVOICE",
+        "target": "TIMER_NAMES",
+        "sourceHandle": "CREATE_INVOICE",
+        "targetHandle": "TIMER_NAMES",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "TIMER_NAMES-SCHEDULE_OVERDUE",
+        "source": "TIMER_NAMES",
+        "target": "SCHEDULE_OVERDUE",
+        "sourceHandle": "TIMER_NAMES",
+        "targetHandle": "SCHEDULE_OVERDUE",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "TIMER_NAMES-SCHEDULE_VOID",
+        "source": "TIMER_NAMES",
+        "target": "SCHEDULE_VOID",
+        "sourceHandle": "TIMER_NAMES",
+        "targetHandle": "SCHEDULE_VOID",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "TIMER_NAMES-RENEWAL_TIMER_GATE",
+        "source": "TIMER_NAMES",
+        "target": "RENEWAL_TIMER_GATE",
+        "sourceHandle": "TIMER_NAMES",
+        "targetHandle": "RENEWAL_TIMER_GATE",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "RENEWAL_TIMER_GATE-SCHEDULE_RENEWAL",
+        "source": "RENEWAL_TIMER_GATE",
+        "target": "SCHEDULE_RENEWAL",
+        "sourceHandle": "RENEWAL_TIMER_GATE",
+        "targetHandle": "SCHEDULE_RENEWAL",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "RENEWAL_TIMER_GATE-SCHEDULE_DISPATCH",
+        "source": "RENEWAL_TIMER_GATE",
+        "target": "SCHEDULE_DISPATCH",
+        "sourceHandle": "RENEWAL_TIMER_GATE",
+        "targetHandle": "SCHEDULE_DISPATCH",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "RENEWAL_TIMER_GATE-ASSERT_TOPICS",
+        "source": "RENEWAL_TIMER_GATE",
+        "target": "ASSERT_TOPICS",
+        "sourceHandle": "RENEWAL_TIMER_GATE",
+        "targetHandle": "ASSERT_TOPICS",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "SCHEDULE_OVERDUE-ASSERT_TOPICS",
+        "source": "SCHEDULE_OVERDUE",
+        "target": "ASSERT_TOPICS",
+        "sourceHandle": "SCHEDULE_OVERDUE",
+        "targetHandle": "ASSERT_TOPICS",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "SCHEDULE_VOID-ASSERT_TOPICS",
+        "source": "SCHEDULE_VOID",
+        "target": "ASSERT_TOPICS",
+        "sourceHandle": "SCHEDULE_VOID",
+        "targetHandle": "ASSERT_TOPICS",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "SCHEDULE_RENEWAL-ASSERT_TOPICS",
+        "source": "SCHEDULE_RENEWAL",
+        "target": "ASSERT_TOPICS",
+        "sourceHandle": "SCHEDULE_RENEWAL",
+        "targetHandle": "ASSERT_TOPICS",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "SCHEDULE_DISPATCH-ASSERT_TOPICS",
+        "source": "SCHEDULE_DISPATCH",
+        "target": "ASSERT_TOPICS",
+        "sourceHandle": "SCHEDULE_DISPATCH",
+        "targetHandle": "ASSERT_TOPICS",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "ASSERT_TOPICS-STAMP_TIMERS",
+        "source": "ASSERT_TOPICS",
+        "target": "STAMP_TIMERS",
+        "sourceHandle": "ASSERT_TOPICS",
+        "targetHandle": "STAMP_TIMERS",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "STAMP_TIMERS-CREATE_BOUND_DECISION",
+        "source": "STAMP_TIMERS",
+        "target": "CREATE_BOUND_DECISION",
+        "sourceHandle": "STAMP_TIMERS",
+        "targetHandle": "CREATE_BOUND_DECISION",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "CREATE_BOUND_DECISION-WELCOME_PACK",
+        "source": "CREATE_BOUND_DECISION",
+        "target": "WELCOME_PACK",
+        "sourceHandle": "CREATE_BOUND_DECISION",
+        "targetHandle": "WELCOME_PACK",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "WELCOME_PACK-RESPOND",
+        "source": "WELCOME_PACK",
+        "target": "RESPOND",
+        "sourceHandle": "WELCOME_PACK",
+        "targetHandle": "RESPOND",
+        "type": "custom",
+        "edgeType": "custom"
+      }
+    ]
+  }
+}
