@@ -531,6 +531,36 @@
             "label": "Bound at"
           }
         }
+      },
+      "premium_basis": {
+        "type": "string",
+        "title": "Premium basis",
+        "description": "How the premium on this decision was arrived at. ADDED BY WAVE 4 under plan \u00a74.2's [G1f] DECIDED 2026-09-02 block, whose third condition is that 'every premium it produces is stamped as provisional on the record, so a quote rated under the inferred formula can be found again when the real one lands'. PROVISIONAL_INFERRED means the ITPI combination was inferred by wave 4 from the shape of the supplied tables and Antipodean have not ratified it; CONFIRMED is reserved for a premium rated under a formula Antipodean have supplied; NOT_RATED means no rate table exists for the selected product (Allied Health and General Property today) and the decision carries no premium. Indexed, because 'findable later' is the whole point of the field. FLAGGED: recommend contract artefact 1 adopt premium_basis on decision_config, and artefact 2 adopt the keyword index entry.",
+        "enum": [
+          "PROVISIONAL_INFERRED",
+          "CONFIRMED",
+          "NOT_RATED"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Premium basis",
+            "options": [
+              {
+                "text": "Provisional (inferred formula)",
+                "value": "PROVISIONAL_INFERRED"
+              },
+              {
+                "text": "Confirmed",
+                "value": "CONFIRMED"
+              },
+              {
+                "text": "Not rated (no rate table)",
+                "value": "NOT_RATED"
+              }
+            ]
+          }
+        }
       }
     }
   },
@@ -645,6 +675,10 @@
     {
       "field": "quote_validity_expiry",
       "type": "datetime"
+    },
+    {
+      "field": "premium_basis",
+      "type": "keyword"
     }
   ]
 }
