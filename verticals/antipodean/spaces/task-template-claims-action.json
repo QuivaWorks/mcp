@@ -1,0 +1,28 @@
+{
+  "name": "Claims Action",
+  "description": "Raised by flow 9 (claim-intake) whenever a claim is notified. Work the claim record \u2014 verify claimant details, the incident description and the estimated loss, and progress claim_status. This task does not carry the `referral` tag, so flow 11 ignores any status move made on it.",
+  "vertical": "antipodean",
+  "priority": "highest",
+  "tags": [
+    "claim"
+  ],
+  "task_actions": [
+    {
+      "kind": "form",
+      "description": "Work the claim record",
+      "config_id": "claim_config",
+      "configs": [
+        {
+          "id": "claim_config"
+        }
+      ]
+    }
+  ],
+  "_notes": {
+    "priority_and_tag": "Both copied verbatim from contract artefact 4: priority `highest` (spec \u00a74.7.2 'urgent') and tag `claim`, both written by flow 9 on this task kind.",
+    "no_referral_tag": "Same load-bearing exclusion as the Sanctions Compliance Review template \u2014 no `referral` tag means flow 11 never acts on this task regardless of what status it is moved to.",
+    "form_action": "Pinned to claim_config with no named view \u2014 claim_config has only a `table` view today, verified by reading record_configs/claim_config.json (not edited). claim_config also needs the `uploader` input type for its `documents` field (plan \u00a76.1), which is wave 2/2b's concern, not this template's.",
+    "assignees": "Deliberately left unset \u2014 see the Underwriting Review template's note; no real claims-user id exists on this staging account to hardcode.",
+    "installed_on_staging": "Created via POST /workspaces/task-template on api.microstrate.io (account 8243246585) as tt_CDD0VSy3QP. Verified back via GET /workspaces/task-template/tt_CDD0VSy3QP and GET /workspaces/task-templates?vertical=antipodean (4 results). Not deployed via the vertical-folder mechanism \u2014 task_templates is not one of the six routing-key folders in \u00a78.11, so this file is the authored source of truth and the id above is the live install; there is no deploy step that re-derives one from the other."
+  }
+}
