@@ -1,0 +1,41 @@
+{
+  "id": "itpi_size_discount_config",
+  "name": "ITPI Size Discount",
+  "description": "Publisher-side (Antipodean) ITPI rating table, loaded by P22 from verticals/antipodean/reference/. Held as records rather than inlined in the engine flow so a rate change is an edit, not a deploy. Ten revenue bands, 0% to 80%. The top band ends at $25,000,000 while QuestionSet_v1 refers any revenue over $15,000,000 to an underwriter, so bands 10 and part of 9 only ever rate a referred risk. Band 1's revenue_min is 0, and the index reads min:0 and max:0 as 'not supplied' \u2014 only exact:0 finds it. A band lookup for a revenue under $100,000 must therefore filter on revenue_max alone, or the engine will silently miss the band that most small risks fall in.",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "band_id": {
+        "type": "string",
+        "description": "Synthetic key, itpi_size_01..10 \u2014 the sheet has none."
+      },
+      "revenue_min": {
+        "type": "number",
+        "description": "Inclusive lower bound. Band 1's '$-' is stored as 0."
+      },
+      "revenue_max": {
+        "type": "number",
+        "description": "Inclusive upper bound."
+      },
+      "discount_percent": {
+        "type": "number",
+        "description": "Percentage as stated (10 means 10%), NOT a fraction."
+      }
+    }
+  },
+  "index_fields": [
+    {
+      "field": "band_id",
+      "type": "keyword"
+    },
+    {
+      "field": "revenue_min",
+      "type": "numeric"
+    },
+    {
+      "field": "revenue_max",
+      "type": "numeric"
+    }
+  ]
+}
