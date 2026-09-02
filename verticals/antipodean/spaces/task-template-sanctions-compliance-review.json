@@ -1,0 +1,28 @@
+{
+  "name": "Sanctions Compliance Review",
+  "description": "Raised by flow 2 (quote-bind) when a sanctions screen returns a hit at bind time. Investigate the hit against policy_config.sanctions_state and resolve it \u2014 clear the policy to bind, or escalate. This task does not carry the `referral` tag, so flow 11 ignores any status move made on it (the tag gate, not the status, is what stops a compliance review from accidentally issuing a quote).",
+  "vertical": "antipodean",
+  "priority": "highest",
+  "tags": [
+    "sanctions"
+  ],
+  "task_actions": [
+    {
+      "kind": "form",
+      "description": "Record the sanctions screening outcome and resolution",
+      "config_id": "policy_config",
+      "configs": [
+        {
+          "id": "policy_config"
+        }
+      ]
+    }
+  ],
+  "_notes": {
+    "priority_and_tag": "Both copied verbatim from contract artefact 4: priority `highest` (spec \u00a74.4.3 'urgent') and tag `sanctions`, both written by flow 2 on this task kind.",
+    "no_referral_tag": "This is the load-bearing exclusion, not an omission. Flow 11's gate 2 requires `referral` IN task.tags; a Sanctions Compliance Review task carries `sanctions` only, so moving it to Approved never issues a quote \u2014 even though `approved` is a shared status id across all four templates in this one space (artefact 4's vocabulary is shared by design, per A4-4).",
+    "form_action": "Pinned to policy_config (which carries `sanctions_state`) with no named view, same reasoning as the Underwriting Review template \u2014 policy_config has only a `table` view today, verified by reading record_configs/policy_config.json (not edited).",
+    "assignees": "Deliberately left unset \u2014 see the Underwriting Review template's note; no real compliance-user id exists on this staging account to hardcode.",
+    "installed_on_staging": "Created via POST /workspaces/task-template on api.microstrate.io (account 8243246585) as tt_nXeSxuoAec. Verified back via GET /workspaces/task-template/tt_nXeSxuoAec and GET /workspaces/task-templates?vertical=antipodean (4 results). Not deployed via the vertical-folder mechanism \u2014 task_templates is not one of the six routing-key folders in \u00a78.11, so this file is the authored source of truth and the id above is the live install; there is no deploy step that re-derives one from the other."
+  }
+}

@@ -1,7 +1,7 @@
 {
  "id": "claim_request_config",
  "name": "Claim request (FNOL)",
- "description": "A broker-initiated first-notification-of-loss request. Distributor-side. Note §1.8: claims FNOL attachments travel broker -> publisher through the gateway upload route, same platform gap as quote_config.attachments (no 'uploader' input type exists yet -- scoped item).",
+ "description": "A broker-initiated first-notification-of-loss request. Distributor-side. Note \u00a71.8: claims FNOL attachments travel broker -> publisher through the gateway upload route, same platform gap as quote_config.attachments (no 'uploader' input type exists yet -- scoped item).",
  "schema": {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
@@ -38,7 +38,7 @@
      "props": {
       "label": "Version",
       "helpText": {
-       "markdown": "Submission versioning: idempotency is on (quoteId, version), never quoteId alone (§1.5, §7.4 item 9)."
+       "markdown": "Submission versioning: idempotency is on (quoteId, version), never quoteId alone (\u00a71.5, \u00a77.4 item 9)."
       }
      }
     }
@@ -228,7 +228,324 @@
      "order": 7
     }
    ]
-  }
+  },
+  "forms": [
+   {
+    "id": "default",
+    "title": "Claim request (FNOL)",
+    "layout": {
+     "type": "grid",
+     "props": {
+      "gridTemplateColumns": "1fr",
+      "gap": 16
+     },
+     "children": [
+      {
+       "type": "grid",
+       "props": {
+        "gridTemplateColumns": "1fr 1fr"
+       },
+       "children": [
+        {
+         "type": "field",
+         "field": "policy_number",
+         "inputType": "text",
+         "props": {
+          "label": "Policy number",
+          "helpText": {
+           "markdown": "The policy the loss is claimed against. P-{PRODUCT_CODE}-{YYYY}-{000000}."
+          }
+         },
+         "rules": [
+          {
+           "id": "policy_number.required",
+           "property": "required",
+           "logic": true,
+           "description": "Policy number is required to identify which policy the loss is claimed against."
+          }
+         ]
+        },
+        {
+         "type": "field",
+         "field": "date_of_loss",
+         "inputType": "date",
+         "props": {
+          "label": "Date of loss"
+         },
+         "rules": [
+          {
+           "id": "date_of_loss.required",
+           "property": "required",
+           "logic": true,
+           "description": "Date of loss is required."
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "grid",
+       "props": {
+        "gridTemplateColumns": "1fr"
+       },
+       "children": [
+        {
+         "type": "field",
+         "field": "loss_description",
+         "inputType": "textarea",
+         "props": {
+          "label": "Loss description"
+         },
+         "rules": [
+          {
+           "id": "loss_description.required",
+           "property": "required",
+           "logic": true,
+           "description": "A description of the loss is required."
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "grid",
+       "props": {
+        "gridTemplateColumns": "1fr"
+       },
+       "children": [
+        {
+         "type": "array-field",
+         "field": "attachments",
+         "props": {
+          "label": "Attachments",
+          "itemLabel": "Attachment"
+         },
+         "children": [
+          {
+           "type": "grid",
+           "props": {
+            "gridTemplateColumns": "2fr 2fr 1fr"
+           },
+           "children": [
+            {
+             "type": "field",
+             "field": "file_name",
+             "inputType": "text",
+             "props": {
+              "label": "File name"
+             }
+            },
+            {
+             "type": "field",
+             "field": "object_key",
+             "inputType": "text",
+             "props": {
+              "label": "Object key"
+             },
+             "rules": [
+              {
+               "id": "object_key.readonly",
+               "property": "readonly",
+               "logic": true,
+               "description": "Set by the upload mechanism once the file lands in the object store; not typed by hand."
+              }
+             ]
+            },
+            {
+             "type": "field",
+             "field": "uploaded_at",
+             "inputType": "date",
+             "props": {
+              "label": "Uploaded at"
+             },
+             "rules": [
+              {
+               "id": "uploaded_at.readonly",
+               "property": "readonly",
+               "logic": true,
+               "description": "Stamped when the file is uploaded; not typed by hand."
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "grid",
+       "props": {
+        "gridTemplateColumns": "1fr 1fr"
+       },
+       "children": [
+        {
+         "type": "field",
+         "field": "request_status",
+         "inputType": "dropdown",
+         "props": {
+          "label": "Request status",
+          "options": [
+           {
+            "value": "DRAFT",
+            "text": "Draft"
+           },
+           {
+            "value": "SUBMITTED",
+            "text": "Submitted"
+           },
+           {
+            "value": "REFERRED",
+            "text": "Referred"
+           },
+           {
+            "value": "APPROVED",
+            "text": "Approved"
+           },
+           {
+            "value": "DECLINED",
+            "text": "Declined"
+           }
+          ]
+         },
+         "rules": [
+          {
+           "id": "request_status.readonly",
+           "property": "readonly",
+           "logic": true,
+           "description": "Moved by the submit flow and the publisher's return projection (DRAFT \u2192 SUBMITTED \u2192 REFERRED \u2192 APPROVED/DECLINED); not edited by hand."
+          }
+         ]
+        },
+        {
+         "type": "field",
+         "field": "claim_number",
+         "inputType": "text",
+         "props": {
+          "label": "Claim number",
+          "helpText": {
+           "markdown": "CLM-{PRODUCT_CODE}-{YYYY}-{000000}. Empty until the publisher mints one."
+          }
+         },
+         "rules": [
+          {
+           "id": "claim_number.readonly",
+           "property": "readonly",
+           "logic": true,
+           "description": "Minted by the publisher once it creates the claim_config record; not edited by hand."
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "grid",
+       "props": {
+        "gridTemplateColumns": "1fr 1fr"
+       },
+       "children": [
+        {
+         "type": "field",
+         "field": "request_reference",
+         "inputType": "text",
+         "props": {
+          "label": "Request reference"
+         },
+         "rules": [
+          {
+           "id": "request_reference.readonly",
+           "property": "readonly",
+           "logic": true,
+           "description": "Minted by the submit flow; not edited by hand."
+          }
+         ]
+        },
+        {
+         "type": "field",
+         "field": "publisher_ref",
+         "inputType": "text",
+         "props": {
+          "label": "Publisher reference"
+         },
+         "rules": [
+          {
+           "id": "publisher_ref.readonly",
+           "property": "readonly",
+           "logic": true,
+           "description": "Filled by the return projection once the publisher-side record exists, so it can match back (\u00a71.5); not edited by hand."
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "grid",
+       "props": {
+        "gridTemplateColumns": "1fr 1fr"
+       },
+       "children": [
+        {
+         "type": "field",
+         "field": "owner_user_id",
+         "inputType": "text",
+         "props": {
+          "label": "Owner (user id)"
+         },
+         "rules": [
+          {
+           "id": "owner_user_id.readonly",
+           "property": "readonly",
+           "logic": true,
+           "description": "Stamped from the broker's session at creation; not edited by hand."
+          }
+         ]
+        },
+        {
+         "type": "field",
+         "field": "version",
+         "inputType": "number",
+         "props": {
+          "label": "Version"
+         },
+         "rules": [
+          {
+           "id": "version.readonly",
+           "property": "readonly",
+           "logic": true,
+           "description": "Submission versioning for idempotency (\u00a71.5); not edited by hand."
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "grid",
+       "props": {
+        "gridTemplateColumns": "1fr"
+       },
+       "children": [
+        {
+         "type": "field",
+         "field": "submitted_at",
+         "inputType": "date",
+         "props": {
+          "label": "Submitted at"
+         },
+         "rules": [
+          {
+           "id": "submitted_at.readonly",
+           "property": "readonly",
+           "logic": true,
+           "description": "Stamped by the submit flow (D-class) when the request crosses to the publisher; not edited by hand."
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   }
+  ]
  },
  "index_fields": [
   {
