@@ -1,0 +1,322 @@
+{
+    "name": "renewal-dispatch",
+    "description": "Flow 7. The T-90 per-entity timer (contract artefact 5 concern \"renewal-dispatch\", name renewal-dispatch:<policyId>). A wake-up, not a decision. It finds the renewal flow 6 wrote \u2014 by folder = <policyId> AND origin = publisher-renewal, never by the reference string, so a regeneration is picked up automatically \u2014 takes the newest one, reads its decision, and dispatches ONLY a clean undispatched ACCEPT on an ACTIVE, auto-renewal-eligible policy with no MTA open (spec 4.6.3: an MTA in progress marks the renewal Pending Expiring Endorsement and queues it for manual review). It renders tpl_quotation_schedule, writes the reference onto the renewal decision's issued_document_refs, and only then emails the Renewal Invitation \u2014 record first, notice second, as plan 5.3 rule 3 requires. Idempotency needs no new schema field: a non-empty issued_document_refs on the renewal decision IS the dispatch record. Timer payload: {policy_id, concern, quote_id}.",
+    "config": {
+        "static": {
+            "api": "https://api.microstrate.io",
+            "space_id": "ANTIPODEAN",
+            "concern": "renewal-dispatch",
+            "self_subject": "ms.hub.config.workflow.3788449144.1497961748",
+            "fallback_notice_email": "operations@antipodean-underwriting.test",
+            "note_attachment": "send-templated-email's contract is {to, to_name?, subject, body_html, email_class, idempotency_key?} \u2014 it carries no attachments, so the invitation names the rendered Quotation Schedule by object key rather than attaching it. Attaching it needs either an attachments field on that sub-flow or a broker-facing document fetch.",
+            "note_class": "email_class transactional: a renewal invitation on an existing contract is a servicing notice to the broker of record, not an opt-out-bearing marketing send. Confirm with Antipodean before the first live broker."
+        },
+        "result": "$.ASSESS",
+        "nodes": [
+            {
+                "id": "TRIGGER",
+                "data": {
+                    "id": "TRIGGER",
+                    "name": "renewal-dispatch timer (T-90)",
+                    "node_type": "trigger",
+                    "payload": {},
+                    "trigger_type": "webhook"
+                }
+            },
+            {
+                "id": "GET_POLICY",
+                "data": {
+                    "id": "GET_POLICY",
+                    "name": "Re-read the expiring policy",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "GET",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records/policy_config/|$.trigger.policy_id",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "PREP",
+                "data": {
+                    "id": "PREP",
+                    "name": "Build the exact-match filters",
+                    "node_type": "eval",
+                    "payload": {
+                        "code": "(function () {\n  var p = (pol && pol.data) ? pol.data : {};\n  var policyId = String((trg && trg.policy_id) || '');\n  if (!policyId) { throw new Error('renewal-dispatch: the timer payload carries no policy_id'); }\n  return {\n    policy_id: policyId,\n    // The renewal is found the same way flow 6 wrote it: folder = the expiring\n    // policy id, origin = publisher-renewal. Both are exact keyword matches, and\n    // this survives a regeneration because it never depends on the reference string.\n    renewal_filter: JSON.stringify({ conditions: [\n      { field: 'folder', keyword: policyId },\n      { field: 'origin', keyword: 'publisher-renewal' }] }),\n    broker_filter: JSON.stringify({ conditions: [\n      { field: 'broker_id', keyword: String(p.broker_id || '') || '__no_broker__' }] }),\n    now: new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z')\n  };\n})();",
+                        "params": {
+                            "pol": "$.GET_POLICY.data",
+                            "trg": "$.trigger"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "FIND_RENEWALS",
+                "data": {
+                    "id": "FIND_RENEWALS",
+                    "name": "The publisher-renewal submission for this policy",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "GET",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        },
+                        "query": {
+                            "config_id": "submission_config",
+                            "space_id": "ANTIPODEAN",
+                            "filter": "$.PREP.renewal_filter",
+                            "limit": "50"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "PICK_RENEWAL",
+                "data": {
+                    "id": "PICK_RENEWAL",
+                    "name": "Newest renewal wins",
+                    "node_type": "eval",
+                    "payload": {
+                        "code": "(function () {\n  var rows = (resp && resp.data && resp.data.results) ? resp.data.results : [];\n  var seen = {}, list = [];\n  for (var i = 0; i < rows.length; i++) {\n    var r = rows[i];\n    if (!r || !r.id || seen[r.id]) continue;\n    seen[r.id] = 1; list.push(r);\n  }\n  // The newest renewal wins: a regeneration supersedes the one before it.\n  var latest = null;\n  for (var j = 0; j < list.length; j++) {\n    if (!latest) { latest = list[j]; continue; }\n    if (String((list[j].data || {}).received_at || '') > String((latest.data || {}).received_at || '')) latest = list[j];\n  }\n  var d = latest ? (latest.data || {}) : {};\n  return {\n    found: !!latest,\n    submission_id: latest ? String(latest.id) : '',\n    quote_id: String(d.quote_id || ''),\n    quote_reference: String(d.quote_reference || ''),\n    policyholder_name: String(d.gen_policyholder_name || ''),\n    occupation: String(d.gen_occupation || ''),\n    renewal_count: list.length,\n    decision_filter: JSON.stringify({ conditions: [\n      { field: 'submission_id', keyword: latest ? String(latest.id) : '__none__' }] })\n  };\n})();",
+                        "params": {
+                            "resp": "$.FIND_RENEWALS"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "FIND_RENEWAL_DECISION",
+                "data": {
+                    "id": "FIND_RENEWAL_DECISION",
+                    "name": "Its decision",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "GET",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        },
+                        "query": {
+                            "config_id": "decision_config",
+                            "space_id": "ANTIPODEAN",
+                            "filter": "$.PICK_RENEWAL.decision_filter",
+                            "limit": "50"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "GET_BROKER",
+                "data": {
+                    "id": "GET_BROKER",
+                    "name": "Broker of record",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "GET",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        },
+                        "query": {
+                            "config_id": "broker_config",
+                            "space_id": "ANTIPODEAN",
+                            "filter": "$.PREP.broker_filter",
+                            "limit": "5"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "ASSESS",
+                "data": {
+                    "id": "ASSESS",
+                    "name": "Dispatch only a clean, undispatched ACCEPT",
+                    "node_type": "eval",
+                    "payload": {
+                        "code": "(function () {\n  function iso(d) { return d.toISOString().replace(/\\.\\d{3}Z$/, 'Z'); }\n  var p = (pol && pol.data) ? pol.data : {};\n  var rows = (dec && dec.data && dec.data.results) ? dec.data.results : [];\n  var seen = {}, list = [];\n  for (var i = 0; i < rows.length; i++) {\n    var r = rows[i];\n    if (!r || !r.id || seen[r.id]) continue;\n    seen[r.id] = 1; list.push(r);\n  }\n  // decision_seq is THE ordering key, never decided_at.\n  var target = null;\n  for (var j = 0; j < list.length; j++) {\n    if (!target) { target = list[j]; continue; }\n    if (Number((list[j].data || {}).decision_seq || 0) > Number((target.data || {}).decision_seq || 0)) target = list[j];\n  }\n  var td = target ? (target.data || {}) : {};\n\n  var brows = (brk && brk.data && brk.data.results) ? brk.data.results : [];\n  var to = '', toName = '';\n  for (var b = 0; b < brows.length; b++) {\n    var bd = brows[b].data || {};\n    if (bd.primary_contact_email) { to = String(bd.primary_contact_email); toName = String(bd.brokerage_name || bd.primary_contact_name || ''); break; }\n  }\n  if (!to) { to = String(fallback || ''); toName = 'Antipodean Operations'; }\n\n  var already = !!(td.issued_document_refs && td.issued_document_refs.length);\n  var mta = String(p.mta_state || 'none');\n  var reasons = [];\n  if (String(p.policy_status || '') !== 'ACTIVE') reasons.push('policy_status_is_' + (String(p.policy_status || '') || 'absent'));\n  if (String(p.auto_renewal_eligible || '') !== 'true') reasons.push('auto_renewal_eligible_is_' + (String(p.auto_renewal_eligible || '') || 'absent'));\n  if (!sub || !sub.found) reasons.push('no_renewal_generated_at_t100');\n  if (sub && sub.found && !target) reasons.push('renewal_not_yet_evaluated');\n  // spec 4.6.3: an MTA in progress or referred marks the renewal Pending\n  // Expiring Endorsement and queues it for MANUAL review, so nothing is\n  // dispatched to the broker while one is open.\n  if (!(mta === 'none' || mta === '')) reasons.push('mta_state_is_' + mta);\n  // Only a clean ACCEPT is dispatched. A REFER is with an underwriter and a\n  // DECLINE is not an offer; dispatching either would be a lie to the broker.\n  if (target && String(td.outcome || '') !== 'ACCEPT') reasons.push('renewal_outcome_is_' + (String(td.outcome || '') || 'absent'));\n  if (target && String(td.decision_status || '') !== 'OPEN') reasons.push('renewal_decision_status_is_' + (String(td.decision_status || '') || 'absent'));\n  // Idempotency without a new schema field: issued_document_refs on the renewal\n  // decision IS the dispatch record. Non-empty means the invitation went out.\n  if (already) reasons.push('already_dispatched');\n\n  return {\n    should_dispatch: reasons.length === 0,\n    skip_reasons: reasons,\n    policy_id: String((trg && trg.policy_id) || ''),\n    policy_number: String(p.policy_number || ''),\n    expiration_date: String(p.expiration_date || ''),\n    renewal_submission_id: sub ? String(sub.submission_id || '') : '',\n    renewal_quote_id: sub ? String(sub.quote_id || '') : '',\n    renewal_quote_reference: sub ? String(sub.quote_reference || '') : '',\n    renewal_decision_id: target ? String(target.id) : '',\n    outcome: String(td.outcome || ''),\n    total_payable: Number(td.total_payable || 0),\n    total_payable_text: (Number(td.total_payable || 0)).toFixed(2),\n    quote_validity_expiry: String(td.quote_validity_expiry || ''),\n    broker_reasons: td.broker_reasons || [],\n    policyholder_name: sub ? String(sub.policyholder_name || '') : '',\n    occupation: sub ? String(sub.occupation || '') : '',\n    notice_to: to,\n    notice_to_name: toName,\n    dispatched_at: iso(new Date())\n  };\n})();",
+                        "params": {
+                            "pol": "$.GET_POLICY.data",
+                            "sub": "$.PICK_RENEWAL",
+                            "dec": "$.FIND_RENEWAL_DECISION",
+                            "brk": "$.GET_BROKER",
+                            "trg": "$.trigger",
+                            "fallback": "$.static.fallback_notice_email"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "GATE",
+                "data": {
+                    "id": "GATE",
+                    "name": "Dispatch or do nothing",
+                    "node_type": "condition",
+                    "payload": [
+                        {
+                            "condition": {
+                                "operator": "=",
+                                "input": [
+                                    "$.ASSESS.should_dispatch",
+                                    true
+                                ]
+                            },
+                            "outcome": "RENDER_SCHEDULE"
+                        },
+                        {
+                            "outcome": "RESOLVE_SUCCESS"
+                        }
+                    ]
+                }
+            },
+            {
+                "id": "RENDER_SCHEDULE",
+                "data": {
+                    "id": "RENDER_SCHEDULE",
+                    "name": "Render tpl_quotation_schedule",
+                    "node_type": "quiva-endpoint",
+                    "payload": {
+                        "payload": {
+                            "quote_reference": "$.ASSESS.renewal_quote_reference",
+                            "gen_policyholder_name": "$.ASSESS.policyholder_name",
+                            "gen_occupation": "$.ASSESS.occupation",
+                            "quote_validity_expiry": "$.ASSESS.quote_validity_expiry",
+                            "outcome_status": "$.ASSESS.outcome",
+                            "total_payable": "$.ASSESS.total_payable",
+                            "broker_reasons": "$.ASSESS.broker_reasons"
+                        },
+                        "list": [
+                            {
+                                "template": "tpl_quotation_schedule"
+                            }
+                        ]
+                    },
+                    "subject": "microstrate.file-generator.post.template-trigger"
+                }
+            },
+            {
+                "id": "SHAPE_DOC",
+                "data": {
+                    "id": "SHAPE_DOC",
+                    "name": "Record the rendered schedule as a document reference",
+                    "node_type": "eval",
+                    "payload": {
+                        "code": "(function () {\n  // The generator's reply shape is not guaranteed, so the object key is read\n  // where it is offered and DERIVED from the template's own output config\n  // otherwise. Both are recorded, and the derived one is marked as derived\n  // rather than passed off as observed.\n  function firstKey(o) {\n    if (!o || typeof o !== 'object') return '';\n    if (typeof o.key === 'string') return o.key;\n    if (typeof o.object_key === 'string') return o.object_key;\n    if (o.output && typeof o.output.key === 'string') return o.output.key;\n    return '';\n  }\n  var rows = [];\n  if (gen && gen.data) { rows = Array.isArray(gen.data) ? gen.data : [gen.data]; }\n  else if (Array.isArray(gen)) { rows = gen; }\n  else if (gen) { rows = [gen]; }\n  var key = '';\n  var errors = [];\n  for (var i = 0; i < rows.length; i++) {\n    var r = rows[i] || {};\n    if (r.errors && r.errors.length) { errors = errors.concat(r.errors); }\n    if (!key) key = firstKey(r);\n  }\n  var derived = false;\n  if (!key) { key = 'antipodean.quotes.quotation-schedule-' + String(ref || '') + '.pdf'; derived = true; }\n  if (errors.length) { throw new Error('renewal-dispatch: tpl_quotation_schedule failed: ' + JSON.stringify(errors)); }\n  return {\n    object_key: key,\n    object_key_derived: derived,\n    issued_document_refs: [{\n      document_type: 'quotation_schedule',\n      template_id: 'tpl_quotation_schedule',\n      object_key: key\n    }]\n  };\n})();",
+                        "params": {
+                            "gen": "$.RENDER_SCHEDULE",
+                            "ref": "$.ASSESS.renewal_quote_reference"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "STAMP_DISPATCH",
+                "data": {
+                    "id": "STAMP_DISPATCH",
+                    "name": "issued_document_refs IS the dispatch record",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "PUT",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records/decision_config/|$.ASSESS.renewal_decision_id",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        },
+                        "data": {
+                            "data": {
+                                "issued_document_refs": "$.SHAPE_DOC.issued_document_refs"
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "id": "NOTIFY_RENEWAL",
+                "data": {
+                    "id": "NOTIFY_RENEWAL",
+                    "name": "Renewal Invitation to the broker of record",
+                    "node_type": "flow",
+                    "payload": {
+                        "to": "$.ASSESS.notice_to",
+                        "to_name": "$.ASSESS.notice_to_name",
+                        "subject": "Renewal invitation |$.ASSESS.renewal_quote_reference| \u2014 policy |$.ASSESS.policy_number|",
+                        "email_class": "transactional",
+                        "idempotency_key": "renewal-dispatch-|$.ASSESS.renewal_decision_id",
+                        "body_html": "<p>Policy <strong>|$.ASSESS.policy_number|</strong> expires on |$.ASSESS.expiration_date|.</p><p>Renewal quote <strong>|$.ASSESS.renewal_quote_reference|</strong> has been prepared for |$.ASSESS.policyholder_name|. Total payable AUD |$.ASSESS.total_payable_text|, valid until |$.ASSESS.quote_validity_expiry|.</p><p>The Quotation Schedule has been generated and is on file at |$.SHAPE_DOC.object_key|.</p><p>The answers were carried forward from the expiring term and are not attested until your client reviews and resubmits them.</p>"
+                    },
+                    "subject": "ms.hub.config.workflow.3788449144.127773145",
+                    "await": true
+                }
+            }
+        ],
+        "edges": [
+            {
+                "id": "e1",
+                "source": "TRIGGER",
+                "target": "GET_POLICY"
+            },
+            {
+                "id": "e2",
+                "source": "GET_POLICY",
+                "target": "PREP"
+            },
+            {
+                "id": "e3",
+                "source": "PREP",
+                "target": "FIND_RENEWALS"
+            },
+            {
+                "id": "e4",
+                "source": "FIND_RENEWALS",
+                "target": "PICK_RENEWAL"
+            },
+            {
+                "id": "e5",
+                "source": "PICK_RENEWAL",
+                "target": "FIND_RENEWAL_DECISION"
+            },
+            {
+                "id": "e6",
+                "source": "FIND_RENEWAL_DECISION",
+                "target": "GET_BROKER"
+            },
+            {
+                "id": "e7",
+                "source": "GET_BROKER",
+                "target": "ASSESS"
+            },
+            {
+                "id": "e8",
+                "source": "ASSESS",
+                "target": "GATE"
+            },
+            {
+                "id": "e9",
+                "source": "GATE",
+                "target": "RENDER_SCHEDULE"
+            },
+            {
+                "id": "e10",
+                "source": "RENDER_SCHEDULE",
+                "target": "SHAPE_DOC"
+            },
+            {
+                "id": "e11",
+                "source": "SHAPE_DOC",
+                "target": "STAMP_DISPATCH"
+            },
+            {
+                "id": "e12",
+                "source": "STAMP_DISPATCH",
+                "target": "NOTIFY_RENEWAL"
+            }
+        ]
+    }
+}

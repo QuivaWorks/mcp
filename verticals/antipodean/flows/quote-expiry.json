@@ -1,0 +1,315 @@
+{
+    "name": "quote-expiry",
+    "description": "Flow 10. The quote_validity_expiry per-entity timer (contract artefact 5 concern \"quote-expire\", name quote-expire:<quoteId>). A wake-up, not a decision: it re-reads every decision on the quote and every policy carrying that quote_id, and lapses only an OPEN, unsuperseded decision whose quote_validity_expiry has passed with no bind \u2014 a bound quote is proved twice over (a policy record, or a BOUND/ISSUED decision) and is never lapsed. The lapse is APPEND-ONLY per contract artefact 3: a new decision instance carrying origin_flow flow-10 and supersedes_decision_id records it, and the expiring instance gains decision_status SUPERSEDED plus the superseded_by forward pointer, so it leaves the decision_status:OPEN referral queue. It then moves the referral task filed under that decision id to \"lapsed\" (contract artefact 4 status 7), never touching one a person has already approved or declined. It deliberately does NOT write quote_outcome_config: that record is materialised by the return projection (plan 1.5), not by a publisher flow. Timer payload: {quote_id, decision_id?}. NOTE: nothing schedules this concern yet \u2014 artefact 5 A5-3 leaves the storing record open and decision_config has no quote_expire_timer_topic property.",
+    "config": {
+        "static": {
+            "api": "https://api.microstrate.io",
+            "space_id": "ANTIPODEAN",
+            "concern": "quote-expire",
+            "self_subject": "ms.hub.config.workflow.3788449144.2572884549",
+            "note_a5_3": "The flow is named quote-expiry (artefact 5 registers the CONCERN token as quote-expire). The concern token and the flow name are different strings by design: the topic is <flowTopic>.<hash(name)>, so the flow name decides the namespace and the concern token is the second line of defence.",
+            "note_gap": "decision_config has no quote_expire_timer_topic property, so a scheduler cannot yet satisfy ASSERT-2a for this concern. Artefact 1 and artefact 5 A5-3 must settle the storing record before anything books this timer."
+        },
+        "result": "$.ASSESS",
+        "nodes": [
+            {
+                "id": "TRIGGER",
+                "data": {
+                    "id": "TRIGGER",
+                    "name": "quote-expiry timer (quote_validity_expiry)",
+                    "node_type": "trigger",
+                    "payload": {},
+                    "trigger_type": "webhook"
+                }
+            },
+            {
+                "id": "PREP",
+                "data": {
+                    "id": "PREP",
+                    "name": "Build the exact-match filters",
+                    "node_type": "eval",
+                    "payload": {
+                        "code": "(function () {\n  var quoteId = String((trg && trg.quote_id) || '');\n  if (!quoteId) { throw new Error('quote-expiry: the timer payload carries no quote_id'); }\n  return {\n    quote_id: quoteId,\n    decision_id_hint: String((trg && trg.decision_id) || ''),\n    // quote_id is a keyword index field on BOTH decision_config and\n    // policy_config, and keyword matching is exact and case-sensitive.\n    decision_filter: JSON.stringify({ conditions: [{ field: 'quote_id', keyword: quoteId }] }),\n    policy_filter: JSON.stringify({ conditions: [{ field: 'quote_id', keyword: quoteId }] }),\n    now: new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z')\n  };\n})();",
+                        "params": {
+                            "trg": "$.trigger"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "FIND_DECISIONS",
+                "data": {
+                    "id": "FIND_DECISIONS",
+                    "name": "Every decision on this quote",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "GET",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        },
+                        "query": {
+                            "config_id": "decision_config",
+                            "space_id": "ANTIPODEAN",
+                            "filter": "$.PREP.decision_filter",
+                            "limit": "50"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "FIND_POLICY",
+                "data": {
+                    "id": "FIND_POLICY",
+                    "name": "Has this quote already bound?",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "GET",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        },
+                        "query": {
+                            "config_id": "policy_config",
+                            "space_id": "ANTIPODEAN",
+                            "filter": "$.PREP.policy_filter",
+                            "limit": "5"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "MINT_DECISION_SEQ",
+                "data": {
+                    "id": "MINT_DECISION_SEQ",
+                    "name": "Mint decision_seq for the lapse instance",
+                    "node_type": "quiva-endpoint",
+                    "payload": {
+                        "name": "DECISION_SEQ",
+                        "amount": 1
+                    },
+                    "subject": "microstrate.numbergen.put.increment"
+                }
+            },
+            {
+                "id": "ASSESS",
+                "data": {
+                    "id": "ASSESS",
+                    "name": "Lapse only an OPEN, unsuperseded, unbound, expired quote",
+                    "node_type": "eval",
+                    "payload": {
+                        "code": "(function () {\n  function iso(d) { return d.toISOString().replace(/\\.\\d{3}Z$/, 'Z'); }\n  function dedupe(resp) {\n    var rows = (resp && resp.data && resp.data.results) ? resp.data.results : [];\n    var seen = {}, out = [];\n    for (var i = 0; i < rows.length; i++) {\n      var r = rows[i];\n      if (!r || !r.id || seen[r.id]) continue;\n      seen[r.id] = 1; out.push(r);\n    }\n    return out;\n  }\n  var decisions = dedupe(dec);\n  var policies = dedupe(pol);\n\n  // A bound quote is never lapsed. Two independent proofs, because either one\n  // alone can be stale: a policy record on this quote_id, or a BOUND decision.\n  var bound = policies.length > 0;\n  for (var b = 0; b < decisions.length; b++) {\n    var bd = decisions[b].data || {};\n    if (bd.outcome === 'BOUND' || bd.decision_status === 'ISSUED') bound = true;\n  }\n\n  // decision_seq is THE ordering key \u2014 never submission_version, never\n  // decided_at (two publisher-side flows are not one clock).\n  var target = null;\n  for (var i = 0; i < decisions.length; i++) {\n    var d = decisions[i].data || {};\n    if (d.decision_status !== 'OPEN') continue;\n    if (d.superseded_by) continue;\n    if (hint && decisions[i].id !== hint) { /* a hint narrows but never widens */ }\n    if (!target) { target = decisions[i]; continue; }\n    var a = Number((target.data || {}).decision_seq || 0);\n    var c = Number(d.decision_seq || 0);\n    if (c > a) { target = decisions[i]; }\n    else if (c === a && String(d.decided_at || '') > String((target.data || {}).decided_at || '')) { target = decisions[i]; }\n  }\n  var td = target ? (target.data || {}) : {};\n  var expiry = td.quote_validity_expiry ? new Date(td.quote_validity_expiry) : null;\n  var expired = !!(expiry && !isNaN(expiry.getTime()) && Date.now() >= expiry.getTime());\n\n  var reasons = [];\n  if (!target) reasons.push('no_open_unsuperseded_decision');\n  if (bound) reasons.push('quote_is_bound');\n  if (target && !expired) reasons.push('quote_validity_expiry_not_reached');\n\n  var lapseSeq = Number((seq && (seq.value !== undefined ? seq.value : seq.count)) || 0);\n  var nowIso = iso(new Date());\n  return {\n    should_lapse: reasons.length === 0,\n    skip_reasons: reasons,\n    quote_id: String((trg && trg.quote_id) || ''),\n    decision_id: target ? String(target.id) : '',\n    submission_id: String(td.submission_id || ''),\n    submission_version: String(td.submission_version || ''),\n    product_code: String(td.product_code || ''),\n    product_version: String(td.product_version || ''),\n    distributor_account_id: String(td.distributor_account_id || ''),\n    outcome_carried: String(td.outcome || ''),\n    quote_validity_expiry: String(td.quote_validity_expiry || ''),\n    decisions_seen: decisions.length,\n    policies_seen: policies.length,\n    lapsed_at: nowIso,\n    // The append-only chain: a NEW instance records the lapse, and the\n    // predecessor gains the forward pointer. Nothing rewrites a decision's\n    // meaning in place.\n    lapse_record: {\n      quote_id: String((trg && trg.quote_id) || ''),\n      submission_id: String(td.submission_id || ''),\n      submission_version: String(td.submission_version || ''),\n      product_code: String(td.product_code || ''),\n      product_version: String(td.product_version || ''),\n      distributor_account_id: String(td.distributor_account_id || ''),\n      outcome: String(td.outcome || ''),\n      decision_status: 'SUPERSEDED',\n      origin_flow: 'flow-10',\n      decided_by: 'system-quote-expiry',\n      decided_at: nowIso,\n      decision_seq: lapseSeq,\n      quote_validity_expiry: String(td.quote_validity_expiry || ''),\n      supersedes_decision_id: target ? String(target.id) : '',\n      premium_basis: String(td.premium_basis || ''),\n      base_premium: Number(td.base_premium || 0),\n      total_payable: Number(td.total_payable || 0),\n      underwriter_notes: 'Lapsed by flow 10 quote-expiry: quote_validity_expiry '\n        + String(td.quote_validity_expiry || '') + ' passed with no bind.'\n    }\n  };\n})();",
+                        "params": {
+                            "dec": "$.FIND_DECISIONS",
+                            "pol": "$.FIND_POLICY",
+                            "seq": "$.MINT_DECISION_SEQ",
+                            "trg": "$.trigger",
+                            "hint": "$.PREP.decision_id_hint"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "GATE",
+                "data": {
+                    "id": "GATE",
+                    "name": "Lapse or do nothing",
+                    "node_type": "condition",
+                    "payload": [
+                        {
+                            "condition": {
+                                "operator": "=",
+                                "input": [
+                                    "$.ASSESS.should_lapse",
+                                    true
+                                ]
+                            },
+                            "outcome": "CREATE_LAPSE"
+                        },
+                        {
+                            "outcome": "RESOLVE_SUCCESS"
+                        }
+                    ]
+                }
+            },
+            {
+                "id": "CREATE_LAPSE",
+                "data": {
+                    "id": "CREATE_LAPSE",
+                    "name": "Append the flow-10 lapse decision",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "POST",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records/decision_config",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        },
+                        "data": {
+                            "space_id": "ANTIPODEAN",
+                            "completed": true,
+                            "folder": "$.ASSESS.submission_id",
+                            "data": "$.ASSESS.lapse_record"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "MARK_SUPERSEDED",
+                "data": {
+                    "id": "MARK_SUPERSEDED",
+                    "name": "Forward-point the expiring decision",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "PUT",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records/decision_config/|$.ASSESS.decision_id",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        },
+                        "data": {
+                            "data": {
+                                "decision_status": "SUPERSEDED",
+                                "superseded_by": "$.CREATE_LAPSE.data.id"
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "id": "FIND_TASKS",
+                "data": {
+                    "id": "FIND_TASKS",
+                    "name": "The referral task filed under the decision id",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "GET",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/workspaces/space/ANTIPODEAN/tasks",
+                        "query": {
+                            "folder": "$.ASSESS.decision_id"
+                        },
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "PICK_TASK",
+                "data": {
+                    "id": "PICK_TASK",
+                    "name": "Pick an unresolved referral task, if any",
+                    "node_type": "eval",
+                    "payload": {
+                        "code": "(function () {\n  var rows = (t && t.data && t.data.results) ? t.data.results\n           : ((t && t.results) ? t.results : []);\n  // artefact 4: a referral task's folder is the DECISION record id, because\n  // flow 11 needs an exact-match handle a task delta can never carry.\n  var found = null;\n  for (var i = 0; i < rows.length; i++) {\n    var x = rows[i];\n    var tags = x.tags || [];\n    var isReferral = false;\n    for (var j = 0; j < tags.length; j++) { if (tags[j] === 'referral') isReferral = true; }\n    // Never touch a task a person has already resolved. approved/declined are a\n    // person's decision and flow 11's trigger; lapsing one would be a lie.\n    if (!isReferral) continue;\n    if (x.status === 'approved' || x.status === 'declined' || x.status === 'lapsed') continue;\n    found = x; break;\n  }\n  return {\n    task_found: !!found,\n    task_id: found ? String(found.id) : '',\n    task_status_before: found ? String(found.status || '') : '',\n    candidates: rows.length\n  };\n})();",
+                        "params": {
+                            "t": "$.FIND_TASKS"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "TASK_GATE",
+                "data": {
+                    "id": "TASK_GATE",
+                    "name": "Only if a live referral task exists",
+                    "node_type": "condition",
+                    "payload": [
+                        {
+                            "condition": {
+                                "operator": "=",
+                                "input": [
+                                    "$.PICK_TASK.task_found",
+                                    true
+                                ]
+                            },
+                            "outcome": "LAPSE_TASK"
+                        },
+                        {
+                            "outcome": "RESOLVE_SUCCESS"
+                        }
+                    ]
+                }
+            },
+            {
+                "id": "LAPSE_TASK",
+                "data": {
+                    "id": "LAPSE_TASK",
+                    "name": "Move the referral task to lapsed",
+                    "node_type": "task",
+                    "payload": {
+                        "space_id": "ANTIPODEAN",
+                        "task_id": "$.PICK_TASK.task_id",
+                        "status": "lapsed"
+                    },
+                    "operation": "set_task_status"
+                }
+            }
+        ],
+        "edges": [
+            {
+                "id": "e1",
+                "source": "TRIGGER",
+                "target": "PREP"
+            },
+            {
+                "id": "e2",
+                "source": "PREP",
+                "target": "FIND_DECISIONS"
+            },
+            {
+                "id": "e3",
+                "source": "FIND_DECISIONS",
+                "target": "FIND_POLICY"
+            },
+            {
+                "id": "e4",
+                "source": "FIND_POLICY",
+                "target": "MINT_DECISION_SEQ"
+            },
+            {
+                "id": "e5",
+                "source": "MINT_DECISION_SEQ",
+                "target": "ASSESS"
+            },
+            {
+                "id": "e6",
+                "source": "ASSESS",
+                "target": "GATE"
+            },
+            {
+                "id": "e7",
+                "source": "GATE",
+                "target": "CREATE_LAPSE"
+            },
+            {
+                "id": "e8",
+                "source": "CREATE_LAPSE",
+                "target": "MARK_SUPERSEDED"
+            },
+            {
+                "id": "e9",
+                "source": "MARK_SUPERSEDED",
+                "target": "FIND_TASKS"
+            },
+            {
+                "id": "e10",
+                "source": "FIND_TASKS",
+                "target": "PICK_TASK"
+            },
+            {
+                "id": "e11",
+                "source": "PICK_TASK",
+                "target": "TASK_GATE"
+            },
+            {
+                "id": "e12",
+                "source": "TASK_GATE",
+                "target": "LAPSE_TASK"
+            }
+        ]
+    }
+}

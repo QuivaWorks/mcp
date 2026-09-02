@@ -1,0 +1,401 @@
+{
+    "name": "policy-void",
+    "description": "Flow 4. The bind+void_after_days per-entity timer (contract artefact 5 concern \"policy-void\", name policy-void:<policyId>). A wake-up, not a decision. It honours the PER-POLICY void_after_days rather than the fire time: policy_config.void_due_date is the authority, recomputed from bind_date + void_after_days when absent, so a term extension or override that moved the deadline after bind causes a REBOOK of the timer instead of an early void. Voiding is ab initio for non-payment: it cancels the two renewal timers by their STORED topics and clears those fields in the same write (artefact 5 ASSERT-2c), writes VOIDED and the voidance_notice stamp BEFORE the notice is sent (plan 5.3 rule 3), renders tpl_void_notice, emails the broker of record, and raises the Void Override task (tag override, priority medium) as the only audit surface a reinstatement has. Skips entirely on a paid invoice, a policy that is not ACTIVE/OVERDUE, or a notice already sent. Timer payload: {policy_id, concern, quote_id}.",
+    "config": {
+        "static": {
+            "api": "https://api.microstrate.io",
+            "space_id": "ANTIPODEAN",
+            "concern": "policy-void",
+            "self_subject": "ms.hub.config.workflow.3788449144.950582440",
+            "default_void_after_days": 61,
+            "fallback_notice_email": "operations@antipodean-underwriting.test",
+            "note_branches": "The three post-GATE paths are linear and never re-join. A merge node downstream of a condition never fires when a sibling branch is taken (graph.go:1169-1184) and the run still reports success."
+        },
+        "result": "$.ASSESS",
+        "nodes": [
+            {
+                "id": "TRIGGER",
+                "data": {
+                    "id": "TRIGGER",
+                    "name": "policy-void timer (bind + void_after_days)",
+                    "node_type": "trigger",
+                    "payload": {},
+                    "trigger_type": "webhook"
+                }
+            },
+            {
+                "id": "GET_POLICY",
+                "data": {
+                    "id": "GET_POLICY",
+                    "name": "Re-read the policy",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "GET",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records/policy_config/|$.trigger.policy_id",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "PREP",
+                "data": {
+                    "id": "PREP",
+                    "name": "Build the exact-match filters",
+                    "node_type": "eval",
+                    "payload": {
+                        "code": "(function () {\n  var p = (pol && pol.data) ? pol.data : {};\n  var policyId = String((trg && trg.policy_id) || '');\n  if (!policyId) { throw new Error('policy-void: the timer payload carries no policy_id'); }\n  return {\n    policy_id: policyId,\n    broker_id: String(p.broker_id || ''),\n    invoice_filter: JSON.stringify({ conditions: [{ field: 'policy_id', keyword: policyId }] }),\n    broker_filter: JSON.stringify({ conditions: [{ field: 'broker_id', keyword: String(p.broker_id || '') || '__no_broker__' }] }),\n    now: new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z')\n  };\n})();",
+                        "params": {
+                            "pol": "$.GET_POLICY.data",
+                            "trg": "$.trigger"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "FIND_INVOICE",
+                "data": {
+                    "id": "FIND_INVOICE",
+                    "name": "Invoices for this policy",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "GET",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        },
+                        "query": {
+                            "config_id": "invoice_config",
+                            "space_id": "ANTIPODEAN",
+                            "filter": "$.PREP.invoice_filter",
+                            "limit": "50"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "GET_BROKER",
+                "data": {
+                    "id": "GET_BROKER",
+                    "name": "Broker of record",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "GET",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        },
+                        "query": {
+                            "config_id": "broker_config",
+                            "space_id": "ANTIPODEAN",
+                            "filter": "$.PREP.broker_filter",
+                            "limit": "5"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "ASSESS",
+                "data": {
+                    "id": "ASSESS",
+                    "name": "Void, reschedule, or do nothing",
+                    "node_type": "eval",
+                    "payload": {
+                        "code": "(function () {\n  function iso(d) { return d.toISOString().replace(/\\.\\d{3}Z$/, 'Z'); }\n  var p = (pol && pol.data) ? pol.data : {};\n  var rows = (inv && inv.data && inv.data.results) ? inv.data.results : [];\n  var seen = {}, list = [];\n  for (var i = 0; i < rows.length; i++) {\n    var r = rows[i];\n    if (!r || !r.id || seen[r.id]) continue;\n    seen[r.id] = 1; list.push(r);\n  }\n  var open = [];\n  for (var j = 0; j < list.length; j++) {\n    var d = list[j].data || {};\n    if (d.payment_status === 'unpaid' || d.payment_status === 'overdue') open.push(list[j]);\n  }\n  open.sort(function (a, b) {\n    return String((a.data || {}).due_date || '') < String((b.data || {}).due_date || '') ? -1 : 1;\n  });\n  var chosen = open.length ? open[0] : null;\n  var cd = chosen ? (chosen.data || {}) : {};\n\n  // ---- honouring the PER-POLICY void_after_days -------------------------\n  // The timer was booked at bind from the void_after_days in force then. A term\n  // extension or an override can move void_after_days afterwards without\n  // rescheduling, so the fire time is a hint and void_due_date is the authority.\n  // Where void_due_date is absent it is recomputed from bind_date so the\n  // per-policy number is still honoured rather than a global 61 being assumed.\n  var days = Number(p.void_after_days);\n  if (!(days > 0)) days = Number(defaultDays) || 61;\n  var bind = p.bind_date ? new Date(p.bind_date) : null;\n  var stored = p.void_due_date ? new Date(p.void_due_date) : null;\n  var derived = (bind && !isNaN(bind.getTime())) ? new Date(bind.getTime() + days * 86400000) : null;\n  var due = (stored && !isNaN(stored.getTime())) ? stored : derived;\n  var nowMs = Date.now();\n  var dueMs = due ? due.getTime() : NaN;\n\n  var brows = (brk && brk.data && brk.data.results) ? brk.data.results : [];\n  var to = '', toName = '';\n  for (var k = 0; k < brows.length; k++) {\n    var bd = brows[k].data || {};\n    if (bd.primary_contact_email) { to = String(bd.primary_contact_email); toName = String(bd.brokerage_name || bd.primary_contact_name || ''); break; }\n  }\n  if (!to) { to = String(fallback || ''); toName = 'Antipodean Operations'; }\n\n  var status = String(p.policy_status || '');\n  var noticeSent = String(p.voidance_notice_state || '') === 'sent';\n  var reasons = [];\n  if (!(status === 'ACTIVE' || status === 'OVERDUE')) reasons.push('policy_status_is_' + (status || 'absent'));\n  if (!chosen) reasons.push('no_unpaid_or_overdue_invoice');\n  // Idempotency is on us: the status is written first and the notice second,\n  // and the send is gated on the absence of the stamp (plan 5.3 rule 3).\n  if (noticeSent) reasons.push('voidance_notice_already_sent');\n  if (isNaN(dueMs)) reasons.push('no_void_due_date_and_no_bind_date');\n\n  var action = 'skip';\n  if (reasons.length === 0) {\n    // A 60s tolerance stops a timer that fires a few milliseconds early from\n    // booking a pointless reschedule.\n    action = (nowMs + 60000 >= dueMs) ? 'void' : 'reschedule';\n    if (action === 'reschedule') reasons.push('void_due_date_moved_out_to_' + iso(due));\n  }\n\n  return {\n    action: action,\n    is_void: action === 'void',\n    is_reschedule: action === 'reschedule',\n    notes: reasons,\n    policy_id: String((trg && trg.policy_id) || ''),\n    policy_number: String(p.policy_number || ''),\n    policy_status_before: status,\n    inception_date: String(p.inception_date || ''),\n    void_after_days: days,\n    void_due_date: due ? iso(due) : '',\n    void_due_date_source: (stored && !isNaN(stored.getTime())) ? 'policy.void_due_date' : 'derived_from_bind_date',\n    invoice_id: chosen ? String(chosen.id) : '',\n    invoice_number: String(cd.invoice_number || ''),\n    amount_due_text: (Number(cd.amount_due || 0)).toFixed(2),\n    // The timer name is composed from the frozen registry in config.static,\n    // never from a literal this flow wrote itself (artefact 5, ASSERT-1c).\n    reschedule_name: String(concern) + ':' + String((trg && trg.policy_id) || ''),\n    // unschedule-flow accepts only the STORED topic. It cannot fail: a\n    // nonexistent topic returns 200, which is why the stored fields are cleared\n    // in the same write that records the cancellation (artefact 5, ASSERT-2c).\n    renewal_generate_topic: String(p.renewal_generate_timer_topic || '') || 'antipodean.nothing-to-cancel',\n    renewal_dispatch_topic: String(p.renewal_dispatch_timer_topic || '') || 'antipodean.nothing-to-cancel',\n    had_renewal_generate_topic: !!p.renewal_generate_timer_topic,\n    had_renewal_dispatch_topic: !!p.renewal_dispatch_timer_topic,\n    notice_to: to,\n    notice_to_name: toName,\n    voided_at: iso(new Date()),\n    assessed_at: iso(new Date())\n  };\n})();",
+                        "params": {
+                            "pol": "$.GET_POLICY.data",
+                            "inv": "$.FIND_INVOICE",
+                            "brk": "$.GET_BROKER",
+                            "trg": "$.trigger",
+                            "fallback": "$.static.fallback_notice_email",
+                            "defaultDays": "$.static.default_void_after_days",
+                            "concern": "$.static.concern"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "GATE",
+                "data": {
+                    "id": "GATE",
+                    "name": "Void / reschedule / skip",
+                    "node_type": "condition",
+                    "payload": [
+                        {
+                            "condition": {
+                                "operator": "=",
+                                "input": [
+                                    "$.ASSESS.action",
+                                    "void"
+                                ]
+                            },
+                            "outcome": "UNSCHED_RENEWAL_GENERATE"
+                        },
+                        {
+                            "condition": {
+                                "operator": "=",
+                                "input": [
+                                    "$.ASSESS.action",
+                                    "reschedule"
+                                ]
+                            },
+                            "outcome": "RESCHEDULE_VOID"
+                        },
+                        {
+                            "outcome": "RESOLVE_SUCCESS"
+                        }
+                    ]
+                }
+            },
+            {
+                "id": "UNSCHED_RENEWAL_GENERATE",
+                "data": {
+                    "id": "UNSCHED_RENEWAL_GENERATE",
+                    "name": "Cancel renewal-generate (artefact 5: flow 4 on void)",
+                    "node_type": "quiva-endpoint",
+                    "payload": {
+                        "topic": "$.ASSESS.renewal_generate_topic"
+                    },
+                    "subject": "microstrate.hub.delete.unschedule-flow"
+                }
+            },
+            {
+                "id": "UNSCHED_RENEWAL_DISPATCH",
+                "data": {
+                    "id": "UNSCHED_RENEWAL_DISPATCH",
+                    "name": "Cancel renewal-dispatch (artefact 5: flow 4 on void)",
+                    "node_type": "quiva-endpoint",
+                    "payload": {
+                        "topic": "$.ASSESS.renewal_dispatch_topic"
+                    },
+                    "subject": "microstrate.hub.delete.unschedule-flow"
+                }
+            },
+            {
+                "id": "STAMP_VOID",
+                "data": {
+                    "id": "STAMP_VOID",
+                    "name": "VOIDED + notice stamp + clear the cancelled topics",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "PUT",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records/policy_config/|$.ASSESS.policy_id",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        },
+                        "data": {
+                            "data": {
+                                "policy_status": "VOIDED",
+                                "voidance_notice_state": "sent",
+                                "voidance_notice_sent_at": "$.ASSESS.voided_at",
+                                "renewal_generate_timer_topic": "",
+                                "renewal_dispatch_timer_topic": "",
+                                "policy_void_timer_topic": "",
+                                "auto_renewal_eligible": "false"
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "id": "RENDER_VOID_NOTICE",
+                "data": {
+                    "id": "RENDER_VOID_NOTICE",
+                    "name": "Render tpl_void_notice",
+                    "node_type": "quiva-endpoint",
+                    "payload": {
+                        "payload": {
+                            "policy_number": "$.ASSESS.policy_number",
+                            "inception_date": "$.ASSESS.inception_date",
+                            "outstanding_invoice_number": "$.ASSESS.invoice_number"
+                        },
+                        "list": [
+                            {
+                                "template": "tpl_void_notice"
+                            }
+                        ]
+                    },
+                    "subject": "microstrate.file-generator.post.template-trigger"
+                }
+            },
+            {
+                "id": "NOTIFY_VOID",
+                "data": {
+                    "id": "NOTIFY_VOID",
+                    "name": "Notice of voidance to the broker of record",
+                    "node_type": "flow",
+                    "payload": {
+                        "to": "$.ASSESS.notice_to",
+                        "to_name": "$.ASSESS.notice_to_name",
+                        "subject": "Notice of voidance: policy |$.ASSESS.policy_number|",
+                        "email_class": "transactional",
+                        "idempotency_key": "policy-void-|$.ASSESS.policy_id",
+                        "body_html": "<p>Policy <strong>|$.ASSESS.policy_number|</strong>, incepted |$.ASSESS.inception_date|, has been <strong>voided ab initio</strong> for non-payment.</p><p>Invoice |$.ASSESS.invoice_number| (AUD |$.ASSESS.amount_due_text|) remained unpaid past |$.ASSESS.void_due_date|.</p><p>The Notice of Voidance has been generated and is on file. Reinstatement requires an underwriter override with a recorded justification.</p>"
+                    },
+                    "subject": "ms.hub.config.workflow.3788449144.127773145",
+                    "await": true
+                }
+            },
+            {
+                "id": "OVERRIDE_TASK",
+                "data": {
+                    "id": "OVERRIDE_TASK",
+                    "name": "Raise the Void Override task",
+                    "node_type": "task",
+                    "payload": {
+                        "space_id": "ANTIPODEAN",
+                        "title": "Void Override \u2014 |$.ASSESS.policy_number",
+                        "description": "Policy |$.ASSESS.policy_number| was voided ab initio for non-payment of invoice |$.ASSESS.invoice_number| (AUD |$.ASSESS.amount_due_text|), due |$.ASSESS.void_due_date|. Reinstating it requires a recorded justification: no audit trail exists on a record edit, so this task is the audit surface. Reinstate through flow 5 policy-reinstate with policy_id |$.ASSESS.policy_id|.",
+                        "priority": "medium",
+                        "tags": [
+                            "override"
+                        ],
+                        "folder": "$.ASSESS.policy_id"
+                    },
+                    "operation": "create_task"
+                }
+            },
+            {
+                "id": "RESCHEDULE_VOID",
+                "data": {
+                    "id": "RESCHEDULE_VOID",
+                    "name": "Rebook policy-void:<policyId> on the moved due date",
+                    "node_type": "quiva-endpoint",
+                    "payload": {
+                        "name": "$.ASSESS.reschedule_name",
+                        "description": "Rebooked by policy-void: void_due_date had moved out",
+                        "trigger_on": "$.ASSESS.void_due_date",
+                        "payload": {
+                            "subject": "$.static.self_subject",
+                            "trigger": {
+                                "policy_id": "$.ASSESS.policy_id",
+                                "concern": "$.static.concern",
+                                "quote_id": "$.trigger.quote_id"
+                            }
+                        }
+                    },
+                    "subject": "microstrate.hub.post.schedule-flow"
+                }
+            },
+            {
+                "id": "RESTAMP_VOID_TOPIC",
+                "data": {
+                    "id": "RESTAMP_VOID_TOPIC",
+                    "name": "ASSERT-2b: re-stamp the returned topic",
+                    "node_type": "eval",
+                    "payload": {
+                        "code": "(function () {\n  // ASSERT-2b: a re-schedule re-stamps the returned topic as its next act. The\n  // returned Topic is the only string unschedule-flow accepts; deriving it\n  // locally is a repair tool for flow 13, never the contract.\n  function topicOf(resp) {\n    if (!resp || typeof resp !== 'object') return '';\n    if (typeof resp.topic === 'string') return resp.topic;\n    if (resp.data && typeof resp.data.topic === 'string') return resp.data.topic;\n    if (resp.results && resp.results.length && resp.results[0].topic) return resp.results[0].topic;\n    return '';\n  }\n  var t = topicOf(sched);\n  if (!t) { throw new Error('policy-void: the reschedule returned no topic \u2014 the void timer would be uncancellable'); }\n  return { policy_void_timer_topic: t, rescheduled_for: String(when || '') };\n})();",
+                        "params": {
+                            "sched": "$.RESCHEDULE_VOID",
+                            "when": "$.ASSESS.void_due_date"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "STAMP_RESCHEDULE",
+                "data": {
+                    "id": "STAMP_RESCHEDULE",
+                    "name": "Store the new topic (the only cancellation handle)",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "PUT",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records/policy_config/|$.ASSESS.policy_id",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        },
+                        "data": {
+                            "data": {
+                                "policy_void_timer_topic": "$.RESTAMP_VOID_TOPIC.policy_void_timer_topic",
+                                "timers_scheduled": "scheduled"
+                            }
+                        }
+                    }
+                }
+            }
+        ],
+        "edges": [
+            {
+                "id": "e1",
+                "source": "TRIGGER",
+                "target": "GET_POLICY"
+            },
+            {
+                "id": "e2",
+                "source": "GET_POLICY",
+                "target": "PREP"
+            },
+            {
+                "id": "e3",
+                "source": "PREP",
+                "target": "FIND_INVOICE"
+            },
+            {
+                "id": "e4",
+                "source": "FIND_INVOICE",
+                "target": "GET_BROKER"
+            },
+            {
+                "id": "e5",
+                "source": "GET_BROKER",
+                "target": "ASSESS"
+            },
+            {
+                "id": "e6",
+                "source": "ASSESS",
+                "target": "GATE"
+            },
+            {
+                "id": "e7",
+                "source": "GATE",
+                "target": "UNSCHED_RENEWAL_GENERATE"
+            },
+            {
+                "id": "e8",
+                "source": "GATE",
+                "target": "RESCHEDULE_VOID"
+            },
+            {
+                "id": "e9",
+                "source": "UNSCHED_RENEWAL_GENERATE",
+                "target": "UNSCHED_RENEWAL_DISPATCH"
+            },
+            {
+                "id": "e10",
+                "source": "UNSCHED_RENEWAL_DISPATCH",
+                "target": "STAMP_VOID"
+            },
+            {
+                "id": "e11",
+                "source": "STAMP_VOID",
+                "target": "RENDER_VOID_NOTICE"
+            },
+            {
+                "id": "e12",
+                "source": "RENDER_VOID_NOTICE",
+                "target": "NOTIFY_VOID"
+            },
+            {
+                "id": "e13",
+                "source": "NOTIFY_VOID",
+                "target": "OVERRIDE_TASK"
+            },
+            {
+                "id": "e14",
+                "source": "RESCHEDULE_VOID",
+                "target": "RESTAMP_VOID_TOPIC"
+            },
+            {
+                "id": "e15",
+                "source": "RESTAMP_VOID_TOPIC",
+                "target": "STAMP_RESCHEDULE"
+            }
+        ]
+    }
+}
