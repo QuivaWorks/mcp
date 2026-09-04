@@ -60,7 +60,7 @@ claude mcp add quiva-flows \
 ## Tools
 
 **Reference / validation** (no API call)
-- `list_node_types` — all 17 node types + JSONPath guide + gotchas
+- `list_node_types` — all 19 node types + JSONPath guide + gotchas
 - `get_node_type_reference` — required/optional props and a correct example per type
 - `list_reference_topics` / `get_flows_reference` — cross-cutting contracts:
   **`rules-syntax`** (the condition/rules DSL — read this first), `jsonpath`,
@@ -146,4 +146,12 @@ engine disagree:
   `{message, title, description, priority, assignees}`; the spec's `notify`
   block is not read by the engine.
 - Extra engine node types not in the spec: `rules`, `http`, `error`,
-  `quiva-endpoint`.
+  `quiva-endpoint`, `task`, `verify-challenge`.
+- A **`verify-challenge`** failure is a *result*, not an error — the node
+  succeeds with `{ success: false }` and the run carries on. Branch on
+  `$.<ID>.success`, and check `$.<ID>.hostname` as well: one widget can allow
+  several domains and a token solved on any of them verifies on all of them.
+- **`task`** nodes carry `operation` at node level (`data.operation`), not in
+  the payload. Omitting `space_id` falls back to the `ESCALATE` space, and
+  status/priority/tags are free strings — an undefined value is stored and then
+  matches no filter.
