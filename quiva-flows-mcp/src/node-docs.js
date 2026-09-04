@@ -56,13 +56,15 @@ export const GOTCHAS = [
   'A conditional chain whose last branch still has a "condition" has no catch-all: a run where nothing matches fails with "failed to determine next steps". End with { "outcome": ... } and no condition.',
   'Nodes and edges need flow-editor presentation fields (node: position/type/measured; edge: type/edgeType/sourceHandle/targetHandle) or the graph renders stacked at the origin. create_workflow / update_workflow auto-layout anything missing.',
   'Pipe concatenation: "$.trigger.first| |$.trigger.last" joins values with a literal middle segment; "Bearer |$.env.auth_token" prefixes a literal. Secrets use the SECRET::NAME:: placeholder.',
+  'verify-challenge nodes: a FAILED challenge is a successful node returning { success: false }, not an error. The run continues downstream regardless, so you MUST branch on $.<ID>.success — otherwise every bot submission proceeds exactly as a person\'s would. Check $.<ID>.hostname too: one widget can allow several domains and a token solved on any of them verifies on all of them.',
+  'task nodes: "operation" is a NODE-LEVEL property (data.operation), not a payload field. Omitting space_id is not neutral — it falls back to the ESCALATE space. An empty assignees list CLEARS assignees (only an absent field is no-change), and a mapped value resolving to nothing sends exactly that. status/priority/tags are free strings server-side, so a value the space does not define is stored and then matches no filter, and the task vanishes from every board.',
   'input / human-in-the-loop payload is {title, description, message, priority, assignees} (assignees = comma-separated user ids). The spec\'s "notify" email/slack block is not read by the current engine.',
 ];
 
 export const NODE_TYPES = {
   trigger: {
     summary:
-      'Entry-point metadata for the visual editor. Most trigger types are skipped at runtime and are purely presentational — but "record", "object-store" and "email" are READ by hub-service\'s subscriber and actually start runs.',
+      'Entry-point metadata for the visual editor. No trigger node is executed as a step. But FOUR kinds are read elsewhere and genuinely start runs: "record", "object-store" and "email" by hub-service\'s subscriber, and "schedule" at PUBLISH time — publish-workflow.go:58-99 unschedules the previously published one and installs the draft\'s. Only "manual", "webhook" and "embed" are purely presentational.',
     required: ['id', 'node_type', 'payload'],
     payload: {
       required: {},
@@ -78,7 +80,7 @@ export const NODE_TYPES = {
     },
     nodeLevelProps: {
       trigger_type:
-        '"manual" | "schedule" | "webhook" | "embed" | "record" | "object-store" | "email". The first four are editor metadata; the last three are live in hub-service (data.TriggerTypeRecord / TriggerTypeObjectStore / TriggerTypeEmail) and drive real dispatch.',
+        '"manual" | "schedule" | "webhook" | "embed" | "record" | "object-store" | "email". "manual", "webhook" and "embed" are editor metadata; "schedule" is installed at publish time (publish-workflow.go:58-99); the last three are live in hub-service (data.TriggerTypeRecord / TriggerTypeObjectStore / TriggerTypeEmail) and drive real dispatch.',
       topic: 'topic identifier for scheduled triggers',
     },
     example: {
@@ -270,7 +272,7 @@ export const NODE_TYPES = {
     summary: 'Invoke another (published) workflow as a sub-flow.',
     required: ['id', 'node_type', 'subject', 'payload'],
     nodeLevelProps: {
-      subject: 'REQUIRED — sub-workflow subject (ms.hub.config.workflow.published.<collection>.<flow>); must exist',
+      subject: 'REQUIRED — sub-workflow subject (ms.hub.config.workflow.<collection>.<flow>); must exist. There is NO "published" segment — see the gotcha; only drafts carry ".draft.". The two segments are hashes of the collection and flow names (hub-service/data/const.go:190-193), so read them off list_workflows rather than composing them from names.',
       await: 'boolean — wait for the sub-flow to finish',
       response_map: 'optional JSONPath mapping over the sub-flow output',
       options: '{ flat_map, backoff_ms, timeout (ms), attempts, ignore_response_codes }',
@@ -286,7 +288,7 @@ export const NODE_TYPES = {
       data: {
         id: 'ENRICH',
         node_type: 'flow',
-        subject: 'ms.hub.config.workflow.published.2408930879.1009853675',
+        subject: 'ms.hub.config.workflow.2408930879.1009853675',
         await: true,
         payload: { record: '$.trigger.record' },
       },
@@ -479,7 +481,7 @@ export const NODE_TYPES = {
         id: 'FOLLOW_UP',
         node_type: 'schedule',
         payload: {
-          flow_subject: 'ms.hub.config.workflow.published.2408930879.1009853675',
+          flow_subject: 'ms.hub.config.workflow.2408930879.1009853675',
           trigger: { customer: '$.trigger.customer' },
           trigger_in: '2d',
         },
@@ -569,6 +571,99 @@ export const NODE_TYPES = {
         payload: { input: '$.trigger' },
       },
     },
+  },
+
+  task: {
+    summary:
+      'Act on a workspace task: create, update, set status, assign, comment, or complete one of its actions. (Not in the OpenAPI spec; added 2026-08.) The operation — NOT a subject — selects the endpoint, so unlike quiva-endpoint there is nothing to look up.',
+    required: ['id', 'node_type', 'operation', 'payload'],
+    nodeLevelProps: {
+      operation:
+        'REQUIRED, and it sits on data.operation, NOT in the payload. One of: create_task, update_task, set_task_status, assign_task, comment_task, complete_task_action. An unknown value fails the node with the valid list, so a typo here is loud (unlike node_type, which is not validated at all).',
+    },
+    payload: {
+      required: {
+        'task_id (all except create_task)':
+          'Task reference such as LEADS-7. Usually mapped from an earlier node. The node moves it out of the body for you — see notes.',
+        'title (create_task)': 'Task title.',
+        'status (set_task_status)': "One of the space's own statuses.",
+        'assignees (assign_task)': 'Array of user ids.',
+        'body (comment_task)': 'Comment text; plain text or markdown.',
+        'action_id (complete_task_action)': "Id of the action to tick off.",
+      },
+      optional: {
+        space_id:
+          'Space the task belongs to. OMITTING THIS IS NOT NEUTRAL — it falls back to ESCALATE, so name the space you mean.',
+        description: 'Markdown supported.',
+        priority: "One of the space's own priorities.",
+        due_date: 'ISO 8601 timestamp.',
+        scheduled_at: 'ISO 8601 timestamp.',
+        tags: 'Array of strings.',
+        folder: 'Folder name. The only usable partition for linking, since task indexes cover no payload fields.',
+        parent: 'Task reference — makes this a subtask.',
+        reporter: 'User id.',
+        archived: 'Boolean, update_task only.',
+        attachments: 'Array of file ids.',
+        internal: 'comment_task only: hidden from client users. A flow runs as the account, so this is not refused for it.',
+        mentions: 'comment_task only: array of user ids.',
+        reply_id: 'comment_task only: id of the comment being replied to.',
+        done: 'complete_task_action only: defaults to true. Pass false to untick.',
+      },
+    },
+    example: {
+      id: 'RAISE_TASK',
+      data: {
+        id: 'RAISE_TASK',
+        node_type: 'task',
+        operation: 'create_task',
+        payload: {
+          space_id: 'LEADS',
+          title: 'New enquiry from |$.trigger.company',
+          description: '$.trigger.message',
+          tags: ['web-form'],
+        },
+      },
+    },
+    notes:
+      'STATUS, PRIORITY AND TAGS ARE FREE STRINGS SERVER-SIDE. A value the space does not define is accepted, stored, and then matches no filter — the task effectively disappears from every board. Read the space first rather than guessing a status name. ' +
+      'An empty assignees list CLEARS the task assignees — only an ABSENT field leaves them unchanged. Assignees is *[]string with omitempty (workspaces-service/model/api.go:430), so an explicit [] survives encoding, and DeepMerge (workspaces-service/transform/transform.go:167-188) replaces the whole value. A mapped "$.X.users" that resolves to nothing sends exactly that empty list. ' +
+      'task_id is authored in the payload for every operation, but the node lifts it onto a header for comment_task and complete_task_action, and renames it to "id" for update_task/set_task_status/assign_task — you do not do either yourself (hub-service/runner/task_node.go). ' +
+      'complete_task_action reads the action back before writing it, because the underlying endpoint replaces the stored action wholesale: a blind write drops the action\'s resources, and is refused outright without a description. That means it costs two calls, and it fails with "task has no action <id>" if the id is wrong. ' +
+      'The node reaches nothing the quiva-endpoint node could not — the same allowlist and secrets guard applies.',
+  },
+
+  'verify-challenge': {
+    summary:
+      'Check a Cloudflare Turnstile token with Cloudflare, so a flow started by a form or chat embedded on a website can tell a person from a bot. (Not in the OpenAPI spec; added 2026-08.)',
+    required: ['id', 'node_type', 'payload'],
+    payload: {
+      required: {
+        token:
+          'The token the widget put in the submission. Map it from the trigger, usually "$.trigger.turnstile_token".',
+        secret:
+          'The account\'s Cloudflare Turnstile SECRET key. Use a secret reference — "SECRET::TURNSTILE_SECRET::" — never the literal key: a flow config is readable by anyone who can read the flow.',
+      },
+      optional: {
+        remote_ip: "The submitter's IP, if the trigger carries one. Cloudflare uses it as a further signal.",
+      },
+    },
+    example: {
+      id: 'VERIFY_HUMAN',
+      data: {
+        id: 'VERIFY_HUMAN',
+        node_type: 'verify-challenge',
+        payload: {
+          token: '$.trigger.turnstile_token',
+          secret: 'SECRET::TURNSTILE_SECRET::',
+        },
+      },
+    },
+    notes:
+      'A FAILED CHALLENGE IS A RESULT, NOT AN ERROR. The node succeeds and returns { success: false, ... }; the run carries on to whatever is downstream. You MUST branch on $.VERIFY_HUMAN.success or every bot submission proceeds exactly as a person\'s would. Only being unable to ask fails the node: no token, no secret, an unresolved SECRET:: reference, or Cloudflare unreachable. ' +
+      'Result fields: success, hostname, action, cdata, challenge_ts, error_codes. Note error_codes is snake_case on the node result even though Cloudflare sends "error-codes". ' +
+      'CHECK hostname AS WELL AS success. One widget can allow several domains, and a token solved on any of them verifies on all of them — so success alone does not tell you the submission came from the site you meant. ' +
+      'Each account supplies its own Turnstile secret; there is no platform-wide key, because Cloudflare requires a hostname allowlist per widget and a shared widget would make tokens interchangeable between customers. Create the secret in the account first — an unresolved reference is refused with instructions rather than sent to Cloudflare as literal text. ' +
+      'The token is redacted in the run log: enough to correlate a run with a submission, not enough to replay one.',
   },
 
   error: {

@@ -124,7 +124,7 @@ function extractError(data) {
 }
 
 // Workflow subjects look like ms.hub.config.workflow.draft.{collection}.{flow}
-// or ms.hub.config.workflow.published.{collection}.{flow}. URL paths use the
+// or ms.hub.config.workflow.{collection}.{flow} (no "published" segment). URL paths use the
 // last two segments.
 export function subjectToTopics(subject) {
   const parts = String(subject).split('.');
