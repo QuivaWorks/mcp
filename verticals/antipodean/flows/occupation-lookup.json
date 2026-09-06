@@ -1,0 +1,114 @@
+{
+ "name": "occupation-lookup",
+ "description": "Type-ahead over the 6363-row occupation reference table, for the quote form's\noccupation field (plan A-06). Gateway-mapped so the browser can POST to it.\n\nPayload:\n```json\n{ \"query\": \"physio\", \"product\": \"itpi\", \"eligibility\": \"yes,refer\", \"limit\": 25, \"offset\": 0 }\n```\n\n- `query` is prefix-matched per whitespace token against occupation_label and\n  lowercased first (the index stores lowercase prefixes; \"PHYS\" matches nothing).\n  Multiple tokens are ANDed, so \"software dev\" means \"a word starting with\n  software AND a word starting with dev\", in any order.\n- `product` is one of itpi | ah / allied_health | gp / general_property. It adds\n  an OR group over the three-valued <product>_eligibility field. `eligibility`\n  overrides the values wanted (default \"yes,refer\" = quotable). The index has no\n  negation, so \"quotable\" is always an OR of the wanted values, never \"not no\".\n- `limit` defaults to 25 and is capped at 50; `offset` pages. Results are sorted\n  by occupation_label (a text_sortable index field) so paging is stable.\n- Below the 3-character minimum, and with no product to browse by, PREPARE\n  substitutes a sentinel keyword filter that matches nothing: the flow returns an\n  empty page rather than scanning, and `reason` says why.\n- Never issues an unbounded read: limit is always set and always <= 50.\n\nReturns `{options:[{value,text,note,...}], total, count, limit, offset, has_more,\nnext_offset, reason, searched}`. `value` is occupation_code, `text` is\noccupation_label. Prefill keys sit at the TOP LEVEL of each row because\nlookup.utils.prefillWrites indexes the row flatly.",
+ "config": {
+  "edges": [
+   {
+    "source": "PREPARE",
+    "target": "FETCH",
+    "id": "xy-edge__PREPAREPREPARE-FETCHFETCH",
+    "targetHandle": "FETCH",
+    "sourceHandle": "PREPARE",
+    "type": "custom",
+    "edgeType": "custom"
+   },
+   {
+    "source": "FETCH",
+    "target": "RESPOND",
+    "id": "xy-edge__FETCHFETCH-RESPONDRESPOND",
+    "targetHandle": "RESPOND",
+    "sourceHandle": "FETCH",
+    "type": "custom",
+    "edgeType": "custom"
+   }
+  ],
+  "nodes": [
+   {
+    "data": {
+     "id": "PREPARE",
+     "name": "Prepare query",
+     "node_type": "eval",
+     "payload": {
+      "code": "(function () {\n  var MIN = 3, MAX = 50, DEF = 25;\n  function cl(v) {\n    if (v === undefined || v === null) return '';\n    var s = String(v);\n    if (s.indexOf('$.') === 0) return '';\n    if (s === 'undefined' || s === 'null' || s === '[]' || s === '{}') return '';\n    return s;\n  }\n  var raw = cl(q).trim();\n  var tokens = raw.toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/^ +| +$/g, '').split(' ');\n  var t2 = [];\n  for (var i = 0; i < tokens.length; i++) { if (tokens[i].length > 0) t2.push(tokens[i]); }\n  tokens = t2;\n  var lim = parseInt(cl(limit), 10);\n  if (!(lim > 0)) lim = DEF;\n  if (lim > MAX) lim = MAX;\n  var off = parseInt(cl(offset), 10);\n  if (!(off > 0)) off = 0;\n  var FIELDS = {\n    itpi: 'itpi_eligibility', itl: 'itpi_eligibility', it: 'itpi_eligibility',\n    itcl: 'itpi_eligibility', itcl01: 'itpi_eligibility',\n    ah: 'ah_eligibility', allied_health: 'ah_eligibility', ahcl: 'ah_eligibility',\n    gp: 'gp_eligibility', general_property: 'gp_eligibility', gp01: 'gp_eligibility'\n  };\n  var key = cl(product).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+/, '').replace(/_+$/, '');\n  var field = FIELDS[key] || '';\n  var wantedRaw = cl(eligibility);\n  if (wantedRaw === '') wantedRaw = 'yes,refer';\n  var parts = wantedRaw.toLowerCase().split(',');\n  var wanted = [];\n  for (var j = 0; j < parts.length; j++) {\n    var w = parts[j].replace(/^ +| +$/g, '');\n    if (w === 'yes' || w === 'no' || w === 'refer') { wanted.push(w); }\n  }\n  if (wanted.length === 0) wanted = ['yes', 'refer'];\n  var tooShort = tokens.length > 0 && raw.length < MIN;\n  var ok = (tokens.length > 0 && raw.length >= MIN) || (tokens.length === 0 && field !== '');\n  var conditions = [{ field: 'occupation_active', keyword: 'true' }];\n  for (var k = 0; k < tokens.length; k++) {\n    conditions.push({ field: 'occupation_label', prefix: tokens[k] });\n  }\n  if (field !== '') {\n    var group = [];\n    for (var m = 0; m < wanted.length; m++) { group.push({ field: field, keyword: wanted[m] }); }\n    conditions.push({ operator: 'or', conditions: group });\n  }\n  var fetchLim = lim;\n  if (!ok) {\n    conditions = [{ field: 'occupation_code', keyword: '__no_query__' }];\n    fetchLim = 1;\n  }\n  return {\n    ok: ok,\n    reason: ok ? 'query' : (tooShort ? 'below_min_chars' : 'no_criteria'),\n    min_chars: MIN,\n    max_limit: MAX,\n    limit: String(lim),\n    fetch_limit: String(fetchLim),\n    offset: String(off),\n    sort_by: 'occupation_label',\n    tokens: tokens,\n    product: key,\n    product_field: field,\n    eligibility: wanted,\n    filter: JSON.stringify({ conditions: conditions })\n  };\n})()",
+      "params": {
+       "eligibility": "$.trigger.eligibility",
+       "limit": "$.trigger.limit",
+       "offset": "$.trigger.offset",
+       "product": "$.trigger.product",
+       "q": "$.trigger.query"
+      }
+     }
+    },
+    "id": "PREPARE",
+    "position": {
+     "x": 0,
+     "y": 0
+    },
+    "type": "custom",
+    "measured": {
+     "height": 96,
+     "width": 96
+    }
+   },
+   {
+    "data": {
+     "id": "FETCH",
+     "name": "Query occupation index",
+     "node_type": "http",
+     "payload": {
+      "headers": {
+       "accept": "application/json",
+       "authorization": "Bearer |$.env.auth_token"
+      },
+      "method": "get",
+      "query": {
+       "config_id": "occupation_config",
+       "filter": "$.PREPARE.filter",
+       "limit": "$.PREPARE.fetch_limit",
+       "offset": "$.PREPARE.offset",
+       "sort_by": "occupation_label",
+       "space_id": "ANTIPODEAN"
+      },
+      "timeout": 20000,
+      "url": "https://api.microstrate.io/records"
+     }
+    },
+    "id": "FETCH",
+    "position": {
+     "x": 320,
+     "y": 0
+    },
+    "type": "custom",
+    "measured": {
+     "height": 96,
+     "width": 96
+    }
+   },
+   {
+    "data": {
+     "id": "RESPOND",
+     "name": "Shape options",
+     "node_type": "eval",
+     "payload": {
+      "code": "(function () {\n  var src = (fetched && typeof fetched === 'object' && fetched.data && typeof fetched.data === 'object') ? fetched.data : null;\n  var rows = (src && Object.prototype.toString.call(src.results) === '[object Array]') ? src.results : [];\n  var total = (src && typeof src.total_hits === 'number') ? src.total_hits : 0;\n  var p = (prep && typeof prep === 'object') ? prep : {};\n  var lim = parseInt(p.limit, 10); if (!(lim > 0)) lim = 25;\n  var off = parseInt(p.offset, 10); if (!(off > 0)) off = 0;\n  var options = [];\n  for (var i = 0; i < rows.length; i++) {\n    var d = (rows[i] && rows[i].data) ? rows[i].data : {};\n    var flags = [];\n    if (d.itpi_eligibility) flags.push('ITPI ' + d.itpi_eligibility);\n    if (d.ah_eligibility) flags.push('Allied Health ' + d.ah_eligibility);\n    if (d.gp_eligibility) flags.push('General Property ' + d.gp_eligibility);\n    options.push({\n      value: d.occupation_code === undefined || d.occupation_code === null ? '' : String(d.occupation_code),\n      text: d.occupation_label === undefined || d.occupation_label === null ? '' : String(d.occupation_label),\n      note: (d.occupation_category ? 'ANZSIC ' + d.occupation_category + ' - ' : '') + flags.join(', '),\n      occupation_code: d.occupation_code,\n      occupation_label: d.occupation_label,\n      occupation_category: d.occupation_category,\n      itpi_eligibility: d.itpi_eligibility,\n      itpi_hazard_class: d.itpi_hazard_class,\n      itpi_question_set: d.itpi_question_set,\n      itpi_wording: d.itpi_wording,\n      itpi_min_premium: d.itpi_min_premium,\n      itpi_min_excess: d.itpi_min_excess,\n      itpi_default_limit_pi: d.itpi_default_limit_pi,\n      itpi_default_limit_ppl: d.itpi_default_limit_ppl,\n      ah_eligibility: d.ah_eligibility,\n      ah_hazard_class: d.ah_hazard_class,\n      ah_question_set: d.ah_question_set,\n      ah_wording: d.ah_wording,\n      ah_min_premium: d.ah_min_premium,\n      ah_min_excess: d.ah_min_excess,\n      ah_default_limit: d.ah_default_limit,\n      gp_eligibility: d.gp_eligibility,\n      gp_question_set: d.gp_question_set,\n      gp_wording: d.gp_wording,\n      gp_min_premium: d.gp_min_premium,\n      gp_min_excess: d.gp_min_excess,\n      gp_default_limit: d.gp_default_limit,\n      data: d\n    });\n  }\n  return {\n    options: options,\n    total: total,\n    count: options.length,\n    limit: lim,\n    offset: off,\n    has_more: (off + options.length) < total,\n    next_offset: ((off + options.length) < total) ? (off + options.length) : null,\n    reason: p.reason || '',\n    tokens: p.tokens || [],\n    product: p.product || '',\n    searched: p.reason === 'query'\n  };\n})()",
+      "params": {
+       "fetched": "$.FETCH",
+       "prep": "$.PREPARE"
+      }
+     }
+    },
+    "id": "RESPOND",
+    "position": {
+     "x": 640,
+     "y": 0
+    },
+    "type": "custom",
+    "measured": {
+     "height": 96,
+     "width": 96
+    }
+   }
+  ],
+  "result": "$.RESPOND"
+ }
+}

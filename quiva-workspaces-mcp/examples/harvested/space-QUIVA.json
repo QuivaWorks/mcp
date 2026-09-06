@@ -1,0 +1,152 @@
+{
+  "slug": "space-QUIVA",
+  "kind": "space",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "id": "QUIVA",
+    "url": "https://app.microstrate.io/en/hub/spaces/QUIVA/tasks",
+    "harvested_from": "GET /workspaces/spaces"
+  },
+  "teaches": [
+    "6 custom board statuses (columns)",
+    "statuses carry the board's presentation fields (color, order, complete, is_visible) — the API does not require them, the board reads them",
+    "default_status naming the column new tasks land in",
+    "5 custom task priorities with icon presentation (icon, icon_type, icon_color)",
+    "record_config_ids linking the space to records configs (escalation_request_v2, insurance_claim_anomaly_detection)",
+    "space-level tag vocabulary",
+    "default_view: \"files\"",
+    "a logo",
+    "read-only fields a create/update body must NOT echo back: owner, created_at, updated_at, url"
+  ],
+  "config": {
+    "name": "Quiva",
+    "id": "QUIVA",
+    "default_status": "backlog",
+    "statuses": [
+      {
+        "id": "backlog",
+        "name": "Backlog",
+        "color": "#9ca3af",
+        "order": 10,
+        "complete": false,
+        "is_visible": true
+      },
+      {
+        "id": "in_progress",
+        "name": "In Progress",
+        "color": "#3b82f6",
+        "order": 20,
+        "complete": false,
+        "is_visible": true
+      },
+      {
+        "id": "blocked",
+        "name": "Blocked",
+        "color": "#ef4444",
+        "order": 30,
+        "complete": false,
+        "is_visible": true
+      },
+      {
+        "id": "testing",
+        "name": "Testing",
+        "color": "#eab308",
+        "order": 40,
+        "complete": false,
+        "is_visible": true
+      },
+      {
+        "id": "review",
+        "name": "Review",
+        "color": "#a855f7",
+        "order": 50,
+        "complete": false,
+        "is_visible": true
+      },
+      {
+        "id": "done",
+        "name": "Done",
+        "color": "#22c55e",
+        "order": 60,
+        "complete": false,
+        "is_visible": true
+      }
+    ],
+    "owner": "<<REDACTED:user-id>>",
+    "created_at": "2026-05-26T11:22:28Z",
+    "updated_at": "2026-06-17T15:48:47Z",
+    "record_config_ids": [
+      "escalation_request_v2",
+      "insurance_claim_anomaly_detection"
+    ],
+    "record_configs": [
+      {
+        "id": "escalation_request_v2"
+      },
+      {
+        "id": "insurance_claim_anomaly_detection"
+      }
+    ],
+    "url": "https://app.microstrate.io/en/hub/spaces/QUIVA/tasks",
+    "logo": true,
+    "priorities": [
+      {
+        "id": "lowest",
+        "name": "Lowest",
+        "icon": "angles-down",
+        "icon_type": "light",
+        "icon_color": "#3B82F6"
+      },
+      {
+        "id": "low",
+        "name": "Low",
+        "icon": "angle-down",
+        "icon_type": "light",
+        "icon_color": "#1E3A8A"
+      },
+      {
+        "id": "medium",
+        "default": true,
+        "name": "Medium",
+        "icon": "equals",
+        "icon_type": "light",
+        "icon_color": "#e8b800"
+      },
+      {
+        "id": "high",
+        "name": "High",
+        "icon": "angle-up",
+        "icon_type": "light",
+        "icon_color": "#ff6600"
+      },
+      {
+        "id": "highest",
+        "name": "Highest",
+        "icon": "angles-up",
+        "icon_type": "light",
+        "icon_color": "#DC2626"
+      }
+    ],
+    "tags": [
+      {
+        "id": "tag",
+        "name": "Bug",
+        "text_color": "#fafcff",
+        "color": "#f91804"
+      }
+    ],
+    "records": {
+      "agents": [],
+      "default_agent": ""
+    },
+    "tasks": {
+      "agents": [],
+      "default_agent": ""
+    },
+    "files": {
+      "agents": [],
+      "default_agent": ""
+    },
+    "default_view": "files"
+  }
+}

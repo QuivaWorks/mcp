@@ -1,0 +1,29 @@
+{
+  "config_id": "itpi_hazard_rate_config",
+  "csv": "../itpi-hazard-rates.csv",
+  "contract": {
+    "file": "../../../../../evari-olympus/.worktrees/antipodean-delivery-plan/docs/antipodean spec/contracts/02-index-fields.json",
+    "config": "itpi_hazard_rate_config"
+  },
+  "space_id": "ANTIPODEAN",
+  "identity_fields": [
+    "hazard_class"
+  ],
+  "columns": [
+    {
+      "csv": "hazard_class",
+      "key": "hazard_class",
+      "as": "number"
+    },
+    {
+      "csv": "rate_pi",
+      "key": "rate_pi",
+      "as": "number"
+    },
+    {
+      "csv": "rate_pl",
+      "key": "rate_pl",
+      "as": "number"
+    }
+  ]
+}

@@ -1,0 +1,695 @@
+{
+  "id": "decision_config",
+  "name": "Decision",
+  "description": "Publisher-side (Antipodean). The outcome for one submission version: accept/refer/decline (or bound/sanction_referral at bind), premium, terms, reasons, issued document references. Append-only \u2014 never updated after creation (contract artefact 3 \u00a73, record 'decision'). One instance per decision; decision_seq is the only ordering key.",
+  "label": "Decision",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "quote_id": {
+        "type": "string",
+        "title": "Quote id (distributor record id)",
+        "description": "The distributor's quote record id. Rides the projection subject \u2014 must be free of '.' and '@' (plan \u00a79, recon-h trap 2).",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Quote id (distributor record id)"
+          }
+        }
+      },
+      "product_code": {
+        "type": "string",
+        "title": "Product code",
+        "description": "Single-valued by the time a decision exists (01-key-list.json system_keys).",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Product code"
+          }
+        }
+      },
+      "quote_validity_expiry": {
+        "type": "string",
+        "title": "Quote validity expiry",
+        "description": "Stamped from the first write (plan \u00a77.5.9).",
+        "format": "date-time",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Quote validity expiry"
+          }
+        }
+      },
+      "quote_expire_timer_topic": {
+        "type": "string",
+        "title": "quote-expire timer topic",
+        "description": "The stored, derived topic for the 'quote-expire:<quoteId>' schedule \u2014 the ONLY thing microstrate.hub.delete.unschedule-flow accepts (contract artefact 5 timer 5). Written on the decision that stamped quote_validity_expiry, and read by flow 2 quote-bind to cancel the timer when the quote binds. Three states: absent/null = never scheduled or the stamp write failed; empty string = deliberately not scheduled because quote_validity_expiry was already past; non-empty = the live topic.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "quote-expire timer topic"
+          }
+        }
+      },
+      "product_version": {
+        "type": "string",
+        "title": "Product version",
+        "description": "The authoritative copy (contract artefact 3 \u00a77). Stamped at creation on submission, carried onto the decision that decided it.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Product version"
+          }
+        }
+      },
+      "submission_id": {
+        "type": "string",
+        "title": "Submission id",
+        "description": "The submission record id this decision decided. Distinct from quote_id: one quote has many submission versions and one decision per version.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Submission id"
+          }
+        }
+      },
+      "submission_version": {
+        "type": "number",
+        "title": "Submission version",
+        "description": "Descriptive only \u2014 NOT the ordering key. See decision_seq (contract artefact 3 \u00a75, \u00a78.9).",
+        "ui": {
+          "inputType": "number",
+          "props": {
+            "label": "Submission version"
+          }
+        }
+      },
+      "distributor_account_id": {
+        "type": "string",
+        "title": "Distributor account id",
+        "description": "From the session at the flow that created this instance, never from a message body.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Distributor account id"
+          }
+        }
+      },
+      "outcome": {
+        "type": "string",
+        "title": "Outcome",
+        "description": "The engine's verdict, plus the two bind-time outcomes contract artefact 3 decision D4 requires. FLAGGED: 01-key-list.json system_keys froze this enum as ACCEPT/REFER/DECLINE only; BOUND and SANCTION_REFERRAL are added here per artefact 3's D4 ('flow-2 creates a decision instance with outcome_status BOUND (or SANCTION_REFERRAL)'). Recommend artefact 1 adopt the 5-value enum.",
+        "enum": [
+          "ACCEPT",
+          "REFER",
+          "DECLINE",
+          "BOUND",
+          "SANCTION_REFERRAL"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Outcome",
+            "options": [
+              {
+                "text": "Accept",
+                "value": "ACCEPT"
+              },
+              {
+                "text": "Refer",
+                "value": "REFER"
+              },
+              {
+                "text": "Decline",
+                "value": "DECLINE"
+              },
+              {
+                "text": "Bound",
+                "value": "BOUND"
+              },
+              {
+                "text": "Sanction Referral",
+                "value": "SANCTION_REFERRAL"
+              }
+            ]
+          }
+        }
+      },
+      "decision_status": {
+        "type": "string",
+        "title": "Decision status",
+        "description": "Positive by design. The referral queue is decision_status:OPEN, never 'not closed' (01-key-list.json system_keys).",
+        "enum": [
+          "OPEN",
+          "ISSUED",
+          "DECLINED",
+          "SUPERSEDED"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Decision status",
+            "options": [
+              {
+                "text": "Open",
+                "value": "OPEN"
+              },
+              {
+                "text": "Issued",
+                "value": "ISSUED"
+              },
+              {
+                "text": "Declined",
+                "value": "DECLINED"
+              },
+              {
+                "text": "Superseded",
+                "value": "SUPERSEDED"
+              }
+            ]
+          }
+        }
+      },
+      "sanctions_state": {
+        "type": "string",
+        "title": "Sanctions state",
+        "description": "A hit produces SANCTION_REFERRAL and a compliance task in Antipodean's account (spec \u00a74.4 / plan \u00a77.5.4).",
+        "enum": [
+          "not_run",
+          "clear",
+          "hit"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Sanctions state",
+            "options": [
+              {
+                "text": "Not Run",
+                "value": "not_run"
+              },
+              {
+                "text": "Clear",
+                "value": "clear"
+              },
+              {
+                "text": "Hit",
+                "value": "hit"
+              }
+            ]
+          }
+        }
+      },
+      "decided_at": {
+        "type": "string",
+        "title": "Decided at",
+        "description": "Display only. Two publisher-side flows are not one clock \u2014 decision_seq is the ordering key.",
+        "format": "date-time",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Decided at"
+          }
+        }
+      },
+      "superseded_by": {
+        "type": "string",
+        "title": "Superseded by (decision id)",
+        "description": "Forward pointer. Not indexed \u2014 decision_status carries the query.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Superseded by (decision id)"
+          }
+        }
+      },
+      "referral_reasons": {
+        "type": "array",
+        "title": "Referral reasons (rule names)",
+        "description": "Internal rule-identifier audit trail. Vocabulary is rule_output_names[].rule_name where outcome == REFER (01-key-list.json). NEVER crosses to the broker \u2014 these are rule names, not display text; see broker_reasons for what crosses.",
+        "ui": {
+          "inputType": "tags",
+          "props": {
+            "label": "Referral reasons (rule names)"
+          }
+        },
+        "items": {
+          "type": "string"
+        }
+      },
+      "decline_reasons": {
+        "type": "array",
+        "title": "Decline reasons (rule names)",
+        "description": "Internal rule-identifier audit trail. Vocabulary is rule_output_names[].rule_name where outcome == DECLINE (01-key-list.json). NEVER crosses.",
+        "ui": {
+          "inputType": "tags",
+          "props": {
+            "label": "Decline reasons (rule names)"
+          }
+        },
+        "items": {
+          "type": "string"
+        }
+      },
+      "underwriter_notes": {
+        "type": "string",
+        "title": "Underwriter notes",
+        "description": "Internal only, never crosses (contract artefact 3 A16). An underwriter cannot amend a broker's answers on their behalf \u2014 plan \u00a71.3.",
+        "ui": {
+          "inputType": "textarea",
+          "props": {
+            "label": "Underwriter notes"
+          }
+        }
+      },
+      "base_premium": {
+        "type": "number",
+        "title": "Base premium",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Base premium"
+          }
+        }
+      },
+      "fsl_levy": {
+        "type": "number",
+        "title": "FSL levy",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "FSL levy"
+          }
+        }
+      },
+      "gst": {
+        "type": "number",
+        "title": "GST",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "GST"
+          }
+        }
+      },
+      "stamp_duty": {
+        "type": "number",
+        "title": "Stamp duty",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Stamp duty"
+          }
+        }
+      },
+      "broker_commission": {
+        "type": "number",
+        "title": "Broker commission",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Broker commission"
+          }
+        }
+      },
+      "total_payable": {
+        "type": "number",
+        "title": "Total payable",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Total payable"
+          }
+        }
+      },
+      "issued_document_refs": {
+        "type": "array",
+        "title": "Issued document references",
+        "description": "References, not bytes \u2014 plan \u00a71.8 pulls the bytes through P2a. Not indexable (array).",
+        "ui": {
+          "inputType": "array",
+          "props": {
+            "label": "Issued documents"
+          }
+        },
+        "items": {
+          "type": "object",
+          "properties": {
+            "template_id": {
+              "type": "string",
+              "title": "Template id"
+            },
+            "object_key": {
+              "type": "string",
+              "title": "Object store key"
+            },
+            "document_type": {
+              "type": "string",
+              "title": "Document type"
+            }
+          }
+        }
+      },
+      "decision_seq": {
+        "type": "number",
+        "title": "Decision sequence",
+        "description": "THE ordering key \u2014 never submission_version, never decided_at (two publisher-side flows are not one clock). Minted from ONE account-wide numbergen counter DECISION_SEQ in the publisher's account, deliberately not year-scoped (contract artefact 3 \u00a75, decision D1).",
+        "minimum": 1,
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Decision sequence"
+          }
+        }
+      },
+      "decided_by": {
+        "type": "string",
+        "title": "Decided by",
+        "description": "'engine' for flow-1/flow-2/flow-10; the underwriter's user id for flow-11. Never projected to the broker (contract artefact 3 \u00a7fields).",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Decided by"
+          }
+        }
+      },
+      "origin_flow": {
+        "type": "string",
+        "title": "Origin flow",
+        "description": "Which flow created this instance \u2014 makes assertion A1's one-writer-per-instance claim observable in data (contract artefact 3 \u00a7fields).",
+        "enum": [
+          "flow-1",
+          "flow-2",
+          "flow-10",
+          "flow-11"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Origin flow",
+            "options": [
+              {
+                "text": "Flow-1",
+                "value": "flow-1"
+              },
+              {
+                "text": "Flow-2",
+                "value": "flow-2"
+              },
+              {
+                "text": "Flow-10",
+                "value": "flow-10"
+              },
+              {
+                "text": "Flow-11",
+                "value": "flow-11"
+              }
+            ]
+          }
+        }
+      },
+      "supersedes_decision_id": {
+        "type": "string",
+        "title": "Supersedes decision id",
+        "description": "Backward pointer. Append-only chain \u2014 there is no 'current' flag on a decision, because a flag would require updating the previous instance (contract artefact 3 \u00a7fields).",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Supersedes decision id"
+          }
+        }
+      },
+      "broker_reasons": {
+        "type": "array",
+        "title": "Broker-facing reasons (display text)",
+        "description": "The 'Display Text (Broker)' column from spec \u00a74.3's rule matrix. THIS is the array that crosses \u2014 becomes quote_outcome.reasons (contract artefact 3 \u00a77, \u00a7fields).",
+        "ui": {
+          "inputType": "tags",
+          "props": {
+            "label": "Broker-facing reasons"
+          }
+        },
+        "items": {
+          "type": "string"
+        }
+      },
+      "underwriter_reasons": {
+        "type": "array",
+        "title": "Underwriter-facing reasons (explanation)",
+        "description": "The 'Underwriter Explanation' column from spec \u00a74.3's rule matrix. NEVER crosses \u2014 e.g. 'Revenue exceeds auto-quote threshold (>$15M)' discloses a rating threshold the broker is not told (contract artefact 3 A16, A20).",
+        "ui": {
+          "inputType": "tags",
+          "props": {
+            "label": "Underwriter-facing reasons"
+          }
+        },
+        "items": {
+          "type": "string"
+        }
+      },
+      "terms": {
+        "type": "object",
+        "title": "Terms",
+        "description": "General terms of the accepted quote \u2014 limits, excess, endorsements, applicable clauses (plan \u00a71.1 decision row; contract artefact 3 \u00a7fields FROZEN). Wave-1 authored shape; refine against contract artefact 6's merge-tag extraction in wave 7.",
+        "properties": {
+          "limit": {
+            "type": "number",
+            "title": "Limit",
+            "ui": {
+              "inputType": "currency",
+              "props": {
+                "label": "Limit"
+              }
+            }
+          },
+          "excess": {
+            "type": "number",
+            "title": "Excess",
+            "ui": {
+              "inputType": "currency",
+              "props": {
+                "label": "Excess"
+              }
+            }
+          },
+          "sub_limits": {
+            "type": "object",
+            "title": "Sub-limits",
+            "ui": {
+              "inputType": "key-value",
+              "props": {
+                "label": "Sub-limits"
+              }
+            }
+          },
+          "endorsement_codes": {
+            "type": "array",
+            "title": "Endorsement codes",
+            "items": {
+              "type": "string"
+            },
+            "ui": {
+              "inputType": "tags",
+              "props": {
+                "label": "Endorsement codes"
+              }
+            }
+          },
+          "clause_codes": {
+            "type": "array",
+            "title": "Clause codes",
+            "items": {
+              "type": "string"
+            },
+            "ui": {
+              "inputType": "tags",
+              "props": {
+                "label": "Clause codes",
+                "helpText": {
+                  "markdown": "References clause_config.clause_code"
+                }
+              }
+            }
+          }
+        },
+        "ui": {
+          "inputType": "key-value",
+          "props": {
+            "label": "Terms"
+          }
+        }
+      },
+      "policy_number": {
+        "type": "string",
+        "title": "Policy number",
+        "description": "Set only on the BOUND instance (contract artefact 3 decision D4).",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Policy number"
+          }
+        }
+      },
+      "bound_at": {
+        "type": "string",
+        "title": "Bound at",
+        "description": "Set only on the BOUND instance (contract artefact 3 decision D4).",
+        "format": "date-time",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Bound at"
+          }
+        }
+      },
+      "premium_basis": {
+        "type": "string",
+        "title": "Premium basis",
+        "description": "How the premium on this decision was arrived at. ADDED BY WAVE 4 under plan \u00a74.2's [G1f] DECIDED 2026-09-02 block, whose third condition is that 'every premium it produces is stamped as provisional on the record, so a quote rated under the inferred formula can be found again when the real one lands'. PROVISIONAL_INFERRED means the ITPI combination was inferred by wave 4 from the shape of the supplied tables and Antipodean have not ratified it; CONFIRMED is reserved for a premium rated under a formula Antipodean have supplied; NOT_RATED means no rate table exists for the selected product (Allied Health and General Property today) and the decision carries no premium. Indexed, because 'findable later' is the whole point of the field. FLAGGED: recommend contract artefact 1 adopt premium_basis on decision_config, and artefact 2 adopt the keyword index entry.",
+        "enum": [
+          "PROVISIONAL_INFERRED",
+          "CONFIRMED",
+          "NOT_RATED"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Premium basis",
+            "options": [
+              {
+                "text": "Provisional (inferred formula)",
+                "value": "PROVISIONAL_INFERRED"
+              },
+              {
+                "text": "Confirmed",
+                "value": "CONFIRMED"
+              },
+              {
+                "text": "Not rated (no rate table)",
+                "value": "NOT_RATED"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "views": {
+    "table": {
+      "type": "table",
+      "columns": [
+        {
+          "field": "quote_id",
+          "order": 0
+        },
+        {
+          "field": "submission_id",
+          "order": 1
+        },
+        {
+          "field": "submission_version",
+          "order": 2
+        },
+        {
+          "field": "decision_status",
+          "order": 3
+        },
+        {
+          "field": "outcome",
+          "order": 4
+        },
+        {
+          "field": "sanctions_state",
+          "order": 5
+        },
+        {
+          "field": "distributor_account_id",
+          "order": 6
+        },
+        {
+          "field": "product_code",
+          "order": 7
+        },
+        {
+          "field": "decided_at",
+          "order": 8
+        },
+        {
+          "field": "total_payable",
+          "order": 9
+        },
+        {
+          "field": "base_premium",
+          "order": 10
+        },
+        {
+          "field": "quote_validity_expiry",
+          "order": 11
+        },
+        {
+          "field": "decision_seq",
+          "order": 12
+        },
+        {
+          "field": "origin_flow",
+          "order": 13
+        }
+      ]
+    }
+  },
+  "index_fields": [
+    {
+      "field": "quote_id",
+      "type": "keyword"
+    },
+    {
+      "field": "submission_id",
+      "type": "keyword"
+    },
+    {
+      "field": "submission_version",
+      "type": "numeric"
+    },
+    {
+      "field": "decision_status",
+      "type": "keyword"
+    },
+    {
+      "field": "outcome",
+      "type": "keyword"
+    },
+    {
+      "field": "sanctions_state",
+      "type": "keyword"
+    },
+    {
+      "field": "distributor_account_id",
+      "type": "keyword"
+    },
+    {
+      "field": "product_code",
+      "type": "keyword"
+    },
+    {
+      "field": "decided_at",
+      "type": "datetime"
+    },
+    {
+      "field": "total_payable",
+      "type": "numeric"
+    },
+    {
+      "field": "base_premium",
+      "type": "numeric"
+    },
+    {
+      "field": "quote_validity_expiry",
+      "type": "datetime"
+    },
+    {
+      "field": "premium_basis",
+      "type": "keyword"
+    }
+  ]
+}

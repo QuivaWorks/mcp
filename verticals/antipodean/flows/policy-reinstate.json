@@ -1,0 +1,460 @@
+{
+    "name": "policy-reinstate",
+    "description": "Flow 5. VOIDED -> ACTIVE with a fresh void_due_date, and the rescheduler of ALL THREE reinstatement-affected timers per contract artefact 5: policy-void:<policyId>, renewal-generate:<policyId> (T-100) and renewal-dispatch:<policyId> (T-90). Each target subject is resolved DYNAMICALLY at run time from the published workflow list by name and the run refuses to schedule any of them if a lookup fails, because scheduleFlow does not validate its subject and a typo'd one returns 200 and produces a live timer that fires into nothing. Draft subjects are excluded from the match. It re-stamps all three returned topics in one record update (ASSERT-2b), asserts they are distinct and non-empty first (ASSERT-1b), and honours artefact 5's past-trigger_on rule: a policy inside its last 100 days gets an empty string for the renewal topics rather than a timer booked in the past. It also restores voidance_notice_state/sent_at and auto_renewal_eligible, without which a reinstated policy could never be voided or renewed again. The reinstatement justification is stamped onto policy_config's void_override_reason/by/at because no audit trail on a record edit exists anywhere on the platform. Gateway trigger. Payload: {policy_id, justification, reinstated_by}.",
+    "config": {
+        "nodes": [
+            {
+                "id": "TRIGGER",
+                "data": {
+                    "id": "TRIGGER",
+                    "name": "Reinstate request",
+                    "node_type": "trigger",
+                    "trigger_type": "gateway",
+                    "payload": {}
+                }
+            },
+            {
+                "id": "VALIDATE_INPUT",
+                "data": {
+                    "id": "VALIDATE_INPUT",
+                    "name": "policy_id and justification present",
+                    "node_type": "condition",
+                    "payload": [
+                        {
+                            "condition": {
+                                "operator": "and",
+                                "input": [
+                                    {
+                                        "operator": "notEmpty",
+                                        "input": [
+                                            "$.trigger.policy_id"
+                                        ]
+                                    },
+                                    {
+                                        "operator": "notEmpty",
+                                        "input": [
+                                            "$.trigger.justification"
+                                        ]
+                                    }
+                                ]
+                            },
+                            "outcome": "GET_POLICY"
+                        },
+                        {
+                            "outcome": "REJECT_INPUT"
+                        }
+                    ]
+                }
+            },
+            {
+                "id": "REJECT_INPUT",
+                "data": {
+                    "id": "REJECT_INPUT",
+                    "name": "Missing required input",
+                    "node_type": "error",
+                    "payload": {
+                        "status_code": 422,
+                        "message": "policy-reinstate requires policy_id and justification (no audit trail on a record edit exists anywhere, so this is the only record of why)"
+                    }
+                }
+            },
+            {
+                "id": "GET_POLICY",
+                "data": {
+                    "id": "GET_POLICY",
+                    "name": "Read the policy",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "GET",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records/policy_config/|$.trigger.policy_id",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "CHECK_VOIDED",
+                "data": {
+                    "id": "CHECK_VOIDED",
+                    "name": "Gate: must currently be VOIDED",
+                    "node_type": "condition",
+                    "payload": [
+                        {
+                            "condition": {
+                                "operator": "=",
+                                "input": [
+                                    "$.GET_POLICY.data.data.policy_status",
+                                    "VOIDED"
+                                ]
+                            },
+                            "outcome": "LOOKUP_FLOWS"
+                        },
+                        {
+                            "outcome": "REJECT_STATE"
+                        }
+                    ]
+                }
+            },
+            {
+                "id": "REJECT_STATE",
+                "data": {
+                    "id": "REJECT_STATE",
+                    "name": "Policy is not VOIDED",
+                    "node_type": "error",
+                    "payload": {
+                        "status_code": 409,
+                        "message": "policy-reinstate: policy is not in VOIDED status; nothing to reinstate"
+                    }
+                }
+            },
+            {
+                "id": "LOOKUP_FLOWS",
+                "data": {
+                    "id": "LOOKUP_FLOWS",
+                    "name": "Resolve the policy-void flow's published subject",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "GET",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/hub/workflows",
+                        "query": {
+                            "collection_topic": "3788449144",
+                            "version": "published"
+                        },
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "DECIDE",
+                "data": {
+                    "id": "DECIDE",
+                    "name": "Resolve all three timer targets and the fresh dates",
+                    "node_type": "eval",
+                    "payload": {
+                        "code": "(function(){\n  function iso(dt){ return dt.toISOString().replace(/\\.\\d{3}Z$/,''+'Z'); }\n  // Contract artefact 5 assigns flow 5 as the rescheduler of THREE concerns, not\n  // one: policy-void, renewal-generate and renewal-dispatch. Each target is\n  // resolved DYNAMICALLY from the published workflow list by name, because\n  // scheduleFlow's subject-existence check is commented out (schedule.go:110-112)\n  // and a typo'd subject returns 200 and produces a live timer that fires into\n  // nothing. Refusing to schedule beats booking a dead timer.\n  var want = ['policy-void','renewal-generate','renewal-dispatch'];\n  var subjects = {};\n  var list = (flows || []);\n  for (var i=0; i<list.length; i++) {\n    var f = list[i];\n    if (!f || !f.subject) continue;\n    // A draft subject carries an extra \".draft.\" token and is REJECTED by\n    // schedule-flow, so it must never be matched here.\n    if (String(f.subject).indexOf('.draft.') >= 0) continue;\n    for (var w=0; w<want.length; w++) { if (f.name === want[w] && !subjects[want[w]]) subjects[want[w]] = f.subject; }\n  }\n  var missing = [];\n  for (var m=0; m<want.length; m++) { if (!subjects[want[m]]) missing.push(want[m]); }\n\n  var days = (voidAfterDays === undefined || voidAfterDays === null) ? 61 : Number(voidAfterDays);\n  if (!(days > 0)) days = 61;\n  var now = new Date();\n  var nowIso = iso(now);\n  var due = new Date(now.getTime() + days*24*60*60*1000);\n\n  // Artefact 5, \"Past trigger_on\": if a computed trigger_on is already in the\n  // past, do NOT call schedule-flow \u2014 stamp the empty string and continue. A\n  // policy inside its last 100 days produces a T-100 that has already gone.\n  var exp = expirationDate ? new Date(expirationDate) : null;\n  var hasExp = !!(exp && !isNaN(exp.getTime()));\n  var onGen = hasExp ? new Date(exp.getTime() - 100*24*60*60*1000) : null;\n  var onDisp = hasExp ? new Date(exp.getTime() - 90*24*60*60*1000) : null;\n  var renewalInPast = !hasExp || onGen.getTime() <= now.getTime() || onDisp.getTime() <= now.getTime();\n\n  return {\n    found: missing.length === 0,\n    missing: missing,\n    subject: subjects['policy-void'] || '',\n    subject_renewal_generate: subjects['renewal-generate'] || '',\n    subject_renewal_dispatch: subjects['renewal-dispatch'] || '',\n    void_due_date: iso(due),\n    void_after_days: days,\n    now: nowIso,\n    expiration_date: hasExp ? iso(exp) : '',\n    on_renewal_generate: renewalInPast ? '' : iso(onGen),\n    on_renewal_dispatch: renewalInPast ? '' : iso(onDisp),\n    renewal_timers_in_past: renewalInPast,\n    // ASSERT-1c: every name is composed from the frozen registry, never from a\n    // literal this flow invented.\n    name: 'policy-void:' + policyId,\n    name_renewal_generate: 'renewal-generate:' + policyId,\n    name_renewal_dispatch: 'renewal-dispatch:' + policyId\n  };\n})();",
+                        "params": {
+                            "flows": "$.LOOKUP_FLOWS.data.results",
+                            "voidAfterDays": "$.GET_POLICY.data.data.void_after_days",
+                            "expirationDate": "$.GET_POLICY.data.data.expiration_date",
+                            "policyId": "$.trigger.policy_id"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "COND_SUBJECT",
+                "data": {
+                    "id": "COND_SUBJECT",
+                    "name": "Gate: all three timer flows must be published",
+                    "node_type": "condition",
+                    "payload": [
+                        {
+                            "condition": {
+                                "operator": "=",
+                                "input": [
+                                    "$.DECIDE.found",
+                                    true
+                                ]
+                            },
+                            "outcome": "SCHEDULE_VOID"
+                        },
+                        {
+                            "outcome": "REJECT_NO_VOID_FLOW"
+                        }
+                    ]
+                }
+            },
+            {
+                "id": "REJECT_NO_VOID_FLOW",
+                "data": {
+                    "id": "REJECT_NO_VOID_FLOW",
+                    "name": "A timer target is not published",
+                    "node_type": "error",
+                    "payload": {
+                        "status_code": 500,
+                        "message": "policy-reinstate: one or more timer target flows are not published in this collection, so the policy calendar cannot be re-established. Missing: see $.DECIDE.missing. Refusing to book a timer that would fire into nothing (scheduleFlow does not validate its subject)."
+                    }
+                }
+            },
+            {
+                "id": "SCHEDULE_VOID",
+                "data": {
+                    "id": "SCHEDULE_VOID",
+                    "name": "Reschedule policy-void:<policyId>",
+                    "node_type": "quiva-endpoint",
+                    "subject": "microstrate.hub.post.schedule-flow",
+                    "payload": {
+                        "name": "$.DECIDE.name",
+                        "description": "Rescheduled by policy-reinstate on reinstatement",
+                        "trigger_on": "$.DECIDE.void_due_date",
+                        "payload": {
+                            "subject": "$.DECIDE.subject",
+                            "trigger": {
+                                "policy_id": "$.trigger.policy_id",
+                                "concern": "policy-void"
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "id": "RENEWAL_GATE",
+                "data": {
+                    "id": "RENEWAL_GATE",
+                    "name": "Are the renewal trigger_on dates already past?",
+                    "node_type": "condition",
+                    "payload": [
+                        {
+                            "condition": {
+                                "operator": "=",
+                                "input": [
+                                    "$.DECIDE.renewal_timers_in_past",
+                                    true
+                                ]
+                            },
+                            "outcome": "ASSERT_TOPICS_NO_RENEWAL"
+                        },
+                        {
+                            "outcome": "SCHEDULE_RENEWAL_GENERATE"
+                        }
+                    ]
+                }
+            },
+            {
+                "id": "SCHEDULE_RENEWAL_GENERATE",
+                "data": {
+                    "id": "SCHEDULE_RENEWAL_GENERATE",
+                    "name": "Reschedule renewal-generate:<policyId> (T-100)",
+                    "node_type": "quiva-endpoint",
+                    "subject": "microstrate.hub.post.schedule-flow",
+                    "payload": {
+                        "name": "$.DECIDE.name_renewal_generate",
+                        "description": "Rescheduled by policy-reinstate on reinstatement",
+                        "trigger_on": "$.DECIDE.on_renewal_generate",
+                        "payload": {
+                            "subject": "$.DECIDE.subject_renewal_generate",
+                            "trigger": {
+                                "policy_id": "$.trigger.policy_id",
+                                "concern": "renewal-generate"
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "id": "SCHEDULE_RENEWAL_DISPATCH",
+                "data": {
+                    "id": "SCHEDULE_RENEWAL_DISPATCH",
+                    "name": "Reschedule renewal-dispatch:<policyId> (T-90)",
+                    "node_type": "quiva-endpoint",
+                    "subject": "microstrate.hub.post.schedule-flow",
+                    "payload": {
+                        "name": "$.DECIDE.name_renewal_dispatch",
+                        "description": "Rescheduled by policy-reinstate on reinstatement",
+                        "trigger_on": "$.DECIDE.on_renewal_dispatch",
+                        "payload": {
+                            "subject": "$.DECIDE.subject_renewal_dispatch",
+                            "trigger": {
+                                "policy_id": "$.trigger.policy_id",
+                                "concern": "renewal-dispatch"
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "id": "ASSERT_TOPICS",
+                "data": {
+                    "id": "ASSERT_TOPICS",
+                    "name": "ASSERT-1b: three distinct topics",
+                    "node_type": "eval",
+                    "payload": {
+                        "code": "(function(){\n  // ASSERT-1b, applied to a reschedule exactly as flow 2 applies it to a bind:\n  // the returned topics are distinct non-empty strings. Cheap, and it catches a\n  // name or target-flow collision here rather than at the next void.\n  function topicOf(resp){\n    if (!resp || typeof resp !== 'object') return '';\n    if (typeof resp.topic === 'string') return resp.topic;\n    if (resp.data && typeof resp.data.topic === 'string') return resp.data.topic;\n    if (resp.results && resp.results.length && resp.results[0].topic) return resp.results[0].topic;\n    return '';\n  }\n  var t = {\n    policy_void_timer_topic: topicOf(sVoid),\n    renewal_generate_timer_topic: skipRenewal ? '' : topicOf(sGen),\n    renewal_dispatch_timer_topic: skipRenewal ? '' : topicOf(sDisp)\n  };\n  var required = ['policy_void_timer_topic'];\n  if (!skipRenewal) { required.push('renewal_generate_timer_topic'); required.push('renewal_dispatch_timer_topic'); }\n  var live = [], uniq = {};\n  for (var i=0;i<required.length;i++){\n    var v = t[required[i]];\n    // Artefact 5: fail the run. Do not compensate, do not retry in-node, do not\n    // compute the topic locally as a substitute. A policy that does not carry\n    // its topics can never have its timers cancelled.\n    if (!v) throw new Error('policy-reinstate ASSERT-1b FAILED: ' + required[i] + ' is empty \u2014 a timer was rescheduled that nothing can ever cancel');\n    if (uniq[v]) throw new Error('policy-reinstate ASSERT-1b FAILED: two concerns returned the same topic ' + v);\n    uniq[v] = 1; live.push(v);\n  }\n  t.distinct_topics = live.length;\n  t.renewal_timers_skipped = !!skipRenewal;\n  return t;\n})();",
+                        "params": {
+                            "sVoid": "$.SCHEDULE_VOID",
+                            "sGen": "$.SCHEDULE_RENEWAL_GENERATE",
+                            "sDisp": "$.SCHEDULE_RENEWAL_DISPATCH",
+                            "skipRenewal": "$.DECIDE.renewal_timers_in_past"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "ASSERT_TOPICS_NO_RENEWAL",
+                "data": {
+                    "id": "ASSERT_TOPICS_NO_RENEWAL",
+                    "name": "ASSERT-1b: void topic only (renewal dates past)",
+                    "node_type": "eval",
+                    "payload": {
+                        "code": "(function(){\n  // ASSERT-1b, applied to a reschedule exactly as flow 2 applies it to a bind:\n  // the returned topics are distinct non-empty strings. Cheap, and it catches a\n  // name or target-flow collision here rather than at the next void.\n  function topicOf(resp){\n    if (!resp || typeof resp !== 'object') return '';\n    if (typeof resp.topic === 'string') return resp.topic;\n    if (resp.data && typeof resp.data.topic === 'string') return resp.data.topic;\n    if (resp.results && resp.results.length && resp.results[0].topic) return resp.results[0].topic;\n    return '';\n  }\n  var t = {\n    policy_void_timer_topic: topicOf(sVoid),\n    renewal_generate_timer_topic: skipRenewal ? '' : topicOf(sGen),\n    renewal_dispatch_timer_topic: skipRenewal ? '' : topicOf(sDisp)\n  };\n  var required = ['policy_void_timer_topic'];\n  if (!skipRenewal) { required.push('renewal_generate_timer_topic'); required.push('renewal_dispatch_timer_topic'); }\n  var live = [], uniq = {};\n  for (var i=0;i<required.length;i++){\n    var v = t[required[i]];\n    // Artefact 5: fail the run. Do not compensate, do not retry in-node, do not\n    // compute the topic locally as a substitute. A policy that does not carry\n    // its topics can never have its timers cancelled.\n    if (!v) throw new Error('policy-reinstate ASSERT-1b FAILED: ' + required[i] + ' is empty \u2014 a timer was rescheduled that nothing can ever cancel');\n    if (uniq[v]) throw new Error('policy-reinstate ASSERT-1b FAILED: two concerns returned the same topic ' + v);\n    uniq[v] = 1; live.push(v);\n  }\n  t.distinct_topics = live.length;\n  t.renewal_timers_skipped = !!skipRenewal;\n  return t;\n})();",
+                        "params": {
+                            "sVoid": "$.SCHEDULE_VOID",
+                            "sGen": "$.DECIDE",
+                            "sDisp": "$.DECIDE",
+                            "skipRenewal": "$.DECIDE.renewal_timers_in_past"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "STAMP",
+                "data": {
+                    "id": "STAMP",
+                    "name": "ACTIVE + all three topics + audit fields",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "PUT",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records/policy_config/|$.trigger.policy_id",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        },
+                        "data": {
+                            "data": {
+                                "policy_status": "ACTIVE",
+                                "void_due_date": "$.DECIDE.void_due_date",
+                                "policy_void_timer_topic": "$.ASSERT_TOPICS.policy_void_timer_topic",
+                                "renewal_generate_timer_topic": "$.ASSERT_TOPICS.renewal_generate_timer_topic",
+                                "renewal_dispatch_timer_topic": "$.ASSERT_TOPICS.renewal_dispatch_timer_topic",
+                                "timers_scheduled": "scheduled",
+                                "voidance_notice_state": "pending",
+                                "voidance_notice_sent_at": "",
+                                "auto_renewal_eligible": "true",
+                                "void_override_reason": "$.trigger.justification",
+                                "void_override_by": "$.trigger.reinstated_by",
+                                "void_override_at": "$.DECIDE.now"
+                            },
+                            "completed": true
+                        }
+                    }
+                }
+            },
+            {
+                "id": "STAMP_NO_RENEWAL",
+                "data": {
+                    "id": "STAMP_NO_RENEWAL",
+                    "name": "ACTIVE + void topic only + audit fields",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "PUT",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records/policy_config/|$.trigger.policy_id",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        },
+                        "data": {
+                            "data": {
+                                "policy_status": "ACTIVE",
+                                "void_due_date": "$.DECIDE.void_due_date",
+                                "policy_void_timer_topic": "$.ASSERT_TOPICS_NO_RENEWAL.policy_void_timer_topic",
+                                "renewal_generate_timer_topic": "$.ASSERT_TOPICS_NO_RENEWAL.renewal_generate_timer_topic",
+                                "renewal_dispatch_timer_topic": "$.ASSERT_TOPICS_NO_RENEWAL.renewal_dispatch_timer_topic",
+                                "timers_scheduled": "scheduled",
+                                "voidance_notice_state": "pending",
+                                "voidance_notice_sent_at": "",
+                                "auto_renewal_eligible": "true",
+                                "void_override_reason": "$.trigger.justification",
+                                "void_override_by": "$.trigger.reinstated_by",
+                                "void_override_at": "$.DECIDE.now"
+                            },
+                            "completed": true
+                        }
+                    }
+                }
+            }
+        ],
+        "edges": [
+            {
+                "id": "e1",
+                "source": "TRIGGER",
+                "target": "VALIDATE_INPUT"
+            },
+            {
+                "id": "e2",
+                "source": "VALIDATE_INPUT",
+                "target": "GET_POLICY"
+            },
+            {
+                "id": "e3",
+                "source": "VALIDATE_INPUT",
+                "target": "REJECT_INPUT"
+            },
+            {
+                "id": "e4",
+                "source": "GET_POLICY",
+                "target": "CHECK_VOIDED"
+            },
+            {
+                "id": "e5",
+                "source": "CHECK_VOIDED",
+                "target": "LOOKUP_FLOWS"
+            },
+            {
+                "id": "e6",
+                "source": "CHECK_VOIDED",
+                "target": "REJECT_STATE"
+            },
+            {
+                "id": "e7",
+                "source": "LOOKUP_FLOWS",
+                "target": "DECIDE"
+            },
+            {
+                "id": "e8",
+                "source": "DECIDE",
+                "target": "COND_SUBJECT"
+            },
+            {
+                "id": "e9",
+                "source": "COND_SUBJECT",
+                "target": "SCHEDULE_VOID"
+            },
+            {
+                "id": "e10",
+                "source": "COND_SUBJECT",
+                "target": "REJECT_NO_VOID_FLOW"
+            },
+            {
+                "id": "e11",
+                "source": "SCHEDULE_VOID",
+                "target": "RENEWAL_GATE"
+            },
+            {
+                "id": "e12",
+                "source": "RENEWAL_GATE",
+                "target": "SCHEDULE_RENEWAL_GENERATE"
+            },
+            {
+                "id": "e13",
+                "source": "RENEWAL_GATE",
+                "target": "ASSERT_TOPICS_NO_RENEWAL"
+            },
+            {
+                "id": "e14",
+                "source": "SCHEDULE_RENEWAL_GENERATE",
+                "target": "SCHEDULE_RENEWAL_DISPATCH"
+            },
+            {
+                "id": "e15",
+                "source": "SCHEDULE_RENEWAL_DISPATCH",
+                "target": "ASSERT_TOPICS"
+            },
+            {
+                "id": "e16",
+                "source": "ASSERT_TOPICS",
+                "target": "STAMP"
+            },
+            {
+                "id": "e17",
+                "source": "ASSERT_TOPICS_NO_RENEWAL",
+                "target": "STAMP_NO_RENEWAL"
+            }
+        ],
+        "result": "$.DECIDE"
+    }
+}

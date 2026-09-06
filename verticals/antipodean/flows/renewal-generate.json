@@ -1,0 +1,323 @@
+{
+    "name": "renewal-generate",
+    "description": "Flow 6. The T-100 per-entity timer (contract artefact 5 concern \"renewal-generate\", name renewal-generate:<policyId>). Publisher-initiated, so it works by HANDOVER (plan 1.3): it mints ONE broker-side quote_config record, pre-filled from the expiring term's highest submission version, and never writes it again \u2014 after creation the answers are the broker's. It then writes a submission_config v1 stamped origin: \"publisher-renewal\" (1.3: \"these are the answers the broker attested\" is not true of a clone), whose quote_id is the handover quote's record id, and calls underwriting-evaluate on it so the renewal is rated and ruled against the CURRENT tables. Plan 5.3's open question is decided here in favour of routing new-unanswered-questions to referral: the renewal carries the current product_version, and a question added since the original bind is unanswered, which wave 4's A-11 already forces to REFER rather than a silent ACCEPT. Answers are copied by PATTERN (gen_/clm_/itcl01_/ahcl/cpl_/gp01_), so a new question is carried across with no flow change. Idempotent on the presence of a publisher-renewal submission in folder <policyId>; a caller passing regenerate:true mints a NEW record at revision Q-REN-<policy_number>-R<n> and supersedes the old through its outcome (1.3 part 3), which closes spec 4.4's Q-REN uniqueness defect by construction. Timer payload: {policy_id, concern, quote_id, regenerate?}.",
+    "config": {
+        "static": {
+            "api": "https://api.microstrate.io",
+            "space_id": "ANTIPODEAN",
+            "concern": "renewal-generate",
+            "self_subject": "ms.hub.config.workflow.3788449144.754421245",
+            "underwriting_evaluate_subject": "ms.hub.config.workflow.3788449144.854751885",
+            "current_product_version": "antipodean-2026.09",
+            "fallback_notice_email": "operations@antipodean-underwriting.test",
+            "note_handover": "The broker-side quote is created ONCE. Regeneration mints a new record and supersedes the old through its outcome; it never overwrites the broker's answers, which is the collision plan 1.3 exists to prevent.",
+            "note_regeneration": "Spec 4.6.3's \"automatically invalidates and re-generates\" stays TASK-DRIVEN, matching wave 6's flow 8: flow 8 raises the invalidation task and a human calls this flow with regenerate:true. Automatic regeneration would have this flow overwrite a broker-side record it is forbidden to touch."
+        },
+        "result": "$.BUILD",
+        "nodes": [
+            {
+                "id": "TRIGGER",
+                "data": {
+                    "id": "TRIGGER",
+                    "name": "renewal-generate timer (T-100)",
+                    "node_type": "trigger",
+                    "payload": {},
+                    "trigger_type": "webhook"
+                }
+            },
+            {
+                "id": "GET_POLICY",
+                "data": {
+                    "id": "GET_POLICY",
+                    "name": "Re-read the expiring policy",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "GET",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records/policy_config/|$.trigger.policy_id",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "PREP",
+                "data": {
+                    "id": "PREP",
+                    "name": "Build the exact-match filters",
+                    "node_type": "eval",
+                    "payload": {
+                        "code": "(function () {\n  var p = (pol && pol.data) ? pol.data : {};\n  var policyId = String((trg && trg.policy_id) || '');\n  if (!policyId) { throw new Error('renewal-generate: the timer payload carries no policy_id'); }\n  var expiringQuoteId = String(p.quote_id || (trg && trg.quote_id) || '');\n  return {\n    policy_id: policyId,\n    policy_number: String(p.policy_number || ''),\n    expiring_quote_id: expiringQuoteId,\n    broker_id: String(p.broker_id || ''),\n    // `folder` is queryable through the index filter even though it is not an\n    // index_fields entry \u2014 verified live on this account. It is the only\n    // foreign-key-shaped handle these records have, and it is what makes a\n    // regeneration findable without a new schema field.\n    existing_renewal_filter: JSON.stringify({ conditions: [\n      { field: 'folder', keyword: policyId },\n      { field: 'origin', keyword: 'publisher-renewal' }] }),\n    original_submission_filter: JSON.stringify({ conditions: [\n      { field: 'quote_id', keyword: expiringQuoteId || '__no_quote__' }] }),\n    broker_filter: JSON.stringify({ conditions: [\n      { field: 'broker_id', keyword: String(p.broker_id || '') || '__no_broker__' }] }),\n    now: new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z')\n  };\n})();",
+                        "params": {
+                            "pol": "$.GET_POLICY.data",
+                            "trg": "$.trigger"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "FIND_EXISTING_RENEWALS",
+                "data": {
+                    "id": "FIND_EXISTING_RENEWALS",
+                    "name": "Renewals already generated for this policy",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "GET",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        },
+                        "query": {
+                            "config_id": "submission_config",
+                            "space_id": "ANTIPODEAN",
+                            "filter": "$.PREP.existing_renewal_filter",
+                            "limit": "50"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "FIND_EXPIRING_SUBMISSIONS",
+                "data": {
+                    "id": "FIND_EXPIRING_SUBMISSIONS",
+                    "name": "The expiring term's answers",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "GET",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        },
+                        "query": {
+                            "config_id": "submission_config",
+                            "space_id": "ANTIPODEAN",
+                            "filter": "$.PREP.original_submission_filter",
+                            "limit": "50"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "GET_BROKER",
+                "data": {
+                    "id": "GET_BROKER",
+                    "name": "Broker of record",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "GET",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        },
+                        "query": {
+                            "config_id": "broker_config",
+                            "space_id": "ANTIPODEAN",
+                            "filter": "$.PREP.broker_filter",
+                            "limit": "5"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "BUILD",
+                "data": {
+                    "id": "BUILD",
+                    "name": "Clone the expiring answers into a renewal",
+                    "node_type": "eval",
+                    "payload": {
+                        "code": "(function () {\n  function iso(d) { return d.toISOString().replace(/\\.\\d{3}Z$/, 'Z'); }\n  function dedupe(resp) {\n    var rows = (resp && resp.data && resp.data.results) ? resp.data.results : [];\n    var seen = {}, out = [];\n    for (var i = 0; i < rows.length; i++) {\n      var r = rows[i];\n      if (!r || !r.id || seen[r.id]) continue;\n      seen[r.id] = 1; out.push(r);\n    }\n    return out;\n  }\n  // ---- answer keys are copied by PATTERN ---------------------------------\n  // The question sections are gen_ / clm_ / itcl01_ / ahcl* / cpl_ / gp01_, and\n  // every one of those keys exists on BOTH submission_config and quote_config.\n  // Copying by pattern rather than by an enumerated list means a question added\n  // to the product later is carried across with no flow change, and nothing\n  // outside the answer space can leak into either record.\n  function isAnswerKey(k) {\n    return k.indexOf('gen_') === 0 || k.indexOf('clm_') === 0 || k.indexOf('itcl01_') === 0\n        || k.indexOf('ahcl') === 0 || k.indexOf('cpl_') === 0 || k.indexOf('gp01_') === 0;\n  }\n\n  var p = (pol && pol.data) ? pol.data : {};\n  var existing = dedupe(prior);\n  var originals = dedupe(orig);\n\n  // The expiring term's answers: the highest submission version on the\n  // expiring quote. version is the submission's own ordering key.\n  var src = null;\n  for (var i = 0; i < originals.length; i++) {\n    if (!src) { src = originals[i]; continue; }\n    if (Number((originals[i].data || {}).version || 0) > Number((src.data || {}).version || 0)) src = originals[i];\n  }\n  var sd = src ? (src.data || {}) : {};\n\n  var regenerate = !!(trg && trg.regenerate);\n  var reasons = [];\n  if (String(p.policy_status || '') !== 'ACTIVE') reasons.push('policy_status_is_' + (String(p.policy_status || '') || 'absent'));\n  if (String(p.auto_renewal_eligible || '') !== 'true') reasons.push('auto_renewal_eligible_is_' + (String(p.auto_renewal_eligible || '') || 'absent'));\n  if (!src) reasons.push('no_expiring_submission_to_clone');\n  // Idempotency: a renewal already exists for this policy and no regeneration\n  // was asked for. 1.3 part 3 \u2014 regeneration MINTS A NEW RECORD and supersedes\n  // the old through its outcome; it never overwrites one.\n  if (existing.length > 0 && !regenerate) reasons.push('renewal_already_generated_' + existing.length);\n\n  // 4.4's Q-REN-{EXPIRING_POLICY_NO} uniqueness defect, closed by construction:\n  // the revision suffix is what supersession gives a meaning to (1.3 part 3).\n  var revision = existing.length + 1;\n  var base = 'Q-REN-' + String(p.policy_number || 'UNKNOWN');\n  var quoteReference = (revision <= 1) ? base : (base + '-R' + revision);\n\n  var answers = {};\n  for (var k in sd) {\n    if (!Object.prototype.hasOwnProperty.call(sd, k)) continue;\n    if (isAnswerKey(k)) answers[k] = sd[k];\n  }\n  var selected = sd.selected_products || [];\n  var selections = sd.product_selections || [];\n  var primary = (selected && selected.length) ? String(selected[0]) : String(p.product_code || '');\n  // 5.3's open question, decided: the renewal is re-evaluated against the\n  // CURRENT tables and the CURRENT product version, and a question added to the\n  // product since the original bind is simply unanswered \u2014 which wave 4's A-11\n  // already routes to REFER, never to a silent ACCEPT. The expiring term's\n  // version is carried on the quote as a note so the divergence stays visible.\n  var productVersion = String(currentProductVersion || sd.product_version || '');\n\n  var brows = (brk && brk.data && brk.data.results) ? brk.data.results : [];\n  var to = '', toName = '';\n  for (var b = 0; b < brows.length; b++) {\n    var bd = brows[b].data || {};\n    if (bd.primary_contact_email) { to = String(bd.primary_contact_email); toName = String(bd.brokerage_name || bd.primary_contact_name || ''); break; }\n  }\n  if (!to) { to = String(fallback || ''); toName = 'Antipodean Operations'; }\n\n  var nowIso = iso(new Date());\n  // ---- the 1.3 HANDOVER --------------------------------------------------\n  // A quote is minted broker-side by the broker. A publisher-initiated renewal\n  // is the one exception, and it is a ONE-TIME act of creation, never an\n  // ongoing write: after this record exists the answers are the broker's and\n  // this flow never touches it again.\n  var brokerQuote = {};\n  for (var a in answers) { if (Object.prototype.hasOwnProperty.call(answers, a)) brokerQuote[a] = answers[a]; }\n  brokerQuote.selected_products = selected;\n  brokerQuote.product_selections = selections;\n  brokerQuote.quote_reference = quoteReference;\n  brokerQuote.primary_product_code = primary;\n  brokerQuote.broker_stage = 'new';\n  brokerQuote.pipeline_stage = 'started';\n  brokerQuote.inception_date = String(p.expiration_date || '');\n  brokerQuote.submitted_at = '';\n  brokerQuote.submitted_version = 0;\n  brokerQuote.broker_notes = 'Renewal of policy ' + String(p.policy_number || '')\n    + ', expiring ' + String(p.expiration_date || '') + '. Pre-filled by the publisher at T-100 '\n    + '(handover, plan 1.3): these answers were cloned from the expiring term and are NOT attested '\n    + 'by the broker until they are reviewed and resubmitted. Expiring product version '\n    + String(sd.product_version || 'unknown') + '; re-evaluated against ' + productVersion + '.';\n\n  return {\n    should_generate: reasons.length === 0,\n    skip_reasons: reasons,\n    regenerate: regenerate,\n    revision: revision,\n    policy_id: String((trg && trg.policy_id) || ''),\n    policy_number: String(p.policy_number || ''),\n    expiration_date: String(p.expiration_date || ''),\n    expiring_quote_id: String(p.quote_id || ''),\n    expiring_submission_id: src ? String(src.id) : '',\n    expiring_product_version: String(sd.product_version || ''),\n    product_version: productVersion,\n    quote_reference: quoteReference,\n    primary_product_code: primary,\n    policyholder_name: String(sd.gen_policyholder_name || ''),\n    existing_renewals: existing.length,\n    notice_to: to,\n    notice_to_name: toName,\n    generated_at: nowIso,\n    broker_quote_record: brokerQuote,\n    // quote_id on the submission is the DISTRIBUTOR-SIDE QUOTE RECORD ID, so it\n    // cannot be known until the handover record exists. STAMP_SUBMISSION injects it.\n    submission_stub: (function () {\n      var s = {};\n      for (var a2 in answers) { if (Object.prototype.hasOwnProperty.call(answers, a2)) s[a2] = answers[a2]; }\n      s.selected_products = selected;\n      s.product_selections = selections;\n      s.product_code_list = (selected || []).join(' ');\n      s.product_version = productVersion;\n      s.distributor_account_id = String(sd.distributor_account_id || p.broker_id || '');\n      s.quote_reference = quoteReference;\n      s.version = 1;\n      s.received_at = nowIso;\n      s.submitted_by = 'system-renewal-generate';\n      // 1.3: \"these are the answers the broker attested\" is not true of a clone.\n      s.origin = 'publisher-renewal';\n      return s;\n    })()\n  };\n})();",
+                        "params": {
+                            "pol": "$.GET_POLICY.data",
+                            "prior": "$.FIND_EXISTING_RENEWALS",
+                            "orig": "$.FIND_EXPIRING_SUBMISSIONS",
+                            "brk": "$.GET_BROKER",
+                            "trg": "$.trigger",
+                            "currentProductVersion": "$.static.current_product_version",
+                            "fallback": "$.static.fallback_notice_email"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "GATE",
+                "data": {
+                    "id": "GATE",
+                    "name": "Generate or do nothing",
+                    "node_type": "condition",
+                    "payload": [
+                        {
+                            "condition": {
+                                "operator": "=",
+                                "input": [
+                                    "$.BUILD.should_generate",
+                                    true
+                                ]
+                            },
+                            "outcome": "CREATE_BROKER_QUOTE"
+                        },
+                        {
+                            "outcome": "RESOLVE_SUCCESS"
+                        }
+                    ]
+                }
+            },
+            {
+                "id": "CREATE_BROKER_QUOTE",
+                "data": {
+                    "id": "CREATE_BROKER_QUOTE",
+                    "name": "HANDOVER: mint the broker-side renewal quote (once)",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "POST",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records/quote_config",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        },
+                        "data": {
+                            "space_id": "ANTIPODEAN",
+                            "completed": false,
+                            "folder": "$.BUILD.policy_id",
+                            "data": "$.BUILD.broker_quote_record"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "STAMP_SUBMISSION",
+                "data": {
+                    "id": "STAMP_SUBMISSION",
+                    "name": "Join the submission to the handover quote",
+                    "node_type": "eval",
+                    "payload": {
+                        "code": "(function () {\n  // The submission's quote_id is the broker-side quote RECORD ID \u2014 the join key\n  // on both sides. It is injected here because the handover record has to exist\n  // before the submission that points at it can be written.\n  var q = (quote && quote.data && quote.data.id) ? String(quote.data.id) : '';\n  if (!q) { throw new Error('renewal-generate: the handover quote returned no record id; refusing to write a submission with no join key'); }\n  var out = {};\n  for (var k in stub) { if (Object.prototype.hasOwnProperty.call(stub, k)) out[k] = stub[k]; }\n  out.quote_id = q;\n  return { submission_record: out, quote_id: q };\n})();",
+                        "params": {
+                            "quote": "$.CREATE_BROKER_QUOTE",
+                            "stub": "$.BUILD.submission_stub"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "CREATE_RENEWAL_SUBMISSION",
+                "data": {
+                    "id": "CREATE_RENEWAL_SUBMISSION",
+                    "name": "Write the publisher-renewal submission v1",
+                    "node_type": "http",
+                    "payload": {
+                        "method": "POST",
+                        "base_url": "https://api.microstrate.io",
+                        "url": "/records/submission_config",
+                        "headers": {
+                            "Authorization": "Bearer |$.env.auth_token"
+                        },
+                        "data": {
+                            "space_id": "ANTIPODEAN",
+                            "completed": true,
+                            "folder": "$.BUILD.policy_id",
+                            "data": "$.STAMP_SUBMISSION.submission_record"
+                        }
+                    }
+                }
+            },
+            {
+                "id": "EVALUATE",
+                "data": {
+                    "id": "EVALUATE",
+                    "name": "Rate and rule the renewal against the CURRENT tables",
+                    "node_type": "flow",
+                    "payload": {
+                        "submission_id": "$.CREATE_RENEWAL_SUBMISSION.data.id"
+                    },
+                    "subject": "ms.hub.config.workflow.3788449144.854751885",
+                    "await": true
+                }
+            },
+            {
+                "id": "RENEWAL_TASK",
+                "data": {
+                    "id": "RENEWAL_TASK",
+                    "name": "Renewal prepared \u2014 queue it for the T-90 dispatch",
+                    "node_type": "task",
+                    "payload": {
+                        "space_id": "ANTIPODEAN",
+                        "title": "Renewal prepared \u2014 |$.BUILD.policy_number",
+                        "description": "T-100 renewal generated for policy |$.BUILD.policy_number|, expiring |$.BUILD.expiration_date|. Renewal quote reference |$.BUILD.quote_reference|. Handover quote record |$.STAMP_SUBMISSION.quote_id|, submission |$.CREATE_RENEWAL_SUBMISSION.data.id|. The answers were CLONED from the expiring term and carry origin publisher-renewal \u2014 they are not attested by the broker until reviewed and resubmitted. Re-evaluated against product version |$.BUILD.product_version| (expiring term was |$.BUILD.expiring_product_version|), so any question added since is unanswered and refers rather than silently accepting.",
+                        "priority": "medium",
+                        "tags": [
+                            "renewal"
+                        ],
+                        "folder": "$.BUILD.policy_id"
+                    },
+                    "operation": "create_task"
+                }
+            }
+        ],
+        "edges": [
+            {
+                "id": "e1",
+                "source": "TRIGGER",
+                "target": "GET_POLICY"
+            },
+            {
+                "id": "e2",
+                "source": "GET_POLICY",
+                "target": "PREP"
+            },
+            {
+                "id": "e3",
+                "source": "PREP",
+                "target": "FIND_EXISTING_RENEWALS"
+            },
+            {
+                "id": "e4",
+                "source": "FIND_EXISTING_RENEWALS",
+                "target": "FIND_EXPIRING_SUBMISSIONS"
+            },
+            {
+                "id": "e5",
+                "source": "FIND_EXPIRING_SUBMISSIONS",
+                "target": "GET_BROKER"
+            },
+            {
+                "id": "e6",
+                "source": "GET_BROKER",
+                "target": "BUILD"
+            },
+            {
+                "id": "e7",
+                "source": "BUILD",
+                "target": "GATE"
+            },
+            {
+                "id": "e8",
+                "source": "GATE",
+                "target": "CREATE_BROKER_QUOTE"
+            },
+            {
+                "id": "e9",
+                "source": "CREATE_BROKER_QUOTE",
+                "target": "STAMP_SUBMISSION"
+            },
+            {
+                "id": "e10",
+                "source": "STAMP_SUBMISSION",
+                "target": "CREATE_RENEWAL_SUBMISSION"
+            },
+            {
+                "id": "e11",
+                "source": "CREATE_RENEWAL_SUBMISSION",
+                "target": "EVALUATE"
+            },
+            {
+                "id": "e12",
+                "source": "EVALUATE",
+                "target": "RENEWAL_TASK"
+            }
+        ]
+    }
+}

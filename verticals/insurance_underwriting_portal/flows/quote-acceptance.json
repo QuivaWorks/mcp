@@ -1,0 +1,163 @@
+{
+  "name": "Quote Acceptance and Policy Creation",
+  "description": "When a UWQuote reaches status Accepted, create the UWPolicy from it, link the two records and raise a policy-setup task. The policy payload is assembled inside the BUILD_POLICY eval and passed as ONE object, not as 24 separate JSONPath values: an unmatched JSONPath resolves to an empty array, and sending [] where the schema wants a string or number fails validation with a 400 that is only visible in the run log. The policy reference derives from the QUOTE id, because the policy id does not exist until after the create call. NOTE: record-triggered, so it does NOT fire when a person saves the form.",
+  "config": {
+    "nodes": [
+      {
+        "id": "record.UWQuote",
+        "data": {
+          "id": "record.UWQuote",
+          "name": "On quote written",
+          "node_type": "trigger",
+          "trigger_type": "record",
+          "payload": {
+            "record_config_id": "UWQuote",
+            "event_type": [
+              "record-created",
+              "record-updated"
+            ]
+          }
+        }
+      },
+      {
+        "id": "GATE_ACCEPTED",
+        "data": {
+          "id": "GATE_ACCEPTED",
+          "name": "Only act on an Accepted quote",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.trigger.data.status",
+                  "Accepted"
+                ]
+              },
+              "outcome": "BUILD_POLICY"
+            },
+            {
+              "outcome": "RESOLVE_SUCCESS"
+            }
+          ]
+        }
+      },
+      {
+        "id": "BUILD_POLICY",
+        "data": {
+          "id": "BUILD_POLICY",
+          "name": "Build the policy record from the quote",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function(){function raw(x){if(Object.prototype.toString.call(x)==='[object Array]')return x.length?x[0]:undefined;return x;}function one(x){var v=raw(x);if(v===null||v===undefined)return '';return String(v);}function num(x){var v=raw(x);if(v===null||v===undefined||v==='')return undefined;var n=Number(v);return isNaN(n)?undefined:n;}function pad(n){return n<10?'0'+n:''+n;}function iso(d){return d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate());}var q=raw(qd)||{};var qid=one(quoteId);var sd=one(q.start_date);var now=new Date();var inception=now;if(sd){var s=new Date(sd);if(!isNaN(s.getTime()))inception=s;}var expiry=new Date(Date.UTC(inception.getUTCFullYear()+1,inception.getUTCMonth(),inception.getUTCDate()));var due=new Date(now.getTime()+86400000);var ref='BR-'+now.getUTCFullYear()+'-'+qid;var uw=one(q.underwriter_id);var policy={policy_reference:ref,originating_quote_id:qid,status:'Active',issue_date:iso(now),inception_date:iso(inception),expiration_date:iso(expiry),insured_name:one(q.insured_name),insured_address:one(q.insured_address),project_name:one(q.project_name),project_address:one(q.project_address),project_type:one(q.project_type),tiv:(num(q.tiv)===undefined?0:num(q.tiv)),premium:(num(q.total_premium)===undefined?0:num(q.total_premium)),payment_status:'Pending',payment_due_date:iso(inception)};var optS=[['insured_contact','insured_contact'],['insured_phone','insured_phone'],['insured_email','insured_email'],['construction_type','construction_type'],['special_conditions','exclusions']];for(var i=0;i<optS.length;i++){var v=one(q[optS[i][1]]);if(v)policy[optS[i][0]]=v;}if(uw)policy.underwriter_id=uw;var optN=[['square_footage','square_footage'],['stories','stories'],['coverage_limits','coverage_limits'],['deductible','deductible']];for(var j=0;j<optN.length;j++){var n2=num(q[optN[j][1]]);if(n2!==undefined)policy[optN[j][0]]=n2;}return{policy:policy,reference:ref,inception_date:policy.inception_date,expiration_date:policy.expiration_date,name:policy.project_name||'Untitled project',setup_due:due.toISOString(),assignees:uw?[uw]:[]};})();",
+            "params": {
+              "quoteId": "$.trigger.id",
+              "qd": "$.trigger.data"
+            }
+          }
+        }
+      },
+      {
+        "id": "CREATE_POLICY",
+        "data": {
+          "id": "CREATE_POLICY",
+          "name": "Create the policy record",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/records/UWPolicy",
+            "method": "POST",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "data": "$.BUILD_POLICY.policy"
+            }
+          }
+        }
+      },
+      {
+        "id": "LINK_QUOTE",
+        "data": {
+          "id": "LINK_QUOTE",
+          "name": "Point the quote at its policy",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/records/UWQuote/|$.trigger.id",
+            "method": "PUT",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "data": {
+                "linked_policy_id": "$.CREATE_POLICY.data.id"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "TASK_SETUP",
+        "data": {
+          "id": "TASK_SETUP",
+          "name": "Raise the policy-setup task",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/workspaces/task",
+            "method": "POST",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "space_id": "UNDERWRITING",
+              "title": "Complete policy setup: |$.BUILD_POLICY.reference",
+              "description": "Policy |$.BUILD_POLICY.reference| created for |$.BUILD_POLICY.name|. Inception |$.BUILD_POLICY.inception_date|, expiry |$.BUILD_POLICY.expiration_date|. Generate the policy schedule and confirm payment terms.",
+              "status": "open",
+              "priority": "high",
+              "due_date": "$.BUILD_POLICY.setup_due",
+              "assignees": "$.BUILD_POLICY.assignees",
+              "tags": [
+                "underwriting",
+                "policy-setup"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_trigger_GATE",
+        "source": "record.UWQuote",
+        "target": "GATE_ACCEPTED"
+      },
+      {
+        "id": "e_GATE_BUILD",
+        "source": "GATE_ACCEPTED",
+        "target": "BUILD_POLICY"
+      },
+      {
+        "id": "e_BUILD_CREATE",
+        "source": "BUILD_POLICY",
+        "target": "CREATE_POLICY"
+      },
+      {
+        "id": "e_CREATE_LINK",
+        "source": "CREATE_POLICY",
+        "target": "LINK_QUOTE"
+      },
+      {
+        "id": "e_LINK_TASK",
+        "source": "LINK_QUOTE",
+        "target": "TASK_SETUP"
+      }
+    ],
+    "result": {
+      "status": "success",
+      "policy_reference": "$.BUILD_POLICY.reference",
+      "policy_id": "$.CREATE_POLICY.data.id"
+    }
+  }
+}

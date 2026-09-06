@@ -1,0 +1,25 @@
+{
+  "id": "itpi_excess_factor_config",
+  "name": "ITPI Excess Factor",
+  "description": "Publisher-side (Antipodean) ITPI rating table, loaded by P22 from verticals/antipodean/reference/. Held as records rather than inlined in the engine flow so a rate change is an edit, not a deploy. 29 discrete excess points from $100 to $20,000. They are POINTS, not a curve: $250 \u2014 the minimum excess on 329 of the 344 quotable ITPI occupations \u2014 is not among them, so the engine needs a stated rule for a value between two points before it can rate a default quote.",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "excess": {
+        "type": "number",
+        "description": "Excess amount in dollars."
+      },
+      "factor": {
+        "type": "number",
+        "description": "Multiplier applied to the premium. 0.999 at $100 down to 0.5 at $20,000."
+      }
+    }
+  },
+  "index_fields": [
+    {
+      "field": "excess",
+      "type": "numeric"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "slug": "agent-with-output-schema",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "subject": "ms.hub.config.agent.448f2aa8-9467-31c7-8e78-a6f7205b767c",
+    "path_id": "448f2aa8-9467-31c7-8e78-a6f7205b767c",
+    "name": "Spellchecks",
+    "harvested_from": "GET /hub/agent"
+  },
+  "teaches": [
+    "output_schema is a { field: description } MAP, NOT JSON Schema",
+    "the invoke result is still a JSON-encoded STRING — parse it before branching on fields"
+  ],
+  "facts": [
+    "llm_provider \"claude\" / model \"claude-3-5-haiku-20241022\"",
+    "shared: \"\"",
+    "output_schema present",
+    "llm_config: {\"temperature\":0.7,\"max_tokens\":20000,\"max_turns\":6}"
+  ],
+  "config": {
+    "name": "Spellchecks",
+    "behaviour": "You are SpellCheckAgent, a helpful assistant that corrects spelling mistakes in text.\nYour goals:\n- Detect and fix spelling errors in any input text.\n- Preserve the user’s original formatting, punctuation, and style.\n- If context requires, correct homophone confusion (e.g., \"there\" vs. \"their\").\n- Offer concise corrections by default.\n- Do not modify grammar, tone, or sentence structure unless a spelling correction makes it unavoidable.",
+    "llm_provider": "claude",
+    "model": "claude-3-5-haiku-20241022",
+    "output_schema": {
+      "corrected": "if status is incorrect, return the corrected text",
+      "status": "correct/incorrect",
+      "typos": "number of typos found"
+    },
+    "has_tools": true,
+    "timeout": 40000000000,
+    "context_limit": 100000,
+    "message_history_limit": 200,
+    "prompt": "$.trigger",
+    "llm_config": {
+      "temperature": 0.7,
+      "max_tokens": 20000,
+      "max_turns": 6
+    },
+    "ai_smart_context": true,
+    "ai_summary_threshold": 0.7,
+    "ai_summary_model": "claude-3-5-sonnet-20241022",
+    "preserve_most_recent": 5,
+    "ai_prompt": false,
+    "api_key": "CLAUDE_API_KEY",
+    "await": true,
+    "shared": "",
+    "owner": ""
+  }
+}

@@ -1,0 +1,354 @@
+{
+  "slug": "job_application_principal",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "config_id": "job_application_principal",
+    "harvested": "live record config (configs only — no record data)"
+  },
+  "featured": false,
+  "teaches": [
+    "required fields",
+    "schema types: boolean, number, object, string"
+  ],
+  "form_node_count": 0,
+  "config": {
+    "id": "job_application_principal",
+    "name": "School Principal Job Application",
+    "description": "Track and manage job applications for school principal positions",
+    "label": "Principal",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "applicant_name": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Full Name",
+              "placeholder": "John Doe"
+            }
+          },
+          "type": "string"
+        },
+        "application_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Application Date"
+            }
+          },
+          "type": "string"
+        },
+        "application_status": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Application Status",
+              "options": [
+                {
+                  "text": "Received",
+                  "value": "received"
+                },
+                {
+                  "text": "Under Review",
+                  "value": "under_review"
+                },
+                {
+                  "text": "Interview Scheduled",
+                  "value": "interview_scheduled"
+                },
+                {
+                  "text": "Interviewed",
+                  "value": "interviewed"
+                },
+                {
+                  "text": "Final Consideration",
+                  "value": "final_consideration"
+                },
+                {
+                  "text": "Offer Extended",
+                  "value": "offer_extended"
+                },
+                {
+                  "text": "Hired",
+                  "value": "hired"
+                },
+                {
+                  "text": "Rejected",
+                  "value": "rejected"
+                },
+                {
+                  "text": "Withdrawn",
+                  "value": "withdrawn"
+                }
+              ]
+            }
+          },
+          "type": "string"
+        },
+        "certification_state": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Certification State/Province",
+              "placeholder": "California"
+            }
+          },
+          "type": "string"
+        },
+        "current_position": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Current Position",
+              "placeholder": "Assistant Principal, Deputy Head"
+            }
+          },
+          "type": "string"
+        },
+        "current_school": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Current School/Organization",
+              "placeholder": "Lincoln High School"
+            }
+          },
+          "type": "string"
+        },
+        "email": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Email Address",
+              "placeholder": "john.doe@email.com"
+            }
+          },
+          "type": "string"
+        },
+        "field_of_study": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Field of Study",
+              "placeholder": "Educational Leadership, Administration"
+            }
+          },
+          "type": "string"
+        },
+        "highest_degree": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Highest Degree",
+              "options": [
+                {
+                  "text": "Bachelor's Degree",
+                  "value": "bachelors"
+                },
+                {
+                  "text": "Master's Degree",
+                  "value": "masters"
+                },
+                {
+                  "text": "Doctorate (PhD/EdD)",
+                  "value": "doctorate"
+                }
+              ]
+            }
+          },
+          "type": "string"
+        },
+        "interview_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "helpText": {
+                "markdown": "Leave blank if interview has not been scheduled"
+              },
+              "label": "Interview Date"
+            }
+          },
+          "type": "string"
+        },
+        "interview_round": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Interview Round",
+              "options": [
+                {
+                  "text": "Not Scheduled",
+                  "value": "not_scheduled"
+                },
+                {
+                  "text": "Phone Screen",
+                  "value": "phone_screen"
+                },
+                {
+                  "text": "First Round",
+                  "value": "first_round"
+                },
+                {
+                  "text": "Second Round",
+                  "value": "second_round"
+                },
+                {
+                  "text": "Final Round",
+                  "value": "final_round"
+                }
+              ]
+            }
+          },
+          "type": "string"
+        },
+        "interview_score": {
+          "ui": {
+            "inputType": "number",
+            "props": {
+              "label": "Interview Score (out of 100)",
+              "max": 100,
+              "min": 0
+            }
+          },
+          "type": "number"
+        },
+        "notes": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Additional Notes",
+              "placeholder": "Any additional comments or observations"
+            }
+          },
+          "type": "string"
+        },
+        "offer_extended": {
+          "ui": {
+            "inputType": "toggle",
+            "props": {
+              "label": "Offer Extended"
+            }
+          },
+          "type": "boolean"
+        },
+        "panel_feedback": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Feedback from Interview Panel",
+              "placeholder": "Summary of strengths and areas of concern"
+            }
+          },
+          "type": "string"
+        },
+        "phone": {
+          "ui": {
+            "inputType": "phone",
+            "props": {
+              "label": "Phone Number",
+              "placeholder": "(555) 123-4567"
+            }
+          },
+          "type": "string"
+        },
+        "position_title": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Position Title",
+              "placeholder": "High School Principal"
+            }
+          },
+          "type": "string"
+        },
+        "principal_certification": {
+          "ui": {
+            "inputType": "toggle",
+            "props": {
+              "label": "Valid Principal Certification"
+            }
+          },
+          "type": "boolean"
+        },
+        "principal_experience": {
+          "ui": {
+            "inputType": "number",
+            "props": {
+              "label": "Years as Principal",
+              "max": 60,
+              "min": 0
+            }
+          },
+          "type": "number"
+        },
+        "salary_offered": {
+          "ui": {
+            "inputType": "currency",
+            "props": {
+              "decimalPlace": 2,
+              "label": "Salary Offered",
+              "min": 0
+            }
+          },
+          "type": "number"
+        },
+        "start_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Start Date"
+            }
+          },
+          "type": "string"
+        },
+        "years_experience": {
+          "ui": {
+            "inputType": "number",
+            "props": {
+              "label": "Years of Experience",
+              "max": 60,
+              "min": 0
+            }
+          },
+          "type": "number"
+        }
+      },
+      "required": [
+        "applicant_name",
+        "application_date",
+        "application_status",
+        "email"
+      ]
+    },
+    "views": {
+      "table": {
+        "type": "table",
+        "columns": [
+          {
+            "field": "applicant_name",
+            "order": 0
+          },
+          {
+            "field": "application_date",
+            "order": 1
+          },
+          {
+            "field": "application_status",
+            "order": 2
+          },
+          {
+            "field": "email",
+            "order": 3
+          },
+          {
+            "field": "notes",
+            "order": 4
+          }
+        ]
+      }
+    },
+    "created_at": "2026-05-20T16:01:38Z",
+    "updated_at": "2026-06-03T14:39:23Z"
+  }
+}

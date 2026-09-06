@@ -1,0 +1,53 @@
+{
+  "slug": "tasks-FAHUB",
+  "kind": "tasks",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "space_id": "FAHUB",
+    "harvested_from": "GET /workspaces/space/FAHUB/tasks (2 of 2 kept)"
+  },
+  "teaches": [
+    "2 real tasks with server-generated ids ({SPACEID}-{n})",
+    "task fields in live use: priority, status, folder, description, reporter",
+    "status values reference the SPACE's status ids: to_do",
+    "priority values reference the SPACE's priority ids: medium",
+    "url is server-built: /en/hub/spaces/{SPACE}/tasks?task={TASK-ID}"
+  ],
+  "tasks": [
+    {
+      "assignees": [
+        "<<REDACTED:user-id>>"
+      ],
+      "attachments": [],
+      "created_at": "2026-07-30T07:42:32Z",
+      "created_by": "<<REDACTED:user-id>>",
+      "description": "We need an up-to-date view of your attitude to risk before we finalise your investment recommendation. The advice summary explains how your answers are used.",
+      "folder": "Chris Humboldt - chris·humboldt@evari·tech",
+      "id": "FAHUB-14",
+      "priority": "medium",
+      "reporter": "<<REDACTED:user-id>>",
+      "space_id": "FAHUB",
+      "status": "to_do",
+      "title": "Complete your risk questionnaire",
+      "updated_at": "2026-07-31T03:15:57Z",
+      "url": "https://app.microstrate.io/en/hub/spaces/FAHUB/tasks?task=FAHUB-14"
+    },
+    {
+      "assignees": [
+        "<<REDACTED:user-id>>"
+      ],
+      "attachments": [],
+      "created_at": "2026-07-30T08:17:00Z",
+      "created_by": "<<REDACTED:user-id>>",
+      "folder": "Chris Humboldt - chris·humboldt+testtwo@evari·tech",
+      "id": "FAHUB-15",
+      "priority": "medium",
+      "reporter": "<<REDACTED:user-id>>",
+      "space_id": "FAHUB",
+      "status": "to_do",
+      "title": "Test",
+      "updated_at": "2026-07-30T08:17:00Z",
+      "url": "https://app.microstrate.io/en/hub/spaces/FAHUB/tasks?task=FAHUB-15"
+    }
+  ]
+}

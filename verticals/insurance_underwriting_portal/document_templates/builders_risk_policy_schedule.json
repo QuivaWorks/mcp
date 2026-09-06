@@ -1,0 +1,43 @@
+{
+  "key": "builders_risk_policy_schedule",
+  "label": "Builders Risk Policy Schedule",
+  "source": {
+    "key": "obj://microstrate-documents/insurance_underwriting_portal.builders_risk_policy_schedule.docx",
+    "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  },
+  "output": {
+    "name": "policy-schedule-{policy_reference}",
+    "content_type": "application/pdf",
+    "bucket": "microstrate-documents",
+    "folder": "underwriting.policies"
+  },
+  "_notes": {
+    "source_file": "builders_risk_policy_schedule.docx sits beside this config in the repo. It is NOT deployed by the vertical — only this config is. Upload the DOCX to the target account first with a POST (not PUT) to /api/default-storage/object/microstrate-documents/insurance_underwriting_portal.builders_risk_policy_schedule.docx; a PUT returns 200 and stores nothing.",
+    "placeholders": [
+      "{construction_type}",
+      "{coverage_limits}",
+      "{deductible}",
+      "{expiration_date}",
+      "{inception_date}",
+      "{insured_address}",
+      "{insured_contact}",
+      "{insured_email}",
+      "{insured_name}",
+      "{insured_phone}",
+      "{issue_date}",
+      "{payment_due_date}",
+      "{payment_status}",
+      "{payment_terms}",
+      "{policy_reference}",
+      "{premium}",
+      "{project_address}",
+      "{project_name}",
+      "{project_type}",
+      "{square_footage}",
+      "{stories}",
+      "{tiv}"
+    ],
+    "payload_contract": "A trigger payload MUST supply all 22 keys above. Any placeholder with no matching key renders as an EMPTY STRING, silently, and the job still reports success. All 22 are named exactly as fields on the UWPolicy record config — verified 2026-08-04, zero orphans. Re-extract after ANY edit to the DOCX.",
+    "source_record": "UWPolicy. policy_reference and issue_date are written by the quote-acceptance flow. Note that {inception_date} and {expiration_date} each appear more than once in the document (header, project section, and terms) — a single payload key fills every occurrence, which is why the period of cover cannot disagree with the header."
+  }
+}

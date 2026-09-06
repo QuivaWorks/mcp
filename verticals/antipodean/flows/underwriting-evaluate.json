@@ -1,0 +1,2111 @@
+{
+  "name": "underwriting-evaluate",
+  "description": "Flow 1. Normalise the submission's facts, run the 41-rule underwriting set with per-product gating, decide (DECLINE > REFER > ACCEPT), rate ITPI provisionally, write decision_config and raise the referral task.",
+  "config": {
+    "static": {
+      "api": "https://api.microstrate.io",
+      "space_id": "ANTIPODEAN",
+      "threshold_total_staff": 500,
+      "threshold_total_revenue": 15000000,
+      "threshold_total_wages": 25000000,
+      "threshold_revenue_overseas": 0,
+      "unanswered_sentinel": "__unanswered",
+      "unanswered_numeric": -1,
+      "gst_rate": 0.1,
+      "quote_validity_days": 30,
+      "rateable_products": [
+        "ITL"
+      ],
+      "expected_rate_rows": {
+        "hazard": 21,
+        "size": 10,
+        "excess": 29
+      },
+      "section_products": {
+        "gen": [
+          "*"
+        ],
+        "clm": [
+          "*"
+        ],
+        "itcl01": [
+          "ITL"
+        ],
+        "ahcl01": [
+          "ALH"
+        ],
+        "ahcl02": [
+          "ALH"
+        ],
+        "ahcl03": [
+          "ALH"
+        ],
+        "ahcl04": [
+          "ALH"
+        ],
+        "ahcl05": [
+          "ALH"
+        ],
+        "gp01": [
+          "GPI"
+        ],
+        "cpl": [
+          "CPL"
+        ],
+        "canc": []
+      },
+      "fact_catalogue": [
+        {
+          "key": "gen_total_staff",
+          "kind": "number",
+          "section": "gen"
+        },
+        {
+          "key": "gen_total_revenue",
+          "kind": "number",
+          "section": "gen"
+        },
+        {
+          "key": "gen_total_wages",
+          "kind": "number",
+          "section": "gen"
+        },
+        {
+          "key": "gen_revenue_overseas",
+          "kind": "number",
+          "section": "gen"
+        },
+        {
+          "key": "clm_insurance_declined",
+          "kind": "string",
+          "section": "clm"
+        },
+        {
+          "key": "clm_criminal_conviction",
+          "kind": "string",
+          "section": "clm"
+        },
+        {
+          "key": "clm_bankruptcy",
+          "kind": "string",
+          "section": "clm"
+        },
+        {
+          "key": "clm_prior_claims",
+          "kind": "string",
+          "section": "clm"
+        },
+        {
+          "key": "clm_prior_claims_similar",
+          "kind": "string",
+          "section": "clm"
+        },
+        {
+          "key": "clm_fraud_crime",
+          "kind": "string",
+          "section": "clm"
+        },
+        {
+          "key": "clm_tax_audit",
+          "kind": "string",
+          "section": "clm"
+        },
+        {
+          "key": "clm_professional_complaint",
+          "kind": "string",
+          "section": "clm"
+        },
+        {
+          "key": "itcl01_indemnify_third_party",
+          "kind": "string",
+          "section": "itcl01"
+        },
+        {
+          "key": "itcl01_limit_liability",
+          "kind": "string",
+          "section": "itcl01"
+        },
+        {
+          "key": "itcl01_medical_applications",
+          "kind": "string",
+          "section": "itcl01"
+        },
+        {
+          "key": "itcl01_aerospace_systems",
+          "kind": "string",
+          "section": "itcl01"
+        },
+        {
+          "key": "itcl01_military_systems",
+          "kind": "string",
+          "section": "itcl01"
+        },
+        {
+          "key": "itcl01_oil_gas_power",
+          "kind": "string",
+          "section": "itcl01"
+        },
+        {
+          "key": "itcl01_financial_systems",
+          "kind": "string",
+          "section": "itcl01"
+        },
+        {
+          "key": "itcl01_gambling",
+          "kind": "string",
+          "section": "itcl01"
+        },
+        {
+          "key": "itcl01_pornographic_material",
+          "kind": "string",
+          "section": "itcl01"
+        },
+        {
+          "key": "itcl01_unchecked_gen_ai",
+          "kind": "string",
+          "section": "itcl01"
+        },
+        {
+          "key": "itcl01_ai_human_audit",
+          "kind": "string",
+          "section": "itcl01"
+        },
+        {
+          "key": "itcl01_staff_qualified",
+          "kind": "string",
+          "section": "itcl01"
+        },
+        {
+          "key": "itcl01_tqm_strategy",
+          "kind": "string",
+          "section": "itcl01"
+        },
+        {
+          "key": "itcl01_bcp_and_drp",
+          "kind": "string",
+          "section": "itcl01"
+        },
+        {
+          "key": "itcl01_privacy_infosec_policy",
+          "kind": "string",
+          "section": "itcl01"
+        },
+        {
+          "key": "itcl01_dev_methodology",
+          "kind": "string",
+          "section": "itcl01"
+        },
+        {
+          "key": "itcl01_written_client_agreements",
+          "kind": "string",
+          "section": "itcl01"
+        },
+        {
+          "key": "itcl01_final_acceptance_test",
+          "kind": "string",
+          "section": "itcl01"
+        },
+        {
+          "key": "itcl01_contracts_legal_review",
+          "kind": "string",
+          "section": "itcl01"
+        },
+        {
+          "key": "ahcl01_staff_qualified",
+          "kind": "string",
+          "section": "ahcl01"
+        },
+        {
+          "key": "ahcl01_client_info",
+          "kind": "string",
+          "section": "ahcl01"
+        },
+        {
+          "key": "ahcl02_ahpra_registered",
+          "kind": "string",
+          "section": "ahcl02"
+        },
+        {
+          "key": "ahcl02_medical_history",
+          "kind": "string",
+          "section": "ahcl02"
+        },
+        {
+          "key": "ahcl03_medical_history",
+          "kind": "string",
+          "section": "ahcl03"
+        },
+        {
+          "key": "ahcl04_medical_history",
+          "kind": "string",
+          "section": "ahcl04"
+        },
+        {
+          "key": "ahcl02_contractors_pii",
+          "kind": "string",
+          "section": "ahcl02"
+        },
+        {
+          "key": "ahcl03_contractors_pii",
+          "kind": "string",
+          "section": "ahcl03"
+        },
+        {
+          "key": "ahcl02_accurate_records",
+          "kind": "string",
+          "section": "ahcl02"
+        },
+        {
+          "key": "ahcl03_accurate_records",
+          "kind": "string",
+          "section": "ahcl03"
+        },
+        {
+          "key": "ahcl04_accurate_records",
+          "kind": "string",
+          "section": "ahcl04"
+        },
+        {
+          "key": "ahcl05_accurate_records",
+          "kind": "string",
+          "section": "ahcl05"
+        },
+        {
+          "key": "ahcl03_informed_consent",
+          "kind": "string",
+          "section": "ahcl03"
+        },
+        {
+          "key": "ahcl04_informed_consent",
+          "kind": "string",
+          "section": "ahcl04"
+        },
+        {
+          "key": "ahcl05_informed_consent",
+          "kind": "string",
+          "section": "ahcl05"
+        },
+        {
+          "key": "ahcl04_practitioners_licensed",
+          "kind": "string",
+          "section": "ahcl04"
+        },
+        {
+          "key": "ahcl05_practitioners_licensed",
+          "kind": "string",
+          "section": "ahcl05"
+        },
+        {
+          "key": "ahcl04_practitioners_insured",
+          "kind": "string",
+          "section": "ahcl04"
+        },
+        {
+          "key": "ahcl05_practitioners_insured",
+          "kind": "string",
+          "section": "ahcl05"
+        },
+        {
+          "key": "ahcl05_clinical_trials",
+          "kind": "string",
+          "section": "ahcl05"
+        },
+        {
+          "key": "selected_products",
+          "kind": "array",
+          "section": "gen"
+        }
+      ],
+      "rule_catalogue": {
+        "REF_GEN_001": {
+          "rule_id": "REF-GEN-001",
+          "outcome": "REFER",
+          "csv_rule_topic": "referStaffCount.value",
+          "broker": "Your application has been referred for underwriter review.",
+          "uw": "Staff count exceeds auto-quote threshold (>500). Review required."
+        },
+        "REF_GEN_002": {
+          "rule_id": "REF-GEN-002",
+          "outcome": "REFER",
+          "csv_rule_topic": "referTotalRevenue.value",
+          "broker": "Your application has been referred for underwriter review.",
+          "uw": "Revenue exceeds auto-quote threshold (>$15M). Review required."
+        },
+        "REF_GEN_003": {
+          "rule_id": "REF-GEN-003",
+          "outcome": "REFER",
+          "csv_rule_topic": "referTotalWages.value",
+          "broker": "Your application has been referred for underwriter review.",
+          "uw": "Wages exceed auto-quote threshold (>$25M). Review required."
+        },
+        "REF_GEN_004": {
+          "rule_id": "REF-GEN-004",
+          "outcome": "REFER",
+          "csv_rule_topic": "referOverseasRevenue.value",
+          "broker": "Your application has been referred for underwriter review.",
+          "uw": "Overseas revenue declared. Review required."
+        },
+        "REF_CLM_001": {
+          "rule_id": "REF-CLM-001",
+          "outcome": "REFER",
+          "csv_rule_topic": "referInsuranceDeclined.value",
+          "broker": "Your application has been referred for underwriter review.",
+          "uw": "Applicant has previously had insurance declined or not renewed."
+        },
+        "REF_CLM_002": {
+          "rule_id": "REF-CLM-002",
+          "outcome": "REFER",
+          "csv_rule_topic": "referCriminalConviction.value",
+          "broker": "Your application has been referred for underwriter review.",
+          "uw": "Criminal conviction disclosed within the organisation."
+        },
+        "REF_CLM_003": {
+          "rule_id": "REF-CLM-003",
+          "outcome": "REFER",
+          "csv_rule_topic": "referBankruptcy.value",
+          "broker": "Your application has been referred for underwriter review.",
+          "uw": "Bankruptcy disclosed within the organisation."
+        },
+        "REF_CLM_004": {
+          "rule_id": "REF-CLM-004",
+          "outcome": "REFER",
+          "csv_rule_topic": "referPriorClaims.value",
+          "broker": "Your application has been referred for underwriter review.",
+          "uw": "Prior claims or notified circumstances in last 5 years."
+        },
+        "REF_CLM_005": {
+          "rule_id": "REF-CLM-005",
+          "outcome": "REFER",
+          "csv_rule_topic": "referPriorClaimsSimilar.value",
+          "broker": "Your application has been referred for underwriter review.",
+          "uw": "Prior claim on a similar policy type in last 5 years."
+        },
+        "REF_CLM_006": {
+          "rule_id": "REF-CLM-006",
+          "outcome": "REFER",
+          "csv_rule_topic": "referFraudCrime.value",
+          "broker": "Your application has been referred for underwriter review.",
+          "uw": "Fraud, crime or break-and-enter experienced in last 5 years."
+        },
+        "REF_CLM_007": {
+          "rule_id": "REF-CLM-007",
+          "outcome": "REFER",
+          "csv_rule_topic": "referTaxAudit.value",
+          "broker": "Your application has been referred for underwriter review.",
+          "uw": "ATO or revenue office audit/investigation in last 5 years."
+        },
+        "REF_CLM_008": {
+          "rule_id": "REF-CLM-008",
+          "outcome": "REFER",
+          "csv_rule_topic": "referProfessionalComplaint.value",
+          "broker": "Your application has been referred for underwriter review.",
+          "uw": "Complaint to professional association or statutory board."
+        },
+        "REF_ITCL_001": {
+          "rule_id": "REF-ITCL-001",
+          "outcome": "REFER",
+          "csv_rule_topic": "referIndemnifyThirdParty.value",
+          "broker": "Your application has been referred for underwriter review.",
+          "uw": "Applicant agrees to indemnify/hold harmless third parties."
+        },
+        "REF_ITCL_002": {
+          "rule_id": "REF-ITCL-002",
+          "outcome": "REFER",
+          "csv_rule_topic": "referLimitLiability.value",
+          "broker": "Your application has been referred for underwriter review.",
+          "uw": "Applicant does not seek to limit liability in contracts."
+        },
+        "REF_ITCL_003": {
+          "rule_id": "REF-ITCL-003",
+          "outcome": "REFER",
+          "csv_rule_topic": "referMedicalApplications.value",
+          "broker": "Your application has been referred for underwriter review.",
+          "uw": "Work involves medical or surgical applications."
+        },
+        "REF_ITCL_004": {
+          "rule_id": "REF-ITCL-004",
+          "outcome": "REFER",
+          "csv_rule_topic": "referAerospaceSystems.value",
+          "broker": "Your application has been referred for underwriter review.",
+          "uw": "Work involves aerospace, radar, or navigation systems."
+        },
+        "REF_ITCL_005": {
+          "rule_id": "REF-ITCL-005",
+          "outcome": "REFER",
+          "csv_rule_topic": "referMilitarySystems.value",
+          "broker": "Your application has been referred for underwriter review.",
+          "uw": "Work involves military or defence systems."
+        },
+        "REF_ITCL_006": {
+          "rule_id": "REF-ITCL-006",
+          "outcome": "REFER",
+          "csv_rule_topic": "referOilGasPower.value",
+          "broker": "Your application has been referred for underwriter review.",
+          "uw": "Work involves oil, gas, or power applications."
+        },
+        "REF_ITCL_007": {
+          "rule_id": "REF-ITCL-007",
+          "outcome": "REFER",
+          "csv_rule_topic": "referFinancialSystems.value",
+          "broker": "Your application has been referred for underwriter review.",
+          "uw": "Work involves financial or banking systems supporting transactions."
+        },
+        "REF_ITCL_008": {
+          "rule_id": "REF-ITCL-008",
+          "outcome": "REFER",
+          "csv_rule_topic": "referGambling.value",
+          "broker": "Your application has been referred for underwriter review.",
+          "uw": "Work involves gambling, sports betting, lotteries, or casinos."
+        },
+        "REF_ITCL_009": {
+          "rule_id": "REF-ITCL-009",
+          "outcome": "REFER",
+          "csv_rule_topic": "referPornographicMaterial.value",
+          "broker": "Your application has been referred for underwriter review.",
+          "uw": "Work involves production of pornographic material."
+        },
+        "REF_ITCL_010": {
+          "rule_id": "REF-ITCL-010",
+          "outcome": "REFER",
+          "csv_rule_topic": "referUncheckedGenAI.value",
+          "broker": "Your application has been referred for underwriter review.",
+          "uw": "Business uses open-loop AI/LLMs without human sign-off."
+        },
+        "REF_ITCL_011": {
+          "rule_id": "REF-ITCL-011",
+          "outcome": "REFER",
+          "csv_rule_topic": "referAIHumanAudit.value",
+          "broker": "Your application has been referred for underwriter review.",
+          "uw": "AI outputs are not periodically quality checked by humans."
+        },
+        "DEC_ITCL_001": {
+          "rule_id": "DEC-ITCL-001",
+          "outcome": "DECLINE",
+          "csv_rule_topic": "declineStaffQualified.value",
+          "broker": "Unfortunately we are unable to offer cover at this time.",
+          "uw": "Staff not suitably qualified for services provided."
+        },
+        "DEC_ITCL_002": {
+          "rule_id": "DEC-ITCL-002",
+          "outcome": "DECLINE",
+          "csv_rule_topic": "declineTQMStrategy.value",
+          "broker": "Unfortunately we are unable to offer cover at this time.",
+          "uw": "No Total Quality Management strategy in place."
+        },
+        "DEC_ITCL_003": {
+          "rule_id": "DEC-ITCL-003",
+          "outcome": "DECLINE",
+          "csv_rule_topic": "declineBCPandDRP.value",
+          "broker": "Unfortunately we are unable to offer cover at this time.",
+          "uw": "No Business Continuity Plan or Disaster Recovery Plan."
+        },
+        "DEC_ITCL_004": {
+          "rule_id": "DEC-ITCL-004",
+          "outcome": "DECLINE",
+          "csv_rule_topic": "declinePrivacyInfoSecPolicy.value",
+          "broker": "Unfortunately we are unable to offer cover at this time.",
+          "uw": "No Privacy Policy or Information Security Policy in place."
+        },
+        "DEC_ITCL_005": {
+          "rule_id": "DEC-ITCL-005",
+          "outcome": "DECLINE",
+          "csv_rule_topic": "declineDevMethodology.value",
+          "broker": "Unfortunately we are unable to offer cover at this time.",
+          "uw": "No systems development methodology in place."
+        },
+        "DEC_ITCL_006": {
+          "rule_id": "DEC-ITCL-006",
+          "outcome": "DECLINE",
+          "csv_rule_topic": "declineWrittenClientAgreements.value",
+          "broker": "Unfortunately we are unable to offer cover at this time.",
+          "uw": "No written client agreements outlining scope of services."
+        },
+        "DEC_ITCL_007": {
+          "rule_id": "DEC-ITCL-007",
+          "outcome": "DECLINE",
+          "csv_rule_topic": "declineFinalAcceptanceTest.value",
+          "broker": "Unfortunately we are unable to offer cover at this time.",
+          "uw": "No final acceptance test or written sign-off from clients."
+        },
+        "DEC_ITCL_008": {
+          "rule_id": "DEC-ITCL-008",
+          "outcome": "DECLINE",
+          "csv_rule_topic": "declineContractsLegalReview.value",
+          "broker": "Unfortunately we are unable to offer cover at this time.",
+          "uw": "Third-party contracts not legally reviewed before signing."
+        },
+        "DEC_AHC_001": {
+          "rule_id": "DEC-AHC-001",
+          "outcome": "DECLINE",
+          "csv_rule_topic": "declineStaffQualified.value",
+          "broker": "Unfortunately we are unable to offer cover at this time.",
+          "uw": "Staff not suitably qualified for the services being provided."
+        },
+        "DEC_AHC_002": {
+          "rule_id": "DEC-AHC-002",
+          "outcome": "DECLINE",
+          "csv_rule_topic": "declineClientInfo.value",
+          "broker": "Unfortunately we are unable to offer cover at this time.",
+          "uw": "Client information not obtained in all cases."
+        },
+        "DEC_AHC_003": {
+          "rule_id": "DEC-AHC-003",
+          "outcome": "DECLINE",
+          "csv_rule_topic": "declineAHPRARegistered.value",
+          "broker": "Unfortunately we are unable to offer cover at this time.",
+          "uw": "Practitioners not registered with AHPRA."
+        },
+        "DEC_AHC_004": {
+          "rule_id": "DEC-AHC-004",
+          "outcome": "DECLINE",
+          "csv_rule_topic": "declineMedicalHistory.value",
+          "broker": "Unfortunately we are unable to offer cover at this time.",
+          "uw": "Medical history or client information not obtained in all cases."
+        },
+        "DEC_AHC_005": {
+          "rule_id": "DEC-AHC-005",
+          "outcome": "DECLINE",
+          "csv_rule_topic": "declineContractorsPII.value",
+          "broker": "Unfortunately we are unable to offer cover at this time.",
+          "uw": "Contractors/agents not required to carry their own PI policy."
+        },
+        "DEC_AHC_006": {
+          "rule_id": "DEC-AHC-006",
+          "outcome": "DECLINE",
+          "csv_rule_topic": "declineAccurateRecords.value",
+          "broker": "Unfortunately we are unable to offer cover at this time.",
+          "uw": "Accurate records of therapeutic/medical services not maintained."
+        },
+        "DEC_AHC_007": {
+          "rule_id": "DEC-AHC-007",
+          "outcome": "DECLINE",
+          "csv_rule_topic": "declineInformedConsent.value",
+          "broker": "Unfortunately we are unable to offer cover at this time.",
+          "uw": "Informed consent not obtained in all cases."
+        },
+        "DEC_AHC_008": {
+          "rule_id": "DEC-AHC-008",
+          "outcome": "DECLINE",
+          "csv_rule_topic": "declinePractitionersLicensed.value",
+          "broker": "Unfortunately we are unable to offer cover at this time.",
+          "uw": "Medical practitioners not licensed/registered in their field."
+        },
+        "DEC_AHC_009": {
+          "rule_id": "DEC-AHC-009",
+          "outcome": "DECLINE",
+          "csv_rule_topic": "declinePractitionersInsured.value",
+          "broker": "Unfortunately we are unable to offer cover at this time.",
+          "uw": "Medical practitioners not fully insured under own indemnity."
+        },
+        "DEC_AHC_010": {
+          "rule_id": "DEC-AHC-010",
+          "outcome": "DECLINE",
+          "csv_rule_topic": "declineClinicalTrials.value",
+          "broker": "Unfortunately we are unable to offer cover at this time.",
+          "uw": "Applicant is not engaged in clinical trials (required for AHCL05)."
+        }
+      },
+      "incomplete_broker_text": "We need a few more answers before we can quote. Your application has been referred for underwriter review.",
+      "manual_broker_text": "Your application has been referred for underwriter review.",
+      "referral_task_title_prefix": "Underwriting Review",
+      "quote_expire_concern": "quote-expire",
+      "quote_expiry_flow_subject": "ms.hub.config.workflow.3788449144.2572884549",
+      "note_a5_3": "Artefact 5 A5-3 registered the quote-expire timer as PROVISIONAL: its entity and storing record were unsettled, so nothing scheduled it and a quote never lapsed. Settled here. Entity = quote_id. Storing record = decision_config.quote_expire_timer_topic (added 2026-09-02). Scheduled on ACCEPT and on REFER, never on DECLINE -- flow 10 lapses the referral task beside the decision, and only a REFER has one, so scheduling on ACCEPT alone would leave that branch of flow 10 unreachable."
+    },
+    "result": "$.DECIDE",
+    "nodes": [
+      {
+        "id": "TRIGGER_SUBMIT",
+        "data": {
+          "id": "TRIGGER_SUBMIT",
+          "node_type": "trigger",
+          "payload": {},
+          "name": "Submission received (gateway)"
+        }
+      },
+      {
+        "id": "LOAD_SUBMISSION",
+        "data": {
+          "id": "LOAD_SUBMISSION",
+          "node_type": "http",
+          "payload": {
+            "url": "https://api.microstrate.io/records/submission_config/|$.trigger.submission_id",
+            "method": "GET",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token",
+              "Content-Type": "application/json"
+            }
+          },
+          "name": "Load submission"
+        }
+      },
+      {
+        "id": "RATE_HAZARD",
+        "data": {
+          "id": "RATE_HAZARD",
+          "node_type": "http",
+          "payload": {
+            "url": "https://api.microstrate.io/records/itpi_hazard_rate_config",
+            "method": "GET",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token",
+              "Content-Type": "application/json"
+            }
+          },
+          "name": "ITPI rate by hazard"
+        }
+      },
+      {
+        "id": "RATE_SIZE",
+        "data": {
+          "id": "RATE_SIZE",
+          "node_type": "http",
+          "payload": {
+            "url": "https://api.microstrate.io/records/itpi_size_discount_config",
+            "method": "GET",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token",
+              "Content-Type": "application/json"
+            }
+          },
+          "name": "ITPI size discount"
+        }
+      },
+      {
+        "id": "RATE_EXCESS",
+        "data": {
+          "id": "RATE_EXCESS",
+          "node_type": "http",
+          "payload": {
+            "url": "https://api.microstrate.io/records/itpi_excess_factor_config",
+            "method": "GET",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token",
+              "Content-Type": "application/json"
+            }
+          },
+          "name": "ITPI excess factor"
+        }
+      },
+      {
+        "id": "MINT_DECISION_SEQ",
+        "data": {
+          "id": "MINT_DECISION_SEQ",
+          "node_type": "quiva-endpoint",
+          "payload": {
+            "name": "DECISION_SEQ",
+            "amount": 1
+          },
+          "name": "Mint decision_seq",
+          "subject": "microstrate.numbergen.put.increment"
+        }
+      },
+      {
+        "id": "NORMALISE_FACTS",
+        "data": {
+          "id": "NORMALISE_FACTS",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function () {\n  // §5.1(2): an unmatched JSONPath resolves to [], and `[] = 'no'` fires a\n  // DECLINE nobody intended. Every rule fact is normalised here, once.\n  var d = (sub && sub.data) ? sub.data : (sub || {});\n  var SENT = cfgSentinel;                 // \"__unanswered\"\n  var NUM_SENT = cfgNumericSentinel;      // -1: below every threshold in the CSV\n  var out = {};\n\n  function blank(v) {\n    return v === undefined || v === null || v === '' ||\n           (Array.isArray(v) && v.length === 0);\n  }\n\n  var unansweredInScope = [];\n  var selected = Array.isArray(d.selected_products) ? d.selected_products.slice() : [];\n  out.selected_products = selected;\n\n  function inScope(prefix) {\n    var prods = sectionProducts[prefix];\n    if (!prods) return false;\n    if (prods.indexOf('*') >= 0) return true;\n    for (var i = 0; i < prods.length; i++) {\n      if (selected.indexOf(prods[i]) >= 0) return true;\n    }\n    return false;\n  }\n\n  for (var i = 0; i < factCatalogue.length; i++) {\n    var fc = factCatalogue[i];\n    var raw = d[fc.key];\n    var scoped = inScope(fc.section);\n    if (blank(raw)) {\n      out[fc.key] = (fc.kind === 'number') ? NUM_SENT : SENT;\n      if (scoped) unansweredInScope.push(fc.key);\n    } else if (fc.kind === 'array') {\n      // selected_products is the gate fact and MUST stay an array: `in` cannot\n      // read a lowercased string, and a broken gate fires nothing at all, which\n      // reads on screen exactly like a correctly-gated ITL-only submission.\n      out[fc.key] = Array.isArray(raw) ? raw.slice() : [String(raw)];\n    } else if (fc.kind === 'number') {\n      var n = Number(String(raw).replace(/[$,\\s]/g, ''));\n      out[fc.key] = isNaN(n) ? NUM_SENT : n;\n      if (isNaN(n) && scoped) unansweredInScope.push(fc.key);\n    } else {\n      out[fc.key] = String(raw).trim().toLowerCase();\n    }\n  }\n\n  out.meta_unanswered_in_scope = unansweredInScope;\n  out.meta_submission_id = d.submission_id || (sub && sub.id) || '';\n  out.meta_quote_id = d.quote_id || '';\n  out.meta_submission_version = d.version || d.submitted_version || '';\n  out.meta_product_version = d.product_version || '';\n  out.meta_distributor_account_id = d.distributor_account_id || '';\n  out.meta_broker_id = d.broker_id || '';\n  // artefact 4, settled: a referral task's `folder` is the BROKERAGE. It must\n  // never be empty -- the board groups on it, and a task in no folder is a task\n  // nobody finds. A submission that names no broker still belongs to the\n  // account that sent it; one that names neither is named as such rather than\n  // filed under nothing.\n  out.meta_task_folder = out.meta_broker_id || out.meta_distributor_account_id || 'unassigned';\n  out.meta_policyholder_name = d.gen_policyholder_name || '';\n\n  // Rating inputs. gen_occupation stores the occupation_code, never the label.\n  var occ = blank(d.gen_occupation) ? '' : String(d.gen_occupation).trim();\n  out.meta_occupation_code = occ;\n  // Built here, as one already-resolved string, so the http node never has to\n  // pipe-concatenate a digit-leading literal into a query value: a JSON number\n  // reaches Go as float64 and \"16110170\" would go on the wire as 1.611017e+07.\n  out.meta_occupation_filter = JSON.stringify([{ field: 'occupation_code', keyword: occ }]);\n\n  var rev = Number(d.gen_total_revenue);\n  out.meta_total_revenue = isNaN(rev) ? 0 : rev;\n\n  // product_selections is an untyped array of objects: {product_code, limit_pi,\n  // limit_pl, excess}. It is not indexable and has no item schema, so read it\n  // defensively and fall back to the occupation's own minimum excess.\n  var sels = Array.isArray(d.product_selections) ? d.product_selections : [];\n  out.meta_product_selections = sels;\n  var itl = null;\n  for (var j = 0; j < sels.length; j++) {\n    var s = sels[j] || {};\n    if (String(s.product_code || s.code || '').toUpperCase() === 'ITL') { itl = s; break; }\n  }\n  out.meta_itl_selection = itl;\n  out.meta_requested_excess = (itl && itl.excess !== undefined && itl.excess !== null && itl.excess !== '')\n    ? Number(itl.excess) : null;\n\n  return out;\n})();\n",
+            "params": {
+              "sub": "$.LOAD_SUBMISSION.data",
+              "cfgSentinel": "$.static.unanswered_sentinel",
+              "cfgNumericSentinel": "$.static.unanswered_numeric",
+              "factCatalogue": "$.static.fact_catalogue",
+              "sectionProducts": "$.static.section_products"
+            }
+          },
+          "name": "Normalise facts"
+        }
+      },
+      {
+        "id": "LOAD_OCCUPATION",
+        "data": {
+          "id": "LOAD_OCCUPATION",
+          "node_type": "http",
+          "payload": {
+            "url": "https://api.microstrate.io/records",
+            "method": "GET",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token",
+              "Content-Type": "application/json"
+            },
+            "query": {
+              "space_id": "ANTIPODEAN",
+              "config_id": "occupation_config",
+              "filter": "$.NORMALISE_FACTS.meta_occupation_filter",
+              "limit": 1
+            }
+          },
+          "name": "Load occupation"
+        }
+      },
+      {
+        "id": "UW_RULES",
+        "data": {
+          "id": "UW_RULES",
+          "node_type": "rules",
+          "payload": {
+            "facts": {
+              "gen_total_staff": "$.NORMALISE_FACTS.gen_total_staff",
+              "gen_total_revenue": "$.NORMALISE_FACTS.gen_total_revenue",
+              "gen_total_wages": "$.NORMALISE_FACTS.gen_total_wages",
+              "gen_revenue_overseas": "$.NORMALISE_FACTS.gen_revenue_overseas",
+              "clm_insurance_declined": "$.NORMALISE_FACTS.clm_insurance_declined",
+              "clm_criminal_conviction": "$.NORMALISE_FACTS.clm_criminal_conviction",
+              "clm_bankruptcy": "$.NORMALISE_FACTS.clm_bankruptcy",
+              "clm_prior_claims": "$.NORMALISE_FACTS.clm_prior_claims",
+              "clm_prior_claims_similar": "$.NORMALISE_FACTS.clm_prior_claims_similar",
+              "clm_fraud_crime": "$.NORMALISE_FACTS.clm_fraud_crime",
+              "clm_tax_audit": "$.NORMALISE_FACTS.clm_tax_audit",
+              "clm_professional_complaint": "$.NORMALISE_FACTS.clm_professional_complaint",
+              "itcl01_indemnify_third_party": "$.NORMALISE_FACTS.itcl01_indemnify_third_party",
+              "itcl01_limit_liability": "$.NORMALISE_FACTS.itcl01_limit_liability",
+              "itcl01_medical_applications": "$.NORMALISE_FACTS.itcl01_medical_applications",
+              "itcl01_aerospace_systems": "$.NORMALISE_FACTS.itcl01_aerospace_systems",
+              "itcl01_military_systems": "$.NORMALISE_FACTS.itcl01_military_systems",
+              "itcl01_oil_gas_power": "$.NORMALISE_FACTS.itcl01_oil_gas_power",
+              "itcl01_financial_systems": "$.NORMALISE_FACTS.itcl01_financial_systems",
+              "itcl01_gambling": "$.NORMALISE_FACTS.itcl01_gambling",
+              "itcl01_pornographic_material": "$.NORMALISE_FACTS.itcl01_pornographic_material",
+              "itcl01_unchecked_gen_ai": "$.NORMALISE_FACTS.itcl01_unchecked_gen_ai",
+              "itcl01_ai_human_audit": "$.NORMALISE_FACTS.itcl01_ai_human_audit",
+              "itcl01_staff_qualified": "$.NORMALISE_FACTS.itcl01_staff_qualified",
+              "itcl01_tqm_strategy": "$.NORMALISE_FACTS.itcl01_tqm_strategy",
+              "itcl01_bcp_and_drp": "$.NORMALISE_FACTS.itcl01_bcp_and_drp",
+              "itcl01_privacy_infosec_policy": "$.NORMALISE_FACTS.itcl01_privacy_infosec_policy",
+              "itcl01_dev_methodology": "$.NORMALISE_FACTS.itcl01_dev_methodology",
+              "itcl01_written_client_agreements": "$.NORMALISE_FACTS.itcl01_written_client_agreements",
+              "itcl01_final_acceptance_test": "$.NORMALISE_FACTS.itcl01_final_acceptance_test",
+              "itcl01_contracts_legal_review": "$.NORMALISE_FACTS.itcl01_contracts_legal_review",
+              "ahcl01_staff_qualified": "$.NORMALISE_FACTS.ahcl01_staff_qualified",
+              "ahcl01_client_info": "$.NORMALISE_FACTS.ahcl01_client_info",
+              "ahcl02_ahpra_registered": "$.NORMALISE_FACTS.ahcl02_ahpra_registered",
+              "ahcl02_medical_history": "$.NORMALISE_FACTS.ahcl02_medical_history",
+              "ahcl03_medical_history": "$.NORMALISE_FACTS.ahcl03_medical_history",
+              "ahcl04_medical_history": "$.NORMALISE_FACTS.ahcl04_medical_history",
+              "ahcl02_contractors_pii": "$.NORMALISE_FACTS.ahcl02_contractors_pii",
+              "ahcl03_contractors_pii": "$.NORMALISE_FACTS.ahcl03_contractors_pii",
+              "ahcl02_accurate_records": "$.NORMALISE_FACTS.ahcl02_accurate_records",
+              "ahcl03_accurate_records": "$.NORMALISE_FACTS.ahcl03_accurate_records",
+              "ahcl04_accurate_records": "$.NORMALISE_FACTS.ahcl04_accurate_records",
+              "ahcl05_accurate_records": "$.NORMALISE_FACTS.ahcl05_accurate_records",
+              "ahcl03_informed_consent": "$.NORMALISE_FACTS.ahcl03_informed_consent",
+              "ahcl04_informed_consent": "$.NORMALISE_FACTS.ahcl04_informed_consent",
+              "ahcl05_informed_consent": "$.NORMALISE_FACTS.ahcl05_informed_consent",
+              "ahcl04_practitioners_licensed": "$.NORMALISE_FACTS.ahcl04_practitioners_licensed",
+              "ahcl05_practitioners_licensed": "$.NORMALISE_FACTS.ahcl05_practitioners_licensed",
+              "ahcl04_practitioners_insured": "$.NORMALISE_FACTS.ahcl04_practitioners_insured",
+              "ahcl05_practitioners_insured": "$.NORMALISE_FACTS.ahcl05_practitioners_insured",
+              "ahcl05_clinical_trials": "$.NORMALISE_FACTS.ahcl05_clinical_trials",
+              "selected_products": "$.NORMALISE_FACTS.selected_products"
+            },
+            "rules": {
+              "REF_GEN_001": [
+                {
+                  "condition": {
+                    "operator": ">",
+                    "input": [
+                      "@fact:gen_total_staff",
+                      "$.static.threshold_total_staff"
+                    ]
+                  },
+                  "outcome": "REFER"
+                }
+              ],
+              "REF_GEN_002": [
+                {
+                  "condition": {
+                    "operator": ">",
+                    "input": [
+                      "@fact:gen_total_revenue",
+                      "$.static.threshold_total_revenue"
+                    ]
+                  },
+                  "outcome": "REFER"
+                }
+              ],
+              "REF_GEN_003": [
+                {
+                  "condition": {
+                    "operator": ">",
+                    "input": [
+                      "@fact:gen_total_wages",
+                      "$.static.threshold_total_wages"
+                    ]
+                  },
+                  "outcome": "REFER"
+                }
+              ],
+              "REF_GEN_004": [
+                {
+                  "condition": {
+                    "operator": ">",
+                    "input": [
+                      "@fact:gen_revenue_overseas",
+                      "$.static.threshold_revenue_overseas"
+                    ]
+                  },
+                  "outcome": "REFER"
+                }
+              ],
+              "REF_CLM_001": [
+                {
+                  "condition": {
+                    "operator": "=",
+                    "input": [
+                      "@fact:clm_insurance_declined",
+                      "yes"
+                    ]
+                  },
+                  "outcome": "REFER"
+                }
+              ],
+              "REF_CLM_002": [
+                {
+                  "condition": {
+                    "operator": "=",
+                    "input": [
+                      "@fact:clm_criminal_conviction",
+                      "yes"
+                    ]
+                  },
+                  "outcome": "REFER"
+                }
+              ],
+              "REF_CLM_003": [
+                {
+                  "condition": {
+                    "operator": "=",
+                    "input": [
+                      "@fact:clm_bankruptcy",
+                      "yes"
+                    ]
+                  },
+                  "outcome": "REFER"
+                }
+              ],
+              "REF_CLM_004": [
+                {
+                  "condition": {
+                    "operator": "=",
+                    "input": [
+                      "@fact:clm_prior_claims",
+                      "yes"
+                    ]
+                  },
+                  "outcome": "REFER"
+                }
+              ],
+              "REF_CLM_005": [
+                {
+                  "condition": {
+                    "operator": "=",
+                    "input": [
+                      "@fact:clm_prior_claims_similar",
+                      "yes"
+                    ]
+                  },
+                  "outcome": "REFER"
+                }
+              ],
+              "REF_CLM_006": [
+                {
+                  "condition": {
+                    "operator": "=",
+                    "input": [
+                      "@fact:clm_fraud_crime",
+                      "yes"
+                    ]
+                  },
+                  "outcome": "REFER"
+                }
+              ],
+              "REF_CLM_007": [
+                {
+                  "condition": {
+                    "operator": "=",
+                    "input": [
+                      "@fact:clm_tax_audit",
+                      "yes"
+                    ]
+                  },
+                  "outcome": "REFER"
+                }
+              ],
+              "REF_CLM_008": [
+                {
+                  "condition": {
+                    "operator": "=",
+                    "input": [
+                      "@fact:clm_professional_complaint",
+                      "yes"
+                    ]
+                  },
+                  "outcome": "REFER"
+                }
+              ],
+              "REF_ITCL_001": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ITL",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "=",
+                        "input": [
+                          "@fact:itcl01_indemnify_third_party",
+                          "yes"
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "REFER"
+                }
+              ],
+              "REF_ITCL_002": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ITL",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "=",
+                        "input": [
+                          "@fact:itcl01_limit_liability",
+                          "no"
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "REFER"
+                }
+              ],
+              "REF_ITCL_003": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ITL",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "=",
+                        "input": [
+                          "@fact:itcl01_medical_applications",
+                          "yes"
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "REFER"
+                }
+              ],
+              "REF_ITCL_004": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ITL",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "=",
+                        "input": [
+                          "@fact:itcl01_aerospace_systems",
+                          "yes"
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "REFER"
+                }
+              ],
+              "REF_ITCL_005": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ITL",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "=",
+                        "input": [
+                          "@fact:itcl01_military_systems",
+                          "yes"
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "REFER"
+                }
+              ],
+              "REF_ITCL_006": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ITL",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "=",
+                        "input": [
+                          "@fact:itcl01_oil_gas_power",
+                          "yes"
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "REFER"
+                }
+              ],
+              "REF_ITCL_007": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ITL",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "=",
+                        "input": [
+                          "@fact:itcl01_financial_systems",
+                          "yes"
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "REFER"
+                }
+              ],
+              "REF_ITCL_008": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ITL",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "=",
+                        "input": [
+                          "@fact:itcl01_gambling",
+                          "yes"
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "REFER"
+                }
+              ],
+              "REF_ITCL_009": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ITL",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "=",
+                        "input": [
+                          "@fact:itcl01_pornographic_material",
+                          "yes"
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "REFER"
+                }
+              ],
+              "REF_ITCL_010": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ITL",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "=",
+                        "input": [
+                          "@fact:itcl01_unchecked_gen_ai",
+                          "yes"
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "REFER"
+                }
+              ],
+              "REF_ITCL_011": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ITL",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "=",
+                        "input": [
+                          "@fact:itcl01_ai_human_audit",
+                          "no"
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "REFER"
+                }
+              ],
+              "DEC_ITCL_001": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ITL",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "=",
+                        "input": [
+                          "@fact:itcl01_staff_qualified",
+                          "no"
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "DECLINE"
+                }
+              ],
+              "DEC_ITCL_002": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ITL",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "=",
+                        "input": [
+                          "@fact:itcl01_tqm_strategy",
+                          "no"
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "DECLINE"
+                }
+              ],
+              "DEC_ITCL_003": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ITL",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "=",
+                        "input": [
+                          "@fact:itcl01_bcp_and_drp",
+                          "no"
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "DECLINE"
+                }
+              ],
+              "DEC_ITCL_004": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ITL",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "=",
+                        "input": [
+                          "@fact:itcl01_privacy_infosec_policy",
+                          "no"
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "DECLINE"
+                }
+              ],
+              "DEC_ITCL_005": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ITL",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "=",
+                        "input": [
+                          "@fact:itcl01_dev_methodology",
+                          "no"
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "DECLINE"
+                }
+              ],
+              "DEC_ITCL_006": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ITL",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "=",
+                        "input": [
+                          "@fact:itcl01_written_client_agreements",
+                          "no"
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "DECLINE"
+                }
+              ],
+              "DEC_ITCL_007": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ITL",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "=",
+                        "input": [
+                          "@fact:itcl01_final_acceptance_test",
+                          "no"
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "DECLINE"
+                }
+              ],
+              "DEC_ITCL_008": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ITL",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "=",
+                        "input": [
+                          "@fact:itcl01_contracts_legal_review",
+                          "no"
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "DECLINE"
+                }
+              ],
+              "DEC_AHC_001": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ALH",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "=",
+                        "input": [
+                          "@fact:ahcl01_staff_qualified",
+                          "no"
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "DECLINE"
+                }
+              ],
+              "DEC_AHC_002": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ALH",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "=",
+                        "input": [
+                          "@fact:ahcl01_client_info",
+                          "no"
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "DECLINE"
+                }
+              ],
+              "DEC_AHC_003": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ALH",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "=",
+                        "input": [
+                          "@fact:ahcl02_ahpra_registered",
+                          "no"
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "DECLINE"
+                }
+              ],
+              "DEC_AHC_004": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ALH",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "or",
+                        "input": [
+                          {
+                            "operator": "=",
+                            "input": [
+                              "@fact:ahcl02_medical_history",
+                              "no"
+                            ]
+                          },
+                          {
+                            "operator": "=",
+                            "input": [
+                              "@fact:ahcl03_medical_history",
+                              "no"
+                            ]
+                          },
+                          {
+                            "operator": "=",
+                            "input": [
+                              "@fact:ahcl04_medical_history",
+                              "no"
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "DECLINE"
+                }
+              ],
+              "DEC_AHC_005": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ALH",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "or",
+                        "input": [
+                          {
+                            "operator": "=",
+                            "input": [
+                              "@fact:ahcl02_contractors_pii",
+                              "no"
+                            ]
+                          },
+                          {
+                            "operator": "=",
+                            "input": [
+                              "@fact:ahcl03_contractors_pii",
+                              "no"
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "DECLINE"
+                }
+              ],
+              "DEC_AHC_006": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ALH",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "or",
+                        "input": [
+                          {
+                            "operator": "=",
+                            "input": [
+                              "@fact:ahcl02_accurate_records",
+                              "no"
+                            ]
+                          },
+                          {
+                            "operator": "=",
+                            "input": [
+                              "@fact:ahcl03_accurate_records",
+                              "no"
+                            ]
+                          },
+                          {
+                            "operator": "=",
+                            "input": [
+                              "@fact:ahcl04_accurate_records",
+                              "no"
+                            ]
+                          },
+                          {
+                            "operator": "=",
+                            "input": [
+                              "@fact:ahcl05_accurate_records",
+                              "no"
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "DECLINE"
+                }
+              ],
+              "DEC_AHC_007": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ALH",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "or",
+                        "input": [
+                          {
+                            "operator": "=",
+                            "input": [
+                              "@fact:ahcl03_informed_consent",
+                              "no"
+                            ]
+                          },
+                          {
+                            "operator": "=",
+                            "input": [
+                              "@fact:ahcl04_informed_consent",
+                              "no"
+                            ]
+                          },
+                          {
+                            "operator": "=",
+                            "input": [
+                              "@fact:ahcl05_informed_consent",
+                              "no"
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "DECLINE"
+                }
+              ],
+              "DEC_AHC_008": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ALH",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "or",
+                        "input": [
+                          {
+                            "operator": "=",
+                            "input": [
+                              "@fact:ahcl04_practitioners_licensed",
+                              "no"
+                            ]
+                          },
+                          {
+                            "operator": "=",
+                            "input": [
+                              "@fact:ahcl05_practitioners_licensed",
+                              "no"
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "DECLINE"
+                }
+              ],
+              "DEC_AHC_009": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ALH",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "or",
+                        "input": [
+                          {
+                            "operator": "=",
+                            "input": [
+                              "@fact:ahcl04_practitioners_insured",
+                              "no"
+                            ]
+                          },
+                          {
+                            "operator": "=",
+                            "input": [
+                              "@fact:ahcl05_practitioners_insured",
+                              "no"
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "DECLINE"
+                }
+              ],
+              "DEC_AHC_010": [
+                {
+                  "condition": {
+                    "operator": "and",
+                    "input": [
+                      {
+                        "operator": "in",
+                        "input": [
+                          "ALH",
+                          "@fact:selected_products"
+                        ]
+                      },
+                      {
+                        "operator": "=",
+                        "input": [
+                          "@fact:ahcl05_clinical_trials",
+                          "no"
+                        ]
+                      }
+                    ]
+                  },
+                  "outcome": "DECLINE"
+                }
+              ]
+            },
+            "context": {}
+          },
+          "name": "Underwriting rules (41)"
+        }
+      },
+      {
+        "id": "COMBINE_ITPI_PREMIUM",
+        "data": {
+          "id": "COMBINE_ITPI_PREMIUM",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function () {\n  // ===========================================================================\n  // COMBINE_ITPI_PREMIUM — the ONE named, isolated node the plan's\n  // [G1f] DECIDED 2026-09-02 block requires (§4.2, condition 2).\n  //\n  // Antipodean have supplied NO premium formula. They supplied three tables:\n  // a rate per hazard class, a discount per revenue band, a factor per excess.\n  // The combination below is INFERRED by wave 4 and is not ratified. Replacing\n  // it when the real formula lands is an edit to this node and nothing else.\n  //\n  // Condition 1 of that decision: the rates are READ FROM THE RECORDS\n  // (itpi_hazard_rate_config / itpi_size_discount_config /\n  // itpi_excess_factor_config). The linear association\n  // rate_pi = 0.00473 x (class + 1) is what licensed the inference; it is\n  // deliberately NOT evaluated anywhere here, so a corrected table replaces the\n  // numbers without touching this flow.\n  //\n  // Condition 3: every premium produced here is stamped\n  // premium_basis = \"PROVISIONAL_INFERRED\" on decision_config, which is an\n  // indexed keyword field, so these quotes can be found again.\n  //\n  // THE INFERRED ARITHMETIC:\n  //   premium_pi = revenue x rate_pi x (1 - discount_percent/100) x excess_factor\n  //   premium_pl = revenue x rate_pl x (1 - discount_percent/100) x excess_factor\n  //   base       = max(premium_pi + premium_pl, occupation.itpi_min_premium)\n  // Money is integer cents throughout (§5.4: there is no decimal type).\n  // ===========================================================================\n  var errors = [], notes = [];\n  function rows(resp) {\n    var r = (resp && resp.results) ? resp.results : [];\n    var out = [];\n    for (var i = 0; i < r.length; i++) out.push(r[i].data || {});\n    return out;\n  }\n  var hazardRows = rows(hz), sizeRows = rows(sz), excessRows = rows(ex);\n\n  // A short page from a reference table is a silent mis-rate, not an error, so\n  // assert the row counts the plan's [G1f] load table verified: 21 / 10 / 29.\n  if (hazardRows.length !== expect.hazard) errors.push('RATE_TABLE_SHORT:itpi_hazard_rate_config:' + hazardRows.length + '/' + expect.hazard);\n  if (sizeRows.length !== expect.size) errors.push('RATE_TABLE_SHORT:itpi_size_discount_config:' + sizeRows.length + '/' + expect.size);\n  if (excessRows.length !== expect.excess) errors.push('RATE_TABLE_SHORT:itpi_excess_factor_config:' + excessRows.length + '/' + expect.excess);\n\n  var selected = f.selected_products || [];\n  var occRows = (occ && occ.results) ? occ.results : [];\n  var occupation = occRows.length ? (occRows[0].data || {}) : null;\n  if (!occupation) errors.push('OCCUPATION_NOT_FOUND:' + (f.meta_occupation_code || '(blank)'));\n\n  // Allied Health and General Property have NO rate table in any supplied file\n  // (§4.2: gp_hazard_class is empty on all 3347 quotable rows). Wave 4 does not\n  // invent one. Any selected product other than ITL is reported unrateable and\n  // the engine refers it — see DECIDE.\n  var unrateable = [];\n  for (var p = 0; p < selected.length; p++) {\n    if (rateableProducts.indexOf(selected[p]) < 0) unrateable.push(selected[p]);\n  }\n\n  var result = {\n    rateable: false,\n    premium_basis: 'NOT_RATED',\n    base_premium: 0, fsl_levy: 0, gst: 0, stamp_duty: 0, broker_commission: 0,\n    total_payable: 0,\n    unrateable_products: unrateable,\n    errors: errors,\n    breakdown: {}\n  };\n\n  if (selected.indexOf('ITL') < 0 || !occupation || errors.length) {\n    result.breakdown = { reason: errors.length ? 'RATE_INPUTS_UNUSABLE' : 'NO_ITL_SELECTED', notes: notes };\n    return result;\n  }\n\n  // --- hazard class: occupation_config stores it as a STRING, the rate table\n  // as a NUMBER. Coerce, do not compare across types.\n  var hazardClass = Number(occupation.itpi_hazard_class);\n  var rateRow = null;\n  for (var i = 0; i < hazardRows.length; i++) {\n    if (Number(hazardRows[i].hazard_class) === hazardClass) { rateRow = hazardRows[i]; break; }\n  }\n  if (!rateRow) {\n    result.errors.push('HAZARD_CLASS_NOT_IN_TABLE:' + occupation.itpi_hazard_class);\n    result.breakdown = { reason: 'HAZARD_CLASS_NOT_IN_TABLE' };\n    return result;\n  }\n\n  // --- size band. Band 1's revenue_min is 0 and the INDEX reads min:0/max:0 as\n  // \"not supplied\", so this table is read whole and bracketed in JS rather than\n  // queried: an index filter would silently miss the band most small risks fall in.\n  var revenue = Number(f.meta_total_revenue) || 0;\n  var sizeRow = null, topRow = null;\n  for (var j = 0; j < sizeRows.length; j++) {\n    var b = sizeRows[j];\n    if (topRow === null || Number(b.revenue_max) > Number(topRow.revenue_max)) topRow = b;\n    if (revenue >= Number(b.revenue_min) && revenue <= Number(b.revenue_max)) sizeRow = b;\n  }\n  if (!sizeRow) {\n    // Above the top band ($25m). §4.2 records that bands 9-10 only ever rate a\n    // risk already referred at $15m, so this path is reachable only on a referral.\n    sizeRow = topRow;\n    notes.push('REVENUE_ABOVE_TOP_BAND:used_band:' + (topRow ? topRow.band_id : 'none'));\n  }\n  var discountPercent = Number(sizeRow.discount_percent) || 0;\n\n  // --- excess factor. $250 is the minimum excess on 329 of the 344 quotable\n  // ITPI occupations and is NOT one of the 29 stated points ($100/$200/$300...).\n  // §4.2 names this as a defect needing a stated rule. Wave 4's stated rule:\n  // take the NEAREST STATED EXCESS AT OR BELOW the requested one (below the\n  // lowest point, take the lowest). A lower excess carries a higher factor, so\n  // this rounds the premium UP, never down, and it is deterministic. It is\n  // recorded on the breakdown so the substitution is visible.\n  var requested = (f.meta_requested_excess !== null && f.meta_requested_excess !== undefined && !isNaN(Number(f.meta_requested_excess)))\n    ? Number(f.meta_requested_excess)\n    : Number(occupation.itpi_min_excess);\n  if (isNaN(requested)) requested = Number(occupation.itpi_min_excess) || 0;\n  var excessRow = null, lowest = null;\n  for (var k = 0; k < excessRows.length; k++) {\n    var e = excessRows[k];\n    if (lowest === null || Number(e.excess) < Number(lowest.excess)) lowest = e;\n    if (Number(e.excess) <= requested && (excessRow === null || Number(e.excess) > Number(excessRow.excess))) excessRow = e;\n  }\n  if (!excessRow) { excessRow = lowest; notes.push('EXCESS_BELOW_LOWEST_POINT'); }\n  if (Number(excessRow.excess) !== requested) {\n    notes.push('EXCESS_NOT_IN_TABLE:requested:' + requested + ':used:' + excessRow.excess);\n  }\n  var excessFactor = Number(excessRow.factor);\n\n  // --- the inferred combination, in integer cents.\n  function cents(x) { return Math.round(x * 100); }\n  var sizeMult = 1 - (discountPercent / 100);\n  var piCents = cents(revenue * Number(rateRow.rate_pi) * sizeMult * excessFactor);\n  var plCents = cents(revenue * Number(rateRow.rate_pl) * sizeMult * excessFactor);\n  var baseCents = piCents + plCents;\n  var minCents = cents(Number(occupation.itpi_min_premium) || 0);\n  var minApplied = false;\n  if (baseCents < minCents) { baseCents = minCents; minApplied = true; }\n\n  // GST is the statutory 10%; it is not an Antipodean input and is not inferred.\n  // FSL/ESL and stamp duty ARE Antipodean inputs (§4.2 items 4 and 5) and NONE\n  // has been supplied, so they are zero and named as missing rather than guessed.\n  var gstCents = Math.round(baseCents * gstRate);\n  var totalCents = baseCents + gstCents;\n\n  result.rateable = true;\n  result.premium_basis = 'PROVISIONAL_INFERRED';\n  result.base_premium = baseCents / 100;\n  result.gst = gstCents / 100;\n  result.fsl_levy = 0;\n  result.stamp_duty = 0;\n  result.broker_commission = 0;\n  result.total_payable = totalCents / 100;\n  result.breakdown = {\n    formula: 'revenue x rate x (1 - discount_percent/100) x excess_factor, per cover section; PROVISIONAL, inferred by wave 4, not supplied by Antipodean',\n    revenue: revenue,\n    occupation_code: occupation.occupation_code,\n    hazard_class: hazardClass,\n    rate_pi: Number(rateRow.rate_pi),\n    rate_pl: Number(rateRow.rate_pl),\n    size_band_id: sizeRow.band_id,\n    discount_percent: discountPercent,\n    excess_requested: requested,\n    excess_used: Number(excessRow.excess),\n    excess_factor: excessFactor,\n    premium_pi: piCents / 100,\n    premium_pl: plCents / 100,\n    minimum_premium: minCents / 100,\n    minimum_premium_applied: minApplied,\n    gst_rate: gstRate,\n    not_supplied: ['fsl_esl_rate', 'stamp_duty_schedule', 'broker_commission_basis', 'rounding_and_order_of_operations'],\n    unrateable_products: unrateable,\n    notes: notes\n  };\n  return result;\n})();\n",
+            "params": {
+              "occ": "$.LOAD_OCCUPATION.data",
+              "hz": "$.RATE_HAZARD.data",
+              "sz": "$.RATE_SIZE.data",
+              "ex": "$.RATE_EXCESS.data",
+              "f": "$.NORMALISE_FACTS",
+              "expect": "$.static.expected_rate_rows",
+              "gstRate": "$.static.gst_rate",
+              "rateableProducts": "$.static.rateable_products"
+            }
+          },
+          "name": "Combine ITPI premium (PROVISIONAL)"
+        }
+      },
+      {
+        "id": "DECIDE",
+        "data": {
+          "id": "DECIDE",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function () {\n  // §5.1 [R]: non-firing rules are ABSENT from the rules node's output, not\n  // false. DECIDE therefore keys on PRESENCE and never on 41 keys coming back.\n  var fired = [], declines = [], refers = [];\n  var brokerReasons = [], uwReasons = [];\n  var seenBroker = {};\n\n  for (var name in r) {\n    if (!Object.prototype.hasOwnProperty.call(r, name)) continue;\n    var outcome = r[name];\n    if (outcome === undefined || outcome === null || outcome === '') continue;\n    fired.push(name);\n    var meta = cat[name] || {};\n    if (outcome === 'DECLINE') declines.push(name); else if (outcome === 'REFER') refers.push(name);\n    if (meta.uw) uwReasons.push(meta.rule_id + ': ' + meta.uw);\n    if (meta.broker && !seenBroker[meta.broker]) { seenBroker[meta.broker] = 1; brokerReasons.push(meta.broker); }\n  }\n\n  // Wave 4's answer to artefact 1's open A-11: an unanswered question that is\n  // IN SCOPE for a selected product forces REFER. It never forces DECLINE (a\n  // missing answer is not an adverse answer) and it never auto-accepts.\n  var incomplete = f.meta_unanswered_in_scope || [];\n  for (var i = 0; i < incomplete.length; i++) {\n    refers.push('INCOMPLETE_SUBMISSION:' + incomplete[i]);\n    uwReasons.push('INCOMPLETE_SUBMISSION: ' + incomplete[i] + ' is unanswered and in scope for the selected products.');\n  }\n  if (incomplete.length && !seenBroker[incompleteBrokerText]) {\n    seenBroker[incompleteBrokerText] = 1; brokerReasons.push(incompleteBrokerText);\n  }\n\n  // No rate table exists for Allied Health or General Property (§4.2). Wave 4\n  // does not invent one and does not fail the run: it REFERS, with a named\n  // reason, so the submission still produces a decision record and a task.\n  var unrateable = (p && p.unrateable_products) ? p.unrateable_products : [];\n  for (var j = 0; j < unrateable.length; j++) {\n    refers.push('NO_RATE_TABLE:' + unrateable[j]);\n    uwReasons.push('NO_RATE_TABLE: no rate table exists for ' + unrateable[j] + '. Price manually.');\n  }\n  var rateErrors = (p && p.errors) ? p.errors : [];\n  for (var k = 0; k < rateErrors.length; k++) {\n    refers.push('RATING_UNAVAILABLE:' + rateErrors[k]);\n    uwReasons.push('RATING_UNAVAILABLE: ' + rateErrors[k]);\n  }\n  if ((unrateable.length || rateErrors.length) && !seenBroker[manualBrokerText]) {\n    seenBroker[manualBrokerText] = 1; brokerReasons.push(manualBrokerText);\n  }\n\n  // DECLINE beats REFER. Non-negotiable precedence (§5.1, G2).\n  var outcome = declines.length ? 'DECLINE' : (refers.length ? 'REFER' : 'ACCEPT');\n\n  var now = new Date();\n  var decidedAt = now.toISOString().replace(/\\.\\d{3}Z$/, 'Z');\n  var expiry = new Date(now.getTime() + validityDays * 86400000).toISOString().replace(/\\.\\d{3}Z$/, 'Z');\n\n  var record = {\n    quote_id: f.meta_quote_id,\n    submission_id: f.meta_submission_id,\n    submission_version: Number(f.meta_submission_version || 0),\n    product_version: String(f.meta_product_version || ''),\n    distributor_account_id: String(f.meta_distributor_account_id || ''),\n    product_code: (f.selected_products && f.selected_products.length) ? f.selected_products[0] : '',\n    outcome: outcome,\n    decision_status: (outcome === 'ACCEPT' || outcome === 'DECLINE') ? 'OPEN' : 'OPEN',\n    origin_flow: 'flow-1',\n    decided_by: 'engine',\n    decided_at: decidedAt,\n    decision_seq: Number((seq && (seq.value !== undefined ? seq.value : seq.count)) || 0),\n    quote_validity_expiry: expiry,\n    sanctions_state: 'not_run',\n    referral_reasons: refers,\n    decline_reasons: declines,\n    broker_reasons: brokerReasons,\n    underwriter_reasons: uwReasons,\n    premium_basis: (outcome === 'ACCEPT' && p && p.rateable) ? p.premium_basis : 'NOT_RATED',\n    base_premium: (outcome === 'ACCEPT' && p && p.rateable) ? p.base_premium : 0,\n    gst: (outcome === 'ACCEPT' && p && p.rateable) ? p.gst : 0,\n    fsl_levy: 0,\n    stamp_duty: 0,\n    broker_commission: 0,\n    total_payable: (outcome === 'ACCEPT' && p && p.rateable) ? p.total_payable : 0,\n    terms: { premium_breakdown: (p && p.breakdown) || {}, rating_provisional: !!(p && p.rateable) }\n  };\n\n  // A quote that can still be taken up is a quote that can lapse. ACCEPT and\n  // REFER both leave one live and both carry a validity expiry; a DECLINE\n  // leaves nothing to expire. Artefact 5 A5-3 left the trigger unsettled, and\n  // this is the answer: flow 10 lapses an OPEN decision and lapses the referral\n  // task beside it, and only a REFER ever has one — so scheduling on ACCEPT\n  // alone would leave that whole branch of flow 10 unreachable.\n  var schedulesExpiry = (outcome === 'ACCEPT' || outcome === 'REFER') && expiry !== '';\n\n  return {\n    outcome: outcome,\n    schedules_expiry: schedulesExpiry,\n    // artefact 5: the name is <concern>:<quoteId>, and the topic is derived\n    // from it. Never sent as `topic` — the caller's topic is discarded.\n    expire_timer_name: 'quote-expire:' + String(f.meta_quote_id || ''),\n    quote_validity_expiry: expiry,\n    fired: fired,\n    decline_reasons: declines,\n    referral_reasons: refers,\n    broker_reasons: brokerReasons,\n    underwriter_reasons: uwReasons,\n    ahc_rules_fired: fired.filter(function (n) { return n.indexOf('DEC_AHC_') === 0; }),\n    itcl_rules_fired: fired.filter(function (n) { return n.indexOf('ITCL_') > 0; }),\n    decision_record: record\n  };\n})();\n",
+            "params": {
+              "r": "$.UW_RULES",
+              "f": "$.NORMALISE_FACTS",
+              "p": "$.COMBINE_ITPI_PREMIUM",
+              "cat": "$.static.rule_catalogue",
+              "seq": "$.MINT_DECISION_SEQ",
+              "validityDays": "$.static.quote_validity_days",
+              "incompleteBrokerText": "$.static.incomplete_broker_text",
+              "manualBrokerText": "$.static.manual_broker_text"
+            }
+          },
+          "name": "Decide (DECLINE > REFER > ACCEPT)"
+        }
+      },
+      {
+        "id": "CREATE_DECISION",
+        "data": {
+          "id": "CREATE_DECISION",
+          "node_type": "http",
+          "payload": {
+            "url": "https://api.microstrate.io/records/decision_config",
+            "method": "POST",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token",
+              "Content-Type": "application/json"
+            },
+            "data": {
+              "data": "$.DECIDE.decision_record",
+              "space_id": "ANTIPODEAN",
+              "folder": "$.NORMALISE_FACTS.meta_submission_id"
+            }
+          },
+          "name": "Write decision"
+        }
+      },
+      {
+        "id": "OUTCOME",
+        "data": {
+          "id": "OUTCOME",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.DECIDE.outcome",
+                  "REFER"
+                ]
+              },
+              "outcome": "RAISE_REFERRAL_TASK"
+            },
+            {
+              "outcome": "RESOLVE_SUCCESS"
+            }
+          ],
+          "name": "Outcome"
+        }
+      },
+      {
+        "id": "RAISE_REFERRAL_TASK",
+        "data": {
+          "id": "RAISE_REFERRAL_TASK",
+          "node_type": "quiva-endpoint",
+          "payload": {
+            "title": "Underwriting Review — |$.NORMALISE_FACTS.meta_policyholder_name",
+            "space_id": "ANTIPODEAN",
+            "status": "open",
+            "priority": "high",
+            "tags": [
+              "referral"
+            ],
+            "folder": "$.NORMALISE_FACTS.meta_task_folder",
+            "description": "Referral raised by flow 1 (underwriting-evaluate).\n\nDecision record: |$.CREATE_DECISION.data.id|\nSubmission: |$.NORMALISE_FACTS.meta_submission_id|\nOutcome: |$.DECIDE.outcome|\n\nReferral reasons (underwriter):\n|$.DECIDE.underwriter_reasons|\n\nMove this task to Approved or Declined; flow 11 (referral-decide) reads that move.",
+            "source": "$.CREATE_DECISION.data.id",
+            "source_detail": "decision_config",
+            "metadata": {
+              "decision_id": "$.CREATE_DECISION.data.id",
+              "broker_id": "$.NORMALISE_FACTS.meta_task_folder",
+              "submission_id": "$.NORMALISE_FACTS.meta_submission_id",
+              "quote_id": "$.NORMALISE_FACTS.meta_quote_id"
+            }
+          },
+          "name": "Raise referral task",
+          "subject": "microstrate.workspaces.post.task"
+        }
+      },
+      {
+        "id": "EXPIRY_GATE",
+        "data": {
+          "id": "EXPIRY_GATE",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.DECIDE.schedules_expiry",
+                  true
+                ]
+              },
+              "outcome": "SCHEDULE_EXPIRY"
+            },
+            {
+              "outcome": "RESOLVE_SUCCESS"
+            }
+          ],
+          "name": "Does this quote expire?"
+        }
+      },
+      {
+        "id": "SCHEDULE_EXPIRY",
+        "data": {
+          "id": "SCHEDULE_EXPIRY",
+          "node_type": "quiva-endpoint",
+          "payload": {
+            "name": "$.DECIDE.expire_timer_name",
+            "description": "Lapse this quote when its validity window closes",
+            "trigger_on": "$.DECIDE.quote_validity_expiry",
+            "payload": {
+              "subject": "$.static.quote_expiry_flow_subject",
+              "trigger": {
+                "quote_id": "$.NORMALISE_FACTS.meta_quote_id",
+                "concern": "$.static.quote_expire_concern",
+                "decision_id": "$.CREATE_DECISION.data.id"
+              }
+            }
+          },
+          "name": "Schedule quote-expire (quote_validity_expiry)",
+          "subject": "microstrate.hub.post.schedule-flow"
+        }
+      },
+      {
+        "id": "READ_EXPIRY_TOPIC",
+        "data": {
+          "id": "READ_EXPIRY_TOPIC",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function () {\n  // ASSERT-2a: the schedule's returned Topic is the ONLY string\n  // microstrate.hub.delete.unschedule-flow accepts. Deriving it locally is a\n  // repair tool for flow 13, never the contract -- so if the schedule came back\n  // without one the timer is uncancellable and that is worth failing loudly for,\n  // not storing an empty string that reads as \"deliberately not scheduled\".\n  function topicOf(resp) {\n    if (!resp || typeof resp !== 'object') return '';\n    if (typeof resp.topic === 'string') return resp.topic;\n    if (resp.data && typeof resp.data.topic === 'string') return resp.data.topic;\n    if (resp.results && resp.results.length && resp.results[0].topic) return resp.results[0].topic;\n    return '';\n  }\n  var t = topicOf(sched);\n  if (!t) {\n    throw new Error('underwriting-evaluate: the quote-expire schedule returned no topic - the timer would be uncancellable at bind');\n  }\n  return { quote_expire_timer_topic: t, expires_on: String(when || '') };\n})();",
+            "params": {
+              "sched": "$.SCHEDULE_EXPIRY",
+              "when": "$.DECIDE.quote_validity_expiry"
+            }
+          },
+          "name": "ASSERT-2a: keep the returned topic"
+        }
+      },
+      {
+        "id": "STAMP_EXPIRY_TOPIC",
+        "data": {
+          "id": "STAMP_EXPIRY_TOPIC",
+          "node_type": "http",
+          "payload": {
+            "url": "https://api.microstrate.io/records/decision_config/|$.CREATE_DECISION.data.id",
+            "method": "PUT",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token",
+              "Content-Type": "application/json"
+            },
+            "data": {
+              "data": {
+                "quote_expire_timer_topic": "$.READ_EXPIRY_TOPIC.quote_expire_timer_topic"
+              }
+            }
+          },
+          "name": "Stamp the topic on the decision"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "TRIGGER_SUBMIT-LOAD_SUBMISSION",
+        "source": "TRIGGER_SUBMIT",
+        "target": "LOAD_SUBMISSION",
+        "sourceHandle": "TRIGGER_SUBMIT",
+        "targetHandle": "LOAD_SUBMISSION",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "LOAD_SUBMISSION-NORMALISE_FACTS",
+        "source": "LOAD_SUBMISSION",
+        "target": "NORMALISE_FACTS",
+        "sourceHandle": "LOAD_SUBMISSION",
+        "targetHandle": "NORMALISE_FACTS",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "NORMALISE_FACTS-LOAD_OCCUPATION",
+        "source": "NORMALISE_FACTS",
+        "target": "LOAD_OCCUPATION",
+        "sourceHandle": "NORMALISE_FACTS",
+        "targetHandle": "LOAD_OCCUPATION",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "NORMALISE_FACTS-UW_RULES",
+        "source": "NORMALISE_FACTS",
+        "target": "UW_RULES",
+        "sourceHandle": "NORMALISE_FACTS",
+        "targetHandle": "UW_RULES",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "LOAD_OCCUPATION-COMBINE_ITPI_PREMIUM",
+        "source": "LOAD_OCCUPATION",
+        "target": "COMBINE_ITPI_PREMIUM",
+        "sourceHandle": "LOAD_OCCUPATION",
+        "targetHandle": "COMBINE_ITPI_PREMIUM",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "RATE_HAZARD-COMBINE_ITPI_PREMIUM",
+        "source": "RATE_HAZARD",
+        "target": "COMBINE_ITPI_PREMIUM",
+        "sourceHandle": "RATE_HAZARD",
+        "targetHandle": "COMBINE_ITPI_PREMIUM",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "RATE_SIZE-COMBINE_ITPI_PREMIUM",
+        "source": "RATE_SIZE",
+        "target": "COMBINE_ITPI_PREMIUM",
+        "sourceHandle": "RATE_SIZE",
+        "targetHandle": "COMBINE_ITPI_PREMIUM",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "RATE_EXCESS-COMBINE_ITPI_PREMIUM",
+        "source": "RATE_EXCESS",
+        "target": "COMBINE_ITPI_PREMIUM",
+        "sourceHandle": "RATE_EXCESS",
+        "targetHandle": "COMBINE_ITPI_PREMIUM",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "UW_RULES-DECIDE",
+        "source": "UW_RULES",
+        "target": "DECIDE",
+        "sourceHandle": "UW_RULES",
+        "targetHandle": "DECIDE",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "COMBINE_ITPI_PREMIUM-DECIDE",
+        "source": "COMBINE_ITPI_PREMIUM",
+        "target": "DECIDE",
+        "sourceHandle": "COMBINE_ITPI_PREMIUM",
+        "targetHandle": "DECIDE",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "MINT_DECISION_SEQ-DECIDE",
+        "source": "MINT_DECISION_SEQ",
+        "target": "DECIDE",
+        "sourceHandle": "MINT_DECISION_SEQ",
+        "targetHandle": "DECIDE",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "DECIDE-CREATE_DECISION",
+        "source": "DECIDE",
+        "target": "CREATE_DECISION",
+        "sourceHandle": "DECIDE",
+        "targetHandle": "CREATE_DECISION",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "CREATE_DECISION-OUTCOME",
+        "source": "CREATE_DECISION",
+        "target": "OUTCOME",
+        "sourceHandle": "CREATE_DECISION",
+        "targetHandle": "OUTCOME",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "OUTCOME-RAISE_REFERRAL_TASK",
+        "source": "OUTCOME",
+        "target": "RAISE_REFERRAL_TASK",
+        "sourceHandle": "OUTCOME",
+        "targetHandle": "RAISE_REFERRAL_TASK",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "CREATE_DECISION-EXPIRY_GATE",
+        "source": "CREATE_DECISION",
+        "target": "EXPIRY_GATE",
+        "sourceHandle": "CREATE_DECISION",
+        "targetHandle": "EXPIRY_GATE",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "EXPIRY_GATE-SCHEDULE_EXPIRY",
+        "source": "EXPIRY_GATE",
+        "target": "SCHEDULE_EXPIRY",
+        "sourceHandle": "EXPIRY_GATE",
+        "targetHandle": "SCHEDULE_EXPIRY",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "SCHEDULE_EXPIRY-READ_EXPIRY_TOPIC",
+        "source": "SCHEDULE_EXPIRY",
+        "target": "READ_EXPIRY_TOPIC",
+        "sourceHandle": "SCHEDULE_EXPIRY",
+        "targetHandle": "READ_EXPIRY_TOPIC",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "READ_EXPIRY_TOPIC-STAMP_EXPIRY_TOPIC",
+        "source": "READ_EXPIRY_TOPIC",
+        "target": "STAMP_EXPIRY_TOPIC",
+        "sourceHandle": "READ_EXPIRY_TOPIC",
+        "targetHandle": "STAMP_EXPIRY_TOPIC",
+        "type": "custom",
+        "edgeType": "custom"
+      }
+    ]
+  }
+}

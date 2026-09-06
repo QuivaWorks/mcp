@@ -1,0 +1,291 @@
+{
+  "name": "ais-referral-research",
+  "description": "Background research on the insured/builder for a referred AIS quote. Started by a RECORD trigger on cip_referral_submission \u2014 ais-referral-intake creates that record LAST with completed:true, which is what fires this. Node id uses a colon (record:cip_referral_submission) so it stays one subject token. Uses an agent with bit://web_search, writes a cip_business_research record, copies the headline onto the decision record so the underwriter reads one screen, comments on the task and moves it to In Review.",
+  "config": {
+    "static": {
+      "spaceId": "CIP_REFERRALS",
+      "quivaApiRoot": "https://api.microstrate.io"
+    },
+    "nodes": [
+      {
+        "id": "record:cip_referral_submission",
+        "data": {
+          "id": "record:cip_referral_submission",
+          "name": "On referral submission record",
+          "node_type": "trigger",
+          "trigger_type": "record",
+          "payload": {
+            "record_config_id": "cip_referral_submission",
+            "event_type": [
+              "record-created"
+            ]
+          }
+        }
+      },
+      {
+        "id": "GATE",
+        "data": {
+          "id": "GATE",
+          "name": "Require a task to report back to",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": "and",
+                "input": [
+                  {
+                    "operator": "notEmpty",
+                    "input": [
+                      "$.trigger.data.topic_prefix"
+                    ]
+                  },
+                  {
+                    "operator": "notEmpty",
+                    "input": [
+                      "$.trigger.data.task_id"
+                    ]
+                  }
+                ]
+              },
+              "outcome": "RESEARCH"
+            },
+            {
+              "outcome": "RESOLVE_SUCCESS"
+            }
+          ]
+        }
+      },
+      {
+        "id": "RESEARCH",
+        "data": {
+          "id": "RESEARCH",
+          "name": "Research the business",
+          "node_type": "agent",
+          "payload": {
+            "agent": {
+              "name": "ais-referral-researcher",
+              "llm_provider": "claude",
+              "model": "claude-opus-5",
+              "behaviour": "You research small-to-mid construction businesses for a US builders-risk underwriter. Use web search to establish whether the business is real, currently trading, and how it is regarded by customers. Report only what you can support from sources you actually found, and cite them. If you cannot find a business, say so plainly and set research_status to 'failed' rather than guessing \u2014 a confident answer about the wrong company is worse than no answer. Never infer a licence number, a rating or a review count you did not see; leave those empty. Keep the summary to a short markdown brief an underwriter can read in under a minute, focused on what bears on insurability: how long they have traded, the type and scale of work, and anything that would concern an underwriter. Web search returns result snippets and links; page fetching is often blocked, so work from what search actually returns and say so plainly when you could not read a source, rather than inferring.",
+              "has_tools": true,
+              "tools": [
+                "bit://web_search"
+              ],
+              "output_schema": {
+                "business_name": "the business name you actually researched, as found",
+                "research_status": "one of complete, partial, failed",
+                "confidence": "one of low, medium, high \u2014 how sure you are this is the right business",
+                "summary": "short markdown brief for the underwriter",
+                "website": "official website URL, or empty",
+                "trading_status": "e.g. active, dissolved, unknown",
+                "years_in_business": "number of years, or 0 if unknown",
+                "registration_number": "contractor licence or registration number, or empty",
+                "google_rating": "average customer rating out of 5, or 0 if not found",
+                "google_review_count": "number of customer reviews, or 0 if not found",
+                "review_themes": "array of short recurring themes from customer reviews",
+                "red_flags": "array of short strings an underwriter should be aware of; empty array if none",
+                "sources": "array of objects with title, url and note"
+              },
+              "timeout": 270
+            },
+            "prompt": "Research this business for a builders-risk referral.\n\nBusiness (builder): |$.trigger.data.builder_name|\nInsured name: |$.trigger.data.insured_name|\nRisk address: |$.trigger.data.risk_address|\nProject type: |$.trigger.data.project_type|\n\nUse the risk address to disambiguate between similarly named businesses. Return the structured fields.",
+            "await": true
+          }
+        }
+      },
+      {
+        "id": "PARSE",
+        "data": {
+          "id": "PARSE",
+          "name": "Unwrap the fenced JSON result",
+          "node_type": "eval",
+          "payload": {
+            "params": {
+              "r": "$.RESEARCH.result",
+              "tp": "$.trigger.data.topic_prefix",
+              "events": "$.RESEARCH.events"
+            },
+            "code": "(() => { const pick = () => { if (String(r || '').trim()) return String(r); const ev = Array.isArray(events) ? events : []; for (let i = ev.length - 1; i >= 0; i--) { const chs = (ev[i] && ev[i].choices) || []; for (let j = chs.length - 1; j >= 0; j--) { const m = chs[j] && chs[j].message; if (m && m.role === 'assistant' && typeof m.content === 'string' && m.content.trim()) return m.content; } } return ''; }; const raw = pick(); let o = {}; if (!raw) { o = { research_status: 'failed', research_error: 'the agent returned no text (empty result and no assistant message in events)' }; } else try { const m = String(raw).match(/\\{[\\s\\S]*\\}/); o = m ? JSON.parse(m[0]) : {}; } catch (e) { o = { research_status: 'failed', research_error: 'could not parse agent output: ' + e.message }; } const arr = v => Array.isArray(v) ? v.map(x => String(x == null ? '' : x)).filter(Boolean) : (v ? [String(v)] : []); const srcs = v => (Array.isArray(v) ? v : []).map(x => (x && typeof x === 'object') ? { title: String(x.title || ''), url: String(x.url || ''), note: String(x.note || '') } : { title: '', url: String(x == null ? '' : x), note: '' }).filter(x => x.url || x.title); const num = v => { const x = Number(v); return isFinite(x) ? x : 0; }; const status = ['complete','partial','failed'].indexOf(o.research_status) > -1 ? o.research_status : 'partial'; const conf = ['low','medium','high'].indexOf(o.confidence) > -1 ? o.confidence : 'low'; const flags = arr(o.red_flags); const research = { topic_prefix: String(tp||''), business_name: String(o.business_name||''), research_status: status, confidence: conf, summary: String(o.summary||''), website: String(o.website||''), trading_status: String(o.trading_status||''), years_in_business: num(o.years_in_business), registration_number: String(o.registration_number||''), google_rating: num(o.google_rating), google_review_count: num(o.google_review_count), review_themes: arr(o.review_themes), red_flags: flags, sources: srcs(o.sources), research_error: String(o.research_error||''), researched_at: new Date().toISOString() }; const flagLine = flags.length ? '\\n\\n**Red flags:** ' + flags.join('; ') : ''; const comment = '**Business research complete** (' + status + ', confidence ' + conf + ')\\n\\n' + String(o.summary||'_No summary returned._') + flagLine; return { research, summary: research.summary, confidence: conf, redFlags: flags, comment }; })()"
+          }
+        }
+      },
+      {
+        "id": "WRITE_RESEARCH",
+        "data": {
+          "id": "WRITE_RESEARCH",
+          "name": "Store the research record",
+          "node_type": "http",
+          "payload": {
+            "url": "$.static.quivaApiRoot|/records/cip_business_research",
+            "method": "post",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "space_id": "$.static.spaceId",
+              "data": "$.PARSE.research",
+              "folder": "$.trigger.data.builder_folder"
+            }
+          }
+        }
+      },
+      {
+        "id": "UPDATE_DECISION",
+        "data": {
+          "id": "UPDATE_DECISION",
+          "name": "Show the research on the decision form",
+          "node_type": "http",
+          "payload": {
+            "url": "$.static.quivaApiRoot|/records/cip_referral_decision/|$.trigger.data.decision_id",
+            "method": "put",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "data": {
+                "research_summary": "$.PARSE.summary",
+                "research_confidence": "$.PARSE.confidence",
+                "research_red_flags": "$.PARSE.redFlags"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "COMMENT",
+        "data": {
+          "id": "COMMENT",
+          "name": "Post the research to the task",
+          "node_type": "task",
+          "operation": "comment_task",
+          "payload": {
+            "space_id": "$.static.spaceId",
+            "task_id": "$.trigger.data.task_id",
+            "body": "$.PARSE.comment"
+          }
+        }
+      },
+      {
+        "id": "FIND_SELF",
+        "data": {
+          "id": "FIND_SELF",
+          "name": "Re-read the task before moving it",
+          "node_type": "task",
+          "operation": "list_tasks",
+          "payload": {
+            "space_id": "$.static.spaceId",
+            "source": "$.trigger.data.topic_prefix",
+            "limit": 50
+          }
+        }
+      },
+      {
+        "id": "CHECK_STATUS",
+        "data": {
+          "id": "CHECK_STATUS",
+          "name": "Is it still researching?",
+          "node_type": "eval",
+          "payload": {
+            "params": {
+              "r": "$.FIND_SELF",
+              "src": "$.trigger.data.topic_prefix"
+            },
+            "code": "(() => { const cands = [r, r && r.body, r && r.data, r && r.result, r && r.body && r.body.data]; let rows = null; for (const c of cands) { if (!c) continue; if (Array.isArray(c)) { rows = c; break; } if (Array.isArray(c.results)) { rows = c.results; break; } if (Array.isArray(c.tasks)) { rows = c.tasks; break; } } const mine = (rows||[]).filter(t => t && String(t.source||'') === String(src||'')); const status = mine.length ? String(mine[0].status||'') : ''; return { status, stillResearching: status === 'researching' || status === 'open' }; })()"
+          }
+        }
+      },
+      {
+        "id": "GATE_STATUS",
+        "data": {
+          "id": "GATE_STATUS",
+          "name": "Do not overwrite a decision",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.CHECK_STATUS.stillResearching",
+                  true
+                ]
+              },
+              "outcome": "SET_STATUS"
+            },
+            {
+              "outcome": "RESOLVE_SUCCESS"
+            }
+          ]
+        }
+      },
+      {
+        "id": "SET_STATUS",
+        "data": {
+          "id": "SET_STATUS",
+          "name": "Hand it to the underwriter",
+          "node_type": "task",
+          "operation": "set_task_status",
+          "payload": {
+            "space_id": "$.static.spaceId",
+            "task_id": "$.trigger.data.task_id",
+            "status": "in_review"
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "source": "record:cip_referral_submission",
+        "target": "GATE"
+      },
+      {
+        "id": "e2",
+        "source": "GATE",
+        "target": "RESEARCH"
+      },
+      {
+        "id": "e3",
+        "source": "RESEARCH",
+        "target": "PARSE"
+      },
+      {
+        "id": "e4",
+        "source": "PARSE",
+        "target": "WRITE_RESEARCH"
+      },
+      {
+        "id": "e5",
+        "source": "WRITE_RESEARCH",
+        "target": "UPDATE_DECISION"
+      },
+      {
+        "id": "e6",
+        "source": "UPDATE_DECISION",
+        "target": "COMMENT"
+      },
+      {
+        "id": "e8",
+        "source": "COMMENT",
+        "target": "FIND_SELF"
+      },
+      {
+        "id": "e9",
+        "source": "FIND_SELF",
+        "target": "CHECK_STATUS"
+      },
+      {
+        "id": "e10",
+        "source": "CHECK_STATUS",
+        "target": "GATE_STATUS"
+      },
+      {
+        "id": "e11",
+        "source": "GATE_STATUS",
+        "target": "SET_STATUS"
+      }
+    ],
+    "result": "$.PARSE.research"
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "slug": "agent-unknown-knowledge-scheme",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "subject": "ms.hub.config.agent.6acaee31-4400-3d21-af28-66971fc2b1aa",
+    "path_id": "6acaee31-4400-3d21-af28-66971fc2b1aa",
+    "name": "Alex Agent_",
+    "harvested_from": "GET /hub/agent"
+  },
+  "teaches": [
+    "a knowledge URI scheme the MCP does not list — evidence the documented scheme set is incomplete"
+  ],
+  "facts": [
+    "llm_provider \"claude\" / model \"claude-opus-4-5\"",
+    "shared: \"\"",
+    "5 tool URI(s)",
+    "6 knowledge URI(s)",
+    "llm_config: {\"temperature\":0.7,\"max_tokens\":64000,\"max_turns\":6}"
+  ],
+  "config": {
+    "name": "Alex Agent_",
+    "description": "some description",
+    "behaviour": "```\n// api.types.ts\nexport interface ApiResponse<T> {\n  data: T;\n  errorCode?: string;\n  message?: string;\n}\n\n\n```\n\nrecord_config_id:escalation_request\n\nspace_id:QUIVA ",
+    "llm_provider": "claude",
+    "model": "claude-opus-4-5",
+    "has_tools": true,
+    "knowledge": [
+      "obj://microstrate-agent-knowledge/_3gPep.text_u00281u0029_copy_2.txt",
+      "uri://https://example-files.online-convert.com/document/txt/example.txt",
+      "obj://microstrate-agent-knowledge/EqDZxjtest.md",
+      "obj://microstrate-agent-knowledge/8jpDcWmanual-knowledge.md",
+      "obj://microstrate-agent-knowledge/cnx6yi.upload.type.ts",
+      "obj://microstrate-agent-knowledge/_z6D21.webp"
+    ],
+    "tools": [
+      "mcp://google-tasks",
+      "mcp://quiva-storage-object-store",
+      "mcp://collation-microservice",
+      "mcp://stripe-prices",
+      "mcp://evari-question-service"
+    ],
+    "timeout": 300,
+    "context_limit": 50000,
+    "message_history_limit": 200,
+    "prompt": null,
+    "llm_config": {
+      "temperature": 0.7,
+      "max_tokens": 64000,
+      "max_turns": 6
+    },
+    "ai_smart_context": true,
+    "ai_summary_threshold": 0.7,
+    "ai_summary_model": "claude-3-5-sonnet-20241022",
+    "preserve_most_recent": 5,
+    "ai_prompt": false,
+    "instructions": [
+      "Some Criteria",
+      ""
+    ],
+    "context_variables": {
+      "account_name": "evari"
+    },
+    "mcp_base_urls": {
+      "collation-microservice": "https://api.clientconnect.evari.tech",
+      "evari-question-service": "https://api.{env}.evari.tech",
+      "google-tasks": "https://tasks.googleapis.com",
+      "quiva-storage-object-store": "my-custom-rul",
+      "stripe-prices": "https://api.stripe.com/v1"
+    },
+    "auth": "<<REDACTED — provide your own credential>>",
+    "api_key": "CLAUDE_API_KEY",
+    "await": true,
+    "id": "2LcGx67Sz0DR-CCvJpzkq",
+    "agent_template_subject": "ms.hub.config.agent.6acaee31-4400-3d21-af28-66971fc2b1aa",
+    "appearance": {
+      "avatar": true,
+      "color": "#ff7b00"
+    },
+    "api_key_source": "system",
+    "shared": "",
+    "owner": "",
+    "chat": {
+      "welcomeMessage": [
+        "What would you like to discuss today?",
+        "How can I help you today?",
+        "Hello! What's on your mind?",
+        "Hi! Feel free to ask me anything.",
+        "What would you like to explore today?"
+      ]
+    },
+    "global_instructions": false,
+    "global_knowledge": false
+  }
+}

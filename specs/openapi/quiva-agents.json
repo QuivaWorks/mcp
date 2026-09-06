@@ -1,0 +1,1534 @@
+{
+    "name": "Quiva Agents",
+    "schema": {
+        "openapi": "3.0.0",
+        "info": {
+            "title": "Quiva Agents API",
+            "x-gateway-name": "API Gateway",
+            "description": "API for managing Quiva Agents. Every endpoint requires a Bearer JWT — the service derives the user/account from token claims; an API key alone is resolved by the gateway but is insufficient for these handlers. Corrected against the hub-service engine (see per-field notes).",
+            "version": "0.1.1",
+            "contact": {
+                "name": "quiva.ai Support"
+            }
+        },
+        "servers": [
+            {
+                "url": "https://api.quiva.ai",
+                "description": "Production API server"
+            },
+            {
+                "url": "https://api.microstrate.io",
+                "description": "Staging API server"
+            }
+        ],
+        "security": [
+            {
+                "bearerAuth": []
+            },
+            {
+                "apiKeyAuth": []
+            }
+        ],
+        "paths": {
+            "/hub/agent/cancel": {
+                "post": {
+                    "operationId": "cancelAgents",
+                    "summary": "Cancel agents",
+                    "description": "Cancels one or more agents that were registered with the cancel_token. Use this to terminate running agent executions gracefully.",
+                    "tags": [
+                        "Agents"
+                    ],
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentCancelRequest"
+                                },
+                                "example": {
+                                    "cancel_token": "my-session-token-123"
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Agents cancelled successfully.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/CancelResponse"
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "description": "Bad request - check that cancel_token is provided and valid.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    }
+                                }
+                            }
+                        },
+                        "401": {
+                            "description": "Unauthorized - provide valid authentication credentials."
+                        },
+                        "500": {
+                            "description": "Server error - the cancellation request could not be processed."
+                        }
+                    },
+                    "x-resource": "microstrate.hub.post.cancel-agents",
+                    "x-resource-type": "service"
+                }
+            },
+            "/hub/agent/invoke": {
+                "post": {
+                    "operationId": "invokeAgent",
+                    "summary": "Invoke an AI agent",
+                    "description": "Invokes an AI agent with specified configuration and prompt. Use this to execute agents with inline definitions or reference pre-configured agents by agent subject.",
+                    "tags": [
+                        "Agents"
+                    ],
+                    "parameters": [
+                        {
+                            "name": "x-cancel-id",
+                            "in": "query",
+                            "required": false,
+                            "schema": {
+                                "type": "string"
+                            },
+                            "description": "Cancel identifier for this agent invocation. NOTE: hub-service does NOT read this query param (nor the request-body cancel_token) — cancellation is an agent-service concern reached via POST /hub/agent/cancel. Kept for gateway/agent-service compatibility.",
+                            "example": "cancel-abc123"
+                        }
+                    ],
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentAgentInvokeRequest"
+                                },
+                                "examples": {
+                                    "withAgentConfig": {
+                                        "summary": "Invoke agent with inline definition",
+                                        "value": {
+                                            "agent": {
+                                                "name": "data-analyzer",
+                                                "description": "Analyzes data patterns",
+                                                "behaviour": "You are a data analysis expert",
+                                                "llm_provider": "claude",
+                                                "model": "claude-haiku-4-5",
+                                                "has_tools": false
+                                            },
+                                            "prompt": "Analyze sales trends",
+                                            "visibility": "team"
+                                        }
+                                    },
+                                    "withAgentSubject": {
+                                        "summary": "Invoke agent by agent subject",
+                                        "value": {
+                                            "subject": "ms.hub.config.agent.805092869.agent123",
+                                            "prompt": "Analyze this data",
+                                            "session_id": "session_abc123",
+                                            "visibility": "user"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Agent invoked successfully.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/AgentInvokeResponse"
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "description": "Bad request - check that prompt is provided and either agent or agent_subject is specified."
+                        },
+                        "401": {
+                            "description": "Unauthorized - provide valid authentication credentials."
+                        },
+                        "429": {
+                            "description": "Rate limit exceeded - wait before retrying."
+                        },
+                        "500": {
+                            "description": "Server error - the agent invocation could not be processed."
+                        }
+                    },
+                    "x-resource": "microstrate.hub.post.invoke-agent",
+                    "x-resource-type": "service"
+                }
+            },
+            "/hub/agent": {
+                "post": {
+                    "tags": [
+                        "Agents"
+                    ],
+                    "summary": "Create a new agent",
+                    "description": "Creates a new agent template",
+                    "operationId": "createAgent",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.hub.post.agent",
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreateAgentRequest"
+                                },
+                                "examples": {
+                                    "Agent": {
+                                        "summary": "Create an agent (body is wrapped in `config`)",
+                                        "value": {
+                                            "config": {
+                                                "id": "EMAIL_DRAFT",
+                                                "name": "Email Draft",
+                                                "description": "Draft a reply to my email",
+                                                "behaviour": "Draft a concise reply to the email.",
+                                                "llm_provider": "claude",
+                                                "model": "claude-haiku-4-5",
+                                                "has_tools": false,
+                                                "shared": "private"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Agent created successfully",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/CreateAgentResponse"
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "description": "Bad request",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    }
+                                }
+                            }
+                        },
+                        "404": {
+                            "description": "Resource not found",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    }
+                                }
+                            }
+                        },
+                        "409": {
+                            "description": "Agent already exists",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "get": {
+                    "tags": [
+                        "Agents"
+                    ],
+                    "summary": "List agent templates",
+                    "description": "Retrieves a list of agents",
+                    "operationId": "listAgentTemplates",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.hub.get.list-agents",
+                    "responses": {
+                        "200": {
+                            "description": "Agents retrieved successfully",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ListAgentsResponse"
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "description": "Bad request",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    },
+                                    "example": {
+                                        "error": "invalid request"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "/hub/agent/{id}": {
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/agentID"
+                    }
+                ],
+                "get": {
+                    "tags": [
+                        "Agents"
+                    ],
+                    "summary": "Get a agent",
+                    "description": "Retrieves a specific agent by subject",
+                    "operationId": "getAgent",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.hub.get.agent",
+                    "responses": {
+                        "200": {
+                            "description": "Agent retrieved successfully",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/GetAgentResponse"
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "description": "Bad request",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    },
+                                    "examples": {
+                                        "InvalidSubject": {
+                                            "value": {
+                                                "error": "invalid subject"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "put": {
+                    "tags": [
+                        "Agents"
+                    ],
+                    "summary": "Update a agent",
+                    "description": "Updates an existing agent agent's properties",
+                    "operationId": "updateAgent",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.hub.put.agent",
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UpdateAgentRequest"
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Agent updated successfully",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/SuccessResponse"
+                                    },
+                                    "example": {
+                                        "message": "success"
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "description": "Bad request",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    },
+                                    "examples": {
+                                        "InvalidBody": {
+                                            "value": {
+                                                "error": "invalid request body"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "404": {
+                            "description": "Resource not found",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    },
+                                    "examples": {
+                                        "AgentNotFound": {
+                                            "value": {
+                                                "error": "agent not found:ms.hub.config.agent.<uuid>"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "delete": {
+                    "tags": [
+                        "Agents"
+                    ],
+                    "summary": "Delete an agent",
+                    "description": "Deletes an agent by {id} (or subject in the body). Genuinely removes it — a second delete returns 404 and it disappears from the list — but a subsequent GET returns a hollow config rather than 404 (see GetAgentResponse).",
+                    "operationId": "deleteAgent",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.hub.delete.agent",
+                    "responses": {
+                        "200": {
+                            "description": "Agent deleted successfully",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/SuccessResponse"
+                                    },
+                                    "example": {
+                                        "message": "success"
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "description": "Bad request",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/ErrorResponse"
+                                    },
+                                    "examples": {
+                                        "InvalidSubject": {
+                                            "value": {
+                                                "error": "invalid subject"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "components": {
+            "schemas": {
+                "CreateAgentRequest": {
+                    "type": "object",
+                    "properties": {
+                        "config": {
+                            "$ref": "#/components/schemas/AgentConfig"
+                        }
+                    }
+                },
+                "UpdateAgentRequest": {
+                    "type": "object",
+                    "required": [
+                        "config"
+                    ],
+                    "properties": {
+                        "subject": {
+                            "type": "string",
+                            "description": "Optional — the full agent subject. When omitted, the {id} path param identifies the agent. Update is a PUT that REPLACES the config (only owner/shared are carried over from the prior version), so send a complete config."
+                        },
+                        "config": {
+                            "$ref": "#/components/schemas/AgentConfig"
+                        }
+                    }
+                },
+                "CreateAgentResponse": {
+                    "type": "object",
+                    "properties": {
+                        "subject": {
+                            "type": "string",
+                            "readOnly": true,
+                            "description": "Server-generated identifier: ms.hub.config.agent.<uuid>, where <uuid> is an MD5 hash of the submitted config. Any subject/id you send is ignored. Re-creating an identical config returns 409 \"agent exists:<subject>\"."
+                        },
+                        "config": {
+                            "$ref": "#/components/schemas/AgentConfig"
+                        },
+                        "modified": {
+                            "$ref": "#/components/schemas/Modified"
+                        }
+                    }
+                },
+                "GetAgentResponse": {
+                    "type": "object",
+                    "description": "NOTE: a deleted or never-existed subject does NOT return 404 — hub-service returns a hollow config with all-empty fields (name/llm_provider/model/owner = \"\"). Treat an all-empty config as \"not found\"; use GET /hub/agent (list) to confirm existence. Likely an engine bug.",
+                    "properties": {
+                        "subject": {
+                            "type": "string",
+                            "description": "Subject identifier for the agent"
+                        },
+                        "config": {
+                            "$ref": "#/components/schemas/AgentConfig"
+                        },
+                        "modified": {
+                            "$ref": "#/components/schemas/Modified"
+                        }
+                    }
+                },
+                "Modified": {
+                    "type": "integer",
+                    "description": "Timestamp of last modification"
+                },
+                "ErrorResponse": {
+                    "type": "object",
+                    "properties": {
+                        "error": {
+                            "type": "string",
+                            "description": "Error message"
+                        }
+                    }
+                },
+                "ListAgentsResponse": {
+                    "type": "object",
+                    "properties": {
+                        "results": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "subject": {
+                                        "type": "string",
+                                        "description": "Subject identifier for the agent"
+                                    },
+                                    "config": {
+                                        "$ref": "#/components/schemas/AgentConfig"
+                                    },
+                                    "modified": {
+                                        "$ref": "#/components/schemas/Modified"
+                                    }
+                                }
+                            }
+                        },
+                        "results_total": {
+                            "type": "integer",
+                            "description": "Total number of results"
+                        }
+                    }
+                },
+                "SuccessResponse": {
+                    "type": "object",
+                    "properties": {
+                        "message": {
+                            "type": "string",
+                            "description": "Success message"
+                        }
+                    }
+                },
+                "AgentCancelRequest": {
+                    "type": "object",
+                    "required": [
+                        "cancel_token"
+                    ],
+                    "properties": {
+                        "cancel_token": {
+                            "type": "string",
+                            "description": "Token identifying agent(s) to cancel.",
+                            "example": "my-session-token-123"
+                        }
+                    }
+                },
+                "CancelResponse": {
+                    "type": "object",
+                    "properties": {
+                        "success": {
+                            "type": "boolean",
+                            "description": "Whether the cancellation was successful."
+                        },
+                        "message": {
+                            "type": "string",
+                            "description": "Human-readable status message."
+                        },
+                        "cancelled_count": {
+                            "type": "integer",
+                            "description": "Number of agents cancelled."
+                        }
+                    }
+                },
+                "AgentAgentInvokeRequest": {
+                    "type": "object",
+                    "description": "Provide either `subject` (an existing agent) OR an inline `agent` definition — 400 if neither. `prompt` (string or object) is expected but not strictly enforced by the engine. The old example field `agent_subject` is NOT read — use `subject`.",
+                    "properties": {
+                        "agent": {
+                            "$ref": "#/components/schemas/AgentConfig",
+                            "description": "Inline agent definition - use this to define agent configuration directly in the request."
+                        },
+                        "subject": {
+                            "type": "string",
+                            "description": "Subject of agent agent to invoke - use this to reference a pre-configured agent.",
+                            "example": "ms.hub.config.agent.8f5568aa-c88c-32d7-adfb-8565d367fb24"
+                        },
+                        "prompt": {
+                            "oneOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "object"
+                                }
+                            ],
+                            "description": "The input prompt or query for the agent to process - can be string or structured object.",
+                            "example": "Analyze sales trends"
+                        },
+                        "session_id": {
+                            "type": "string",
+                            "description": "Session identifier for conversation continuity - omit for one-shot interactions.",
+                            "example": "session_abc123"
+                        },
+                        "cancel_token": {
+                            "type": "string",
+                            "description": "NOTE: not read by hub-service on invoke (agent-service concern). Cancel via POST /hub/agent/cancel.",
+                            "example": "my-session-token-123"
+                        },
+                        "visibility": {
+                            "type": "string",
+                            "enum": [
+                                "user",
+                                "team"
+                            ],
+                            "description": "Visibility level for the invocation (user: private, team: shared)."
+                        },
+                        "knowledge": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Additional knowledge sources for this specific invocation using URI schemes (kv://, obj://, str://, sid://, dta://)."
+                        },
+                        "response_subject": {
+                            "description": "Bellerophon subject for async response publishing."
+                        },
+                        "await": {
+                            "type": "boolean",
+                            "description": "Whether to wait for synchronous response (true) or return immediately (false)."
+                        },
+                        "folder": {
+                            "type": "string",
+                            "description": "Optional folder/space path to organise the resulting session."
+                        },
+                        "llm_provider": {
+                            "type": "string",
+                            "enum": [
+                                "claude",
+                                "anthropic"
+                            ],
+                            "description": "Override the provider for this invocation (requires model)."
+                        },
+                        "model": {
+                            "type": "string",
+                            "description": "Override the model for this invocation (requires llm_provider)."
+                        },
+                        "no_invoke": {
+                            "type": "boolean",
+                            "description": "If true, persist the message but do not run the agent."
+                        }
+                    }
+                },
+                "AgentInvokeResponse": {
+                    "type": "object",
+                    "required": [
+                        "name",
+                        "session_id",
+                        "success",
+                        "duration_ms",
+                        "provider",
+                        "model"
+                    ],
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Agent name from the request."
+                        },
+                        "session_id": {
+                            "type": "string",
+                            "description": "Session ID for conversation continuity."
+                        },
+                        "complete": {
+                            "type": "boolean",
+                            "description": "Whether the agent has completed its task (true) or requires more interaction (false)."
+                        },
+                        "escalate": {
+                            "type": "boolean",
+                            "description": "Whether the agent is requesting human intervention or admin escalation."
+                        },
+                        "success": {
+                            "type": "boolean",
+                            "description": "Whether the invocation succeeded."
+                        },
+                        "result": {
+                            "description": "Agent response - structured according to OutputSchema if defined, otherwise free-form string."
+                        },
+                        "thinking": {
+                            "type": "string",
+                            "description": "Model's reasoning or thought process extracted from the response."
+                        },
+                        "error": {
+                            "$ref": "#/components/schemas/ErrorInfo",
+                            "description": "Error details if success is false."
+                        },
+                        "warnings": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Non-fatal warnings from provisioning or execution."
+                        },
+                        "duration_ms": {
+                            "type": "integer",
+                            "description": "Total execution time in milliseconds."
+                        },
+                        "provider": {
+                            "type": "string",
+                            "description": "LLM provider used for this invocation."
+                        },
+                        "model": {
+                            "type": "string",
+                            "description": "Model identifier used for this invocation."
+                        },
+                        "input_tokens": {
+                            "type": "integer",
+                            "description": "Number of input tokens consumed."
+                        },
+                        "output_tokens": {
+                            "type": "integer",
+                            "description": "Number of output tokens generated."
+                        },
+                        "total_tokens": {
+                            "type": "integer",
+                            "description": "Total tokens used (input + output)."
+                        },
+                        "cost": {
+                            "type": "number",
+                            "format": "float",
+                            "description": "Estimated cost in USD for this invocation."
+                        },
+                        "summarization_status": {
+                            "type": "string",
+                            "enum": [
+                                "none",
+                                "pending",
+                                "completed"
+                            ],
+                            "description": "Status of conversation summarization."
+                        },
+                        "message_count": {
+                            "type": "integer",
+                            "description": "Total number of messages in the session conversation history."
+                        },
+                        "token_usage": {
+                            "type": "integer",
+                            "description": "Current conversation context usage in tokens."
+                        },
+                        "instruction_metadata": {
+                            "$ref": "#/components/schemas/InstructionMetadata",
+                            "description": "Metadata about instruction processing if instructions were provided."
+                        },
+                        "ai_summary_metadata": {
+                            "$ref": "#/components/schemas/AISummaryMetadata",
+                            "description": "Metadata about AI summarization if performed."
+                        }
+                    }
+                },
+                "AgentConfig": {
+                    "type": "object",
+                    "required": [
+                        "name",
+                        "llm_provider",
+                        "model",
+                        "behaviour"
+                    ],
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                            "description": "Optional human-facing label (alphanumeric, dashes, underscores). This is NOT the identifier and is not used for routing — the real identifier is the server-generated `subject`. The GET/PUT/DELETE path {id} is the uuid suffix of that subject, not this field.",
+                            "example": "EMAIL_DRAFT"
+                        },
+                        "name": {
+                            "type": "string",
+                            "description": "Human-readable agent name. (e.g., 'Knowledge Researcher' or 'Claude Chat'). If a name already exists, there is no need to update it unless the purpose of the agent has completely changed",
+                            "example": "Helper Agent"
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Agent description.Human-readable explanation of what the agent does and its purpose.",
+                            "example": "Analyzes data patterns"
+                        },
+                        "agent_type": {
+                            "type": "string",
+                            "enum": [
+                                "",
+                                "deep-research"
+                            ],
+                            "description": "Built-in agent type - empty for standard LLM agent, 'deep-research' for research workflow agent."
+                        },
+                        "behaviour": {
+                            "type": "string",
+                            "description": "System prompt defining agent behaviour - this may be augmented by internal prompts.",
+                            "example": "You are a data analysis expert"
+                        },
+                        "llm_provider": {
+                            "type": "string",
+                            "enum": [
+                                "claude",
+                                "anthropic"
+                            ],
+                            "description": "LLM service provider. invoke accepts only \"claude\" or \"anthropic\"; any other value returns 400 \"unsupported provider\"."
+                        },
+                        "model": {
+                            "type": "string",
+                            "default": "claude-haiku-4-5",
+                            "description": "Model identifier from available Claude models: claude-haiku-4-5 (default), claude-sonnet-4, claude-sonnet-4-5, claude-opus-4-5, claude-opus-4-1",
+                            "example": "claude-haiku-4-5"
+                        },
+                        "api_key": {
+                            "type": "string",
+                            "description": "Secret key for the LLM provider API key. If none is provided, a system key will be used. Only accounts with a TEAM subscription are allowed to use their own key. This property will be ignored for other subscription types and a system key will be used.",
+                            "example": "CLAUDE_API_KEY"
+                        },
+                        "output_schema": {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "description": "Response structure with field descriptions - helps the LLM understand expected output format."
+                        },
+                        "has_tools": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "Whether this agent has access to external tools/functions."
+                        },
+                        "knowledge": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Knowledge sources using URI schemes: kv://bucket/document, obj://bucket/document, str://stream/start/end, sid://session_id, dta://data"
+                        },
+                        "tools": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Available tools using URI schemes: mcp://integration, fun://function, bit://tool"
+                        },
+                        "tool_definitions": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/ToolDefinition"
+                            },
+                            "description": "Full tool definitions for dynamic registration from MCP or other sources."
+                        },
+                        "timeout": {
+                            "type": "integer",
+                            "default": 60000,
+                            "description": "Maximum request duration in milliseconds before timeout."
+                        },
+                        "context_limit": {
+                            "type": "integer",
+                            "default": 200000,
+                            "description": "Maximum conversation context in tokens managed by workforce."
+                        },
+                        "message_history_limit": {
+                            "type": "integer",
+                            "default": 2000,
+                            "description": "Number of historical messages to retain in conversation."
+                        },
+                        "smart_context": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "Enable intelligent context curation for token optimization."
+                        },
+                        "ai_smart_context": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "Enable AI-powered context summarization using Claude."
+                        },
+                        "ai_summary_threshold": {
+                            "type": "number",
+                            "format": "float",
+                            "minimum": 0.5,
+                            "maximum": 0.95,
+                            "default": 0.7,
+                            "description": "Trigger AI summarization when context reaches this capacity ratio (0.5-0.95)."
+                        },
+                        "ai_summary_model": {
+                            "type": "string",
+                            "default": "claude-haiku-4-5",
+                            "description": "Model to use for AI-powered summarization."
+                        },
+                        "preserve_most_recent": {
+                            "type": "integer",
+                            "minimum": 2,
+                            "maximum": 20,
+                            "default": 5,
+                            "description": "Number of recent messages to always keep unsummarized."
+                        },
+                        "ai_prompt": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "Enable AI-powered prompt and behaviour enhancement using Claude Haiku."
+                        },
+                        "instructions": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Optional guidance instructions for response validation and refinement."
+                        },
+                        "context_variables": {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "description": "Key-value pairs injected into agent system prompt. WARNING: Values are not sanitized and can enable prompt injection."
+                        },
+                        "mcp_base_urls": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            },
+                            "description": "Override base URLs for MCP servers indexed by server ID."
+                        },
+                        "auth": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "$ref": "#/components/schemas/AgentAuth"
+                            },
+                            "description": "Authentication configurations for various services."
+                        },
+                        "llm_config": {
+                            "$ref": "#/components/schemas/LLMConfigOverride",
+                            "description": "Optional LLM configuration overrides for this agent."
+                        },
+                        "agent_settings": {
+                            "$ref": "#/components/schemas/AgentSettings",
+                            "description": "Advanced agent configuration for memory, context, verification, and debugging."
+                        },
+                        "allowed_agents": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/AllowedAgent"
+                            },
+                            "description": "List of agents this agent may invoke - empty means no invocation permitted"
+                        },
+                        "invocation_depth": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1,
+                            "default": 0,
+                            "description": "Current invocation depth - 0 for main agent and 1 for sub-agent"
+                        },
+                        "agent_template_subject": {
+                            "type": "string",
+                            "description": "Agent template subject identifier"
+                        },
+                        "appearance": {
+                            "$ref": "#/components/schemas/AgentAppearance",
+                            "description": "Visual appearance configuration for the agent"
+                        },
+                        "api_key_source": {
+                            "type": "string",
+                            "enum": [
+                                "personal",
+                                "system"
+                            ],
+                            "description": "Source of the API key - 'personal' or 'system'"
+                        },
+                        "shared": {
+                            "type": "string",
+                            "enum": [
+                                "private",
+                                "team",
+                                "public"
+                            ],
+                            "default": "private",
+                            "description": "Sharing state of the agent - 'private' (only owner), 'team' (team members), or 'public' (anyone)."
+                        }
+                    }
+                },
+                "AllowedAgent": {
+                    "type": "object",
+                    "required": [
+                        "subject"
+                    ],
+                    "properties": {
+                        "subject": {
+                            "type": "string",
+                            "description": "Unique identifier for the invocable agent"
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Human-readable description of the agent's purpose"
+                        }
+                    },
+                    "description": "Represents an agent that can be invoked by another agent. This enables richer metadata about permitted agents for dynamic tool documentation."
+                },
+                "AgentAppearance": {
+                    "type": "object",
+                    "properties": {
+                        "avatar": {
+                            "type": "boolean",
+                            "description": "Whether to display an avatar for the agent"
+                        },
+                        "avatar_bg_size": {
+                            "type": "string",
+                            "description": "Background size setting for the avatar"
+                        },
+                        "color": {
+                            "type": "string",
+                            "description": "Color scheme for the agent's visual representation"
+                        },
+                        "fit_avatar": {
+                            "type": "boolean",
+                            "description": "Whether to fit the avatar to its container"
+                        }
+                    },
+                    "description": "Visual appearance configuration for the agent"
+                },
+                "ToolDefinition": {
+                    "type": "object",
+                    "required": [
+                        "uri",
+                        "name",
+                        "description",
+                        "schema"
+                    ],
+                    "properties": {
+                        "uri": {
+                            "type": "string",
+                            "description": "Unique tool identifier URI (e.g., 'mcp://local/file_read').",
+                            "example": "mcp://local/file_read"
+                        },
+                        "name": {
+                            "type": "string",
+                            "description": "Tool name for invocation.",
+                            "example": "file_read"
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Human-readable explanation of what the tool does.",
+                            "example": "Reads content from a file"
+                        },
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "description": "JSON Schema defining the tool's input parameters."
+                        }
+                    }
+                },
+                "AgentAuth": {
+                    "type": "object",
+                    "properties": {
+                        "bearer": {
+                            "type": "string",
+                            "description": "Bearer token for authentication."
+                        },
+                        "api_key": {
+                            "type": "string",
+                            "description": "API key for authentication."
+                        },
+                        "username": {
+                            "type": "string",
+                            "description": "Username for basic authentication."
+                        },
+                        "password": {
+                            "type": "string",
+                            "description": "Password for basic authentication."
+                        },
+                        "oauth": {
+                            "type": "string",
+                            "description": "OAuth subject/connection identifier."
+                        },
+                        "scheme_name": {
+                            "type": "string",
+                            "description": "Security scheme name from OpenAPI specification."
+                        },
+                        "private_auth": {
+                            "type": "boolean",
+                            "description": "If true, the MCP auth has to be set per user, otherwise the auth is shared."
+                        }
+                    }
+                },
+                "LLMConfigOverride": {
+                    "type": "object",
+                    "properties": {
+                        "temperature": {
+                            "type": "number",
+                            "format": "float",
+                            "minimum": 0,
+                            "maximum": 2,
+                            "description": "Sampling temperature override - higher values make output more random."
+                        },
+                        "max_tokens": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "description": "Maximum tokens override for model output."
+                        },
+                        "max_turns": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "description": "Maximum turn count for LLM conversations."
+                        }
+                    }
+                },
+                "AgentSettings": {
+                    "type": "object",
+                    "description": "Advanced agent configuration options for memory, context, verification, and debugging.",
+                    "properties": {
+                        "memory": {
+                            "$ref": "#/components/schemas/MemorySettings",
+                            "description": "Smart memory system configuration for learning from historical resolutions."
+                        },
+                        "smart_context_advanced": {
+                            "$ref": "#/components/schemas/SmartContextAdvancedSettings",
+                            "description": "Advanced smart context configuration for token management."
+                        },
+                        "verification": {
+                            "$ref": "#/components/schemas/VerificationSettings",
+                            "description": "Consensus-based verification configuration."
+                        },
+                        "human_in_the_loop": {
+                            "$ref": "#/components/schemas/HumanInTheLoopSettings",
+                            "description": "Human-in-the-loop configuration for escalation."
+                        },
+                        "branching": {
+                            "$ref": "#/components/schemas/BranchingSettings",
+                            "description": "Conversation branching and checkpointing."
+                        },
+                        "observability": {
+                            "$ref": "#/components/schemas/ObservabilitySettings",
+                            "description": "Observability, instrumentation, and debugging."
+                        },
+                        "knowledge_advanced": {
+                            "$ref": "#/components/schemas/KnowledgeAdvancedSettings",
+                            "description": "Advanced knowledge system configuration."
+                        }
+                    }
+                },
+                "MemorySettings": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "Enable smart memory system for learning from historical resolutions."
+                        },
+                        "marker_types": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "error",
+                                    "question",
+                                    "escalation",
+                                    "tool_call",
+                                    "success"
+                                ]
+                            },
+                            "description": "Types of markers to capture in memory."
+                        },
+                        "query_enabled": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Enable querying memory bank for similar historical problems."
+                        },
+                        "max_memory_entries": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1000,
+                            "default": 100,
+                            "description": "Maximum number of memory entries to retain."
+                        },
+                        "similarity_threshold": {
+                            "type": "number",
+                            "format": "float",
+                            "minimum": 0,
+                            "maximum": 1,
+                            "default": 0.7,
+                            "description": "Minimum similarity score for memory retrieval (0.0-1.0)."
+                        }
+                    }
+                },
+                "SmartContextAdvancedSettings": {
+                    "type": "object",
+                    "properties": {
+                        "token_limit_auto_adjust": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Enable dynamic token allocation based on query complexity."
+                        },
+                        "complexity_detection": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Enable automatic query complexity analysis."
+                        },
+                        "complexity_detection_method": {
+                            "type": "string",
+                            "enum": [
+                                "keyword",
+                                "llm",
+                                "rubric"
+                            ],
+                            "default": "keyword",
+                            "description": "Method for complexity detection."
+                        },
+                        "message_summarization": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Enable summarizing multiple large messages."
+                        },
+                        "ephemeral_streams": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "Enable ephemeral streams for context-relevant message queuing."
+                        },
+                        "min_messages_for_summary": {
+                            "type": "integer",
+                            "minimum": 2,
+                            "maximum": 20,
+                            "default": 3,
+                            "description": "Minimum messages before summarization is triggered."
+                        }
+                    }
+                },
+                "VerificationSettings": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "Enable consensus-based verification."
+                        },
+                        "consensus_runs": {
+                            "type": "integer",
+                            "minimum": 2,
+                            "maximum": 10,
+                            "default": 3,
+                            "description": "Number of runs for consensus (typically 3 or 5)."
+                        },
+                        "consensus_threshold": {
+                            "type": "number",
+                            "format": "float",
+                            "minimum": 0.5,
+                            "maximum": 1,
+                            "default": 0.66,
+                            "description": "Agreement threshold for consensus validation."
+                        },
+                        "verifier_agent": {
+                            "type": "string",
+                            "description": "Specific agent name to use for verification runs."
+                        }
+                    }
+                },
+                "HumanInTheLoopSettings": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "Enable human-in-the-loop escalation."
+                        },
+                        "auto_escalate_on_error": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "Automatically escalate to human when errors occur."
+                        },
+                        "checkpoints": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "pre_tool_call",
+                                    "post_tool_call",
+                                    "pre_response",
+                                    "post_validation"
+                                ]
+                            },
+                            "description": "Specific checkpoints requiring human review."
+                        },
+                        "escalation_threshold": {
+                            "$ref": "#/components/schemas/EscalationThreshold",
+                            "description": "Conditions that trigger human escalation."
+                        }
+                    }
+                },
+                "EscalationThreshold": {
+                    "type": "object",
+                    "properties": {
+                        "error_count": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 3,
+                            "description": "Escalate after N consecutive errors."
+                        },
+                        "confidence_score": {
+                            "type": "number",
+                            "format": "float",
+                            "minimum": 0,
+                            "maximum": 1,
+                            "default": 0.5,
+                            "description": "Escalate when confidence drops below this threshold."
+                        },
+                        "turn_count": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 10,
+                            "description": "Escalate after N turns without resolution."
+                        }
+                    }
+                },
+                "BranchingSettings": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "Enable conversation branching for testing approaches."
+                        },
+                        "auto_checkpoint": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Automatically create checkpoints at critical points."
+                        },
+                        "checkpoint_interval": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 5,
+                            "description": "Create checkpoint every N turns."
+                        },
+                        "max_branches": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 10,
+                            "default": 3,
+                            "description": "Maximum number of active conversation branches."
+                        }
+                    }
+                },
+                "ObservabilitySettings": {
+                    "type": "object",
+                    "properties": {
+                        "debug_mode": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "Enable detailed debug logging and instrumentation."
+                        },
+                        "capture_thinking": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Capture and log LLM reasoning processes."
+                        },
+                        "capture_tool_calls": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Capture detailed tool call information."
+                        },
+                        "metrics_enabled": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Enable performance metrics collection."
+                        },
+                        "tracing_enabled": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Enable distributed tracing with OpenTelemetry."
+                        },
+                        "log_level": {
+                            "type": "string",
+                            "enum": [
+                                "debug",
+                                "info",
+                                "warn",
+                                "error"
+                            ],
+                            "default": "info",
+                            "description": "Logging level."
+                        }
+                    }
+                },
+                "KnowledgeAdvancedSettings": {
+                    "type": "object",
+                    "properties": {
+                        "semantic_indexing": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Enable semantic indexing with llms.txt-style summaries."
+                        },
+                        "image_detail_level": {
+                            "type": "string",
+                            "enum": [
+                                "low",
+                                "high",
+                                "auto"
+                            ],
+                            "default": "low",
+                            "description": "Initial image detail level."
+                        },
+                        "adaptive_image_resolution": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Allow LLM to request higher resolution regions."
+                        },
+                        "bucket_semantic_search": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Enable semantic search across knowledge buckets."
+                        },
+                        "section_based_retrieval": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Enable section-based retrieval from documents."
+                        },
+                        "max_retrieval_tokens": {
+                            "type": "integer",
+                            "minimum": 100,
+                            "maximum": 100000,
+                            "default": 10000,
+                            "description": "Maximum tokens to retrieve from knowledge sources."
+                        }
+                    }
+                },
+                "ErrorInfo": {
+                    "type": "object",
+                    "required": [
+                        "code",
+                        "message"
+                    ],
+                    "properties": {
+                        "code": {
+                            "type": "string",
+                            "description": "Error code for categorization.",
+                            "example": "AGENT_TIMEOUT"
+                        },
+                        "message": {
+                            "type": "string",
+                            "description": "Human-readable error message.",
+                            "example": "Agent execution exceeded timeout limit"
+                        },
+                        "details": {
+                            "description": "Additional error context."
+                        },
+                        "retryable": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "Whether the request can be retried."
+                        }
+                    }
+                },
+                "InstructionMetadata": {
+                    "type": "object",
+                    "properties": {
+                        "instructions_processed": {
+                            "type": "boolean",
+                            "description": "Whether instructions were processed."
+                        },
+                        "instruction_count": {
+                            "type": "integer",
+                            "description": "Number of instructions processed."
+                        },
+                        "was_refined": {
+                            "type": "boolean",
+                            "description": "Whether response was modified by instructions."
+                        },
+                        "processing_time_ms": {
+                            "type": "integer",
+                            "description": "Time spent processing instructions in milliseconds."
+                        }
+                    }
+                },
+                "AISummaryMetadata": {
+                    "type": "object",
+                    "properties": {
+                        "summarization_performed": {
+                            "type": "boolean",
+                            "description": "Whether AI summarization was performed."
+                        },
+                        "model": {
+                            "type": "string",
+                            "description": "AI model used for summarization."
+                        },
+                        "original_tokens": {
+                            "type": "integer",
+                            "description": "Number of tokens in original messages."
+                        },
+                        "summary_tokens": {
+                            "type": "integer",
+                            "description": "Number of tokens in summary."
+                        },
+                        "compression_ratio": {
+                            "type": "number",
+                            "format": "float",
+                            "description": "Compression ratio achieved (summary_tokens/original_tokens)."
+                        },
+                        "messages_processed": {
+                            "type": "integer",
+                            "description": "Number of messages summarized."
+                        },
+                        "processing_time_ms": {
+                            "type": "integer",
+                            "description": "Time spent on AI summarization in milliseconds."
+                        },
+                        "fallback_used": {
+                            "type": "boolean",
+                            "description": "Whether fallback truncation was used due to AI failure."
+                        }
+                    }
+                }
+            },
+            "securitySchemes": {
+                "bearerAuth": {
+                    "type": "http",
+                    "scheme": "bearer",
+                    "bearerFormat": "JWT",
+                    "description": "JWT Authorization header using the Bearer scheme."
+                },
+                "apiKeyAuth": {
+                    "type": "apiKey",
+                    "in": "header",
+                    "name": "X-Api-Key",
+                    "description": "API key authentication via X-Api-Key header."
+                }
+            },
+            "parameters": {
+                "agentID": {
+                    "name": "id",
+                    "in": "path",
+                    "description": "Agent id - hash of the original agent definition",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    },
+                    "example": "8f5568aa-c88c-32d7-adfb-8565d367fb24"
+                }
+            }
+        }
+    }
+}

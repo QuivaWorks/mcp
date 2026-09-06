@@ -1,0 +1,54 @@
+name: engine drift
+
+# Our engine-truth documentation is only as good as the last time somebody read
+# the handler. This job re-resolves every cited file against evari-olympus main
+# and fails when one has changed, so a claim going stale is visible instead of
+# being discovered by a blank PDF three weeks later.
+
+on:
+  schedule:
+    # Mondays, 08:00 UTC — a weekly nudge, not a merge gate.
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'engine/**'
+      - '**/*-docs.js'
+      - '**/validate.js'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # evari-olympus is in a DIFFERENT org (myevari), so the default
+      # GITHUB_TOKEN cannot read it. Add a fine-grained PAT with
+      # Contents: Read on myevari/evari-olympus as the ENGINE_READ_TOKEN secret.
+      # Without it the job reports and skips rather than failing red for ever.
+      - name: Check cited engine files against main
+        env:
+          GH_TOKEN: ${{ secrets.ENGINE_READ_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::notice title=Engine drift check skipped::ENGINE_READ_TOKEN is not set."
+            echo "Add a fine-grained PAT with Contents: Read on myevari/evari-olympus"
+            echo "to enable this check. Locally it works off your own gh auth."
+            exit 0
+          fi
+          node engine/sync.mjs
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      # All five suites are offline: no credentials, no platform calls.
+      - run: npm test

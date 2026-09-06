@@ -1,0 +1,22 @@
+{
+  "_comment": [
+    "Stream trigger for flow 11 referral-decide. POST this body to /trigger/stream.",
+    "flow 11 is INERT without it: the flow itself carries only a manual trigger node.",
+    "subject MUST be precomputed as ms.trigger.config.<collection>.<fnv1a32(name)>; the",
+    "service does not derive it from the body and an unset subject is 'invalid subject'.",
+    "The pair created is an EXPORT of ms.workspaces.task.* and an IMPORT of it back as",
+    "hub.trigger.<published flow subject>.*, which hub truncates to six segments to find",
+    "the flow. Re-point it after a republish only if the flow's published subject changes;",
+    "publishing the same flow does not.",
+    "Verified live in antipodean_build 2026-09-02: subject ms.trigger.config.antipodean.3250134652."
+  ],
+  "name": "referral-decide-task-status",
+  "description": "Flow 11 referral-decide. Every task write in the account publishes to ms.workspaces.task.<taskID> on microstrate-workspaces; this pair exports that subject and imports it as hub.trigger.<flow subject>.* so hub dispatches a run. The body is the partial UpdateTaskRequest, not the task.",
+  "collection": "antipodean",
+  "flow_subject": "ms.hub.config.workflow.3788449144.1610473599",
+  "subject": "ms.trigger.config.antipodean.3250134652",
+  "source": {
+    "subject": "ms.workspaces.task.*",
+    "stream": "microstrate-workspaces"
+  }
+}

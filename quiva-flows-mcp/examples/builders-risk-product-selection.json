@@ -1,0 +1,703 @@
+{
+  "slug": "builders-risk-product-selection",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "subject": "ms.hub.config.workflow.1508781670.1968763177",
+    "name": "Builders Risk Product Selection",
+    "harvested_from": "published version"
+  },
+  "teaches": [
+    "rules payload { facts, rules, context } run through a compute function node",
+    "derived facts chaining via \"@fact:<earlier rule key>\"",
+    "deeply nested expressions (and/or/=/</in/split/jPath/numberFormat/generate-array)",
+    "a conditional chain with a catch-all final branch",
+    "SECRET::NAME:: placeholders",
+    "map node with JSONPath filters and pipe concatenation"
+  ],
+  "redactions": 0,
+  "description": "Receive a submission, run multiple APIs and resolve decline rules and product selection",
+  "config": {
+    "edges": [
+      {
+        "source": "HAZARD_HUB_REQUESt",
+        "target": "CHECK_UWING_RULES",
+        "id": "xy-edge__HAZARD_HUB_REQUEStHAZARD_HUB_REQUESt-CHECK_UWING_RULESCHECK_UWING_RULES",
+        "targetHandle": "CHECK_UWING_RULES",
+        "sourceHandle": "HAZARD_HUB_REQUESt",
+        "type": "created",
+        "subject": "ms.hub.config.workflow-edge.1508781670.1968763177.xy-edge__HAZARD_HUB_REQUEStHAZARD_HUB_REQUESt-CHECK_UWING_RULESCHECK_UWING_RULES",
+        "modified": 1755005857
+      },
+      {
+        "source": "HAZARD_HUB_REQUESt",
+        "target": "PRODUCT_SELECTION_RULEs",
+        "id": "xy-edge__HAZARD_HUB_REQUEStHAZARD_HUB_REQUESt-PRODUCT_SELECTION_RULEsPRODUCT_SELECTION_RULEs",
+        "targetHandle": "PRODUCT_SELECTION_RULEs",
+        "sourceHandle": "HAZARD_HUB_REQUESt",
+        "type": "created",
+        "subject": "ms.hub.config.workflow-edge.1508781670.1968763177.xy-edge__HAZARD_HUB_REQUEStHAZARD_HUB_REQUESt-PRODUCT_SELECTION_RULEsPRODUCT_SELECTION_RULEs",
+        "modified": 1755005857
+      },
+      {
+        "source": "GEOCODE_ADDRESs",
+        "target": "GEOCODE_RESPONSe",
+        "id": "xy-edge__GEOCODE_ADDRESsGEOCODE_ADDRESs-GEOCODE_RESPONSeGEOCODE_RESPONSe",
+        "targetHandle": "GEOCODE_RESPONSe",
+        "sourceHandle": "GEOCODE_ADDRESs",
+        "type": "created",
+        "subject": "ms.hub.config.workflow-edge.1508781670.1968763177.xy-edge__GEOCODE_ADDRESsGEOCODE_ADDRESs-GEOCODE_RESPONSeGEOCODE_RESPONSe",
+        "modified": 1755005857
+      },
+      {
+        "source": "GEOCODE_RESPONSe",
+        "target": "HAZARD_HUB_REQUESt",
+        "id": "xy-edge__GEOCODE_RESPONSeGEOCODE_RESPONSe-HAZARD_HUB_REQUEStHAZARD_HUB_REQUESt",
+        "targetHandle": "HAZARD_HUB_REQUESt",
+        "sourceHandle": "GEOCODE_RESPONSe",
+        "type": "created",
+        "subject": "ms.hub.config.workflow-edge.1508781670.1968763177.xy-edge__GEOCODE_RESPONSeGEOCODE_RESPONSe-HAZARD_HUB_REQUEStHAZARD_HUB_REQUESt",
+        "modified": 1755005857
+      },
+      {
+        "source": "CHECK_UWING_RULES",
+        "target": "CREATE_QUOTe",
+        "id": "xy-edge__CHECK_UWING_RULESCHECK_UWING_RULES-CREATE_QUOTeCREATE_QUOTe",
+        "targetHandle": "CREATE_QUOTe",
+        "sourceHandle": "CHECK_UWING_RULES",
+        "type": "created",
+        "subject": "ms.hub.config.workflow-edge.1508781670.1968763177.xy-edge__CHECK_UWING_RULESCHECK_UWING_RULES-CREATE_QUOTeCREATE_QUOTe",
+        "modified": 1755005857
+      },
+      {
+        "source": "PRODUCT_SELECTION_RULEs",
+        "target": "CREATE_QUOTe",
+        "id": "xy-edge__PRODUCT_SELECTION_RULEsPRODUCT_SELECTION_RULEs-CREATE_QUOTeCREATE_QUOTe",
+        "targetHandle": "CREATE_QUOTe",
+        "sourceHandle": "PRODUCT_SELECTION_RULEs",
+        "type": "created",
+        "subject": "ms.hub.config.workflow-edge.1508781670.1968763177.xy-edge__PRODUCT_SELECTION_RULEsPRODUCT_SELECTION_RULEs-CREATE_QUOTeCREATE_QUOTe",
+        "modified": 1755005857
+      }
+    ],
+    "nodes": [
+      {
+        "data": {
+          "id": "GEOCODE_ADDRESs",
+          "name": "Google Geocode",
+          "description": "Call Google Geocode API with the submitted address and return result",
+          "subject": "ms.compute.1753641292.function.112623013",
+          "node_type": "function",
+          "payload": {
+            "method": "GET",
+            "query": {
+              "address": "$.trigger.address",
+              "components": "street_number|route|locality|administrative_area_level_1|postal_code",
+              "key": "SECRET::GOOGLE_PLACES_API_KEY::"
+            },
+            "url": "https://maps.googleapis.com/maps/api/geocode/json"
+          },
+          "options": {
+            "timeout": 20000,
+            "attempts": 2
+          },
+          "schema": {}
+        },
+        "id": "GEOCODE_ADDRESs",
+        "position": {
+          "x": -207.10861846751186,
+          "y": -17.11904720798334
+        },
+        "type": "custom",
+        "origin": [
+          0.5,
+          0
+        ],
+        "measured": {
+          "height": 80,
+          "width": 96
+        },
+        "subject": "ms.hub.config.workflow-node.1508781670.1968763177.GEOCODE_ADDRESs",
+        "modified": 1755005857
+      },
+      {
+        "data": {
+          "id": "HAZARD_HUB_REQUESt",
+          "name": "Get Perils Info",
+          "description": "Make a Hazard Hub request with the geocode result from the previous step",
+          "subject": "ms.compute.1753641292.function.112623013",
+          "node_type": "function",
+          "payload": {
+            "data": {
+              "address": "$.GEOCODE_RESPONSe.address",
+              "city": "$.GEOCODE_RESPONSe.city",
+              "state": "$.GEOCODE_RESPONSe.state",
+              "test": "test",
+              "zip": "$.GEOCODE_RESPONSe.zip"
+            },
+            "headers": {
+              "Authorization": "SECRET::HAZARDHUB::",
+              "Content-Type": "application/json"
+            },
+            "method": "GET",
+            "url": "https://api.hazardhub.com/v1/risks_and_enhanced_property"
+          },
+          "options": {
+            "timeout": 20000,
+            "attempts": 2
+          },
+          "schema": {}
+        },
+        "id": "HAZARD_HUB_REQUESt",
+        "position": {
+          "x": 609.0120221021506,
+          "y": -17.17361242553318
+        },
+        "type": "custom",
+        "origin": [
+          0.5,
+          0
+        ],
+        "measured": {
+          "height": 80,
+          "width": 96
+        },
+        "subject": "ms.hub.config.workflow-node.1508781670.1968763177.HAZARD_HUB_REQUESt",
+        "modified": 1755005857
+      },
+      {
+        "data": {
+          "id": "CHECK_UWING_RULES",
+          "name": "Check Underwriting Rules",
+          "description": "Check the underwriting rules for decline triggers",
+          "subject": "ms.compute.1753641292.function.1116417408",
+          "node_type": "function",
+          "payload": {
+            "facts": {
+              "CIP_BR_Bankruptcy.value": "$.trigger.CIP_BR_Bankruptcy",
+              "CIP_BR_FireWaterSmokeMold.value": "$.trigger.CIP_BR_FireWaterSmokeMold",
+              "CIP_BR_FoundationWork.value": "$.trigger.CIP_BR_FoundationWork",
+              "CIP_BR_Haz_CoastDistance.value": "$.HAZARD_HUB_REQUESt.risks.coast_distance.distance| |$.HAZARD_HUB_REQUESt.risks.coast_distance.units",
+              "CIP_BR_Haz_FireScore.value": "$.HAZARD_HUB_REQUESt.risks.enhanced_wildfire.score",
+              "CIP_BR_Haz_HurricaneScore.value": "$.HAZARD_HUB_REQUESt.risks.enhanced_hurricane_params.score",
+              "CIP_BR_HistoricLandmark.value": "$.trigger.CIP_BR_HistoricLandmark",
+              "CIP_BR_InsFraudArson.value": "$.trigger.CIP_BR_InsFraudArson",
+              "CIP_BR_NonConvConst.value": "$.trigger.CIP_BR_NonConvConst",
+              "CIP_BR_RENOVATION.value": "$.trigger.CIP_BR_RENOVATION",
+              "CIP_BR_RiskOverWater.value": "$.trigger.CIP_BR_RiskOverWater",
+              "CIP_BR_SolarPanels.value": "$.trigger.CIP_BR_SolarPanels",
+              "CIP_BR_StateCoast.value": "$.trigger.CIP_BR_StateCoast"
+            },
+            "rules": {
+              "CIP_BR_declineBankruptcy.value": {
+                "input": [
+                  "@fact:CIP_BR_Bankruptcy.value",
+                  "yes"
+                ],
+                "operator": "="
+              },
+              "CIP_BR_declineCoastDistance.value": [
+                {
+                  "condition": {
+                    "input": [
+                      {
+                        "input": [
+                          "@fact:CIP_BR_StateCoast.value",
+                          "West Coast"
+                        ],
+                        "operator": "="
+                      },
+                      {
+                        "input": [
+                          {
+                            "input": [
+                              {
+                                "input": [
+                                  {
+                                    "input": [
+                                      {
+                                        "input": [
+                                          "@fact:CIP_BR_Haz_CoastDistance.value",
+                                          "miles"
+                                        ],
+                                        "operator": "split"
+                                      },
+                                      "$.0"
+                                    ],
+                                    "operator": "jPath"
+                                  },
+                                  2
+                                ],
+                                "operator": "numberFormat"
+                              },
+                              1
+                            ],
+                            "operator": "<"
+                          },
+                          {
+                            "input": [
+                              {
+                                "input": [
+                                  {
+                                    "input": [
+                                      {
+                                        "input": [
+                                          "@fact:CIP_BR_Haz_CoastDistance.value",
+                                          "feet"
+                                        ],
+                                        "operator": "split"
+                                      },
+                                      "$.0"
+                                    ],
+                                    "operator": "jPath"
+                                  },
+                                  2
+                                ],
+                                "operator": "numberFormat"
+                              },
+                              5280
+                            ],
+                            "operator": "<"
+                          }
+                        ],
+                        "operator": "or"
+                      }
+                    ],
+                    "operator": "and"
+                  },
+                  "outcome": true
+                },
+                {
+                  "condition": {
+                    "input": [
+                      {
+                        "input": [
+                          "@fact:CIP_BR_StateCoast.value",
+                          "West Coast"
+                        ],
+                        "operator": "!="
+                      },
+                      {
+                        "input": [
+                          {
+                            "input": [
+                              {
+                                "input": [
+                                  {
+                                    "input": [
+                                      {
+                                        "input": [
+                                          "@fact:CIP_BR_Haz_CoastDistance.value",
+                                          "feet"
+                                        ],
+                                        "operator": "split"
+                                      },
+                                      "$.0"
+                                    ],
+                                    "operator": "jPath"
+                                  },
+                                  2
+                                ],
+                                "operator": "numberFormat"
+                              },
+                              26400
+                            ],
+                            "operator": "<"
+                          },
+                          {
+                            "input": [
+                              {
+                                "input": [
+                                  {
+                                    "input": [
+                                      {
+                                        "input": [
+                                          "@fact:CIP_BR_Haz_CoastDistance.value",
+                                          "miles"
+                                        ],
+                                        "operator": "split"
+                                      },
+                                      "$.0"
+                                    ],
+                                    "operator": "jPath"
+                                  },
+                                  2
+                                ],
+                                "operator": "numberFormat"
+                              },
+                              5
+                            ],
+                            "operator": "<"
+                          }
+                        ],
+                        "operator": "or"
+                      }
+                    ],
+                    "operator": "and"
+                  },
+                  "outcome": true
+                },
+                {
+                  "outcome": false
+                }
+              ],
+              "CIP_BR_declineFireWaterSmokeMold.value": {
+                "input": [
+                  {
+                    "input": [
+                      "@fact:CIP_BR_FireWaterSmokeMold.value",
+                      "yes"
+                    ],
+                    "operator": "="
+                  },
+                  "@fact:CIP_BR_RENOVATION.value"
+                ],
+                "operator": "and"
+              },
+              "CIP_BR_declineFoundationWork.value": {
+                "input": [
+                  {
+                    "input": [
+                      "@fact:CIP_BR_FoundationWork.value",
+                      "yes"
+                    ],
+                    "operator": "="
+                  },
+                  "@fact:CIP_BR_RENOVATION.value"
+                ],
+                "operator": "and"
+              },
+              "CIP_BR_declineHistoricLandmark.value": {
+                "input": [
+                  {
+                    "input": [
+                      "@fact:CIP_BR_HistoricLandmark.value",
+                      "yes"
+                    ],
+                    "operator": "="
+                  },
+                  "@fact:CIP_BR_RENOVATION.value"
+                ],
+                "operator": "and"
+              },
+              "CIP_BR_declineHurricaneHazard.value": {
+                "input": [
+                  "@fact:CIP_BR_Haz_HurricaneScore.value",
+                  "F"
+                ],
+                "operator": "="
+              },
+              "CIP_BR_declineInsFraudArson.value": {
+                "input": [
+                  "@fact:CIP_BR_InsFraudArson.value",
+                  "yes"
+                ],
+                "operator": "="
+              },
+              "CIP_BR_declineNonConvConst.value": {
+                "input": [
+                  "@fact:CIP_BR_NonConvConst.value",
+                  "yes"
+                ],
+                "operator": "="
+              },
+              "CIP_BR_declineQuote.value": {
+                "input": [
+                  "@fact:CIP_BR_declineBankruptcy.value",
+                  "@fact:CIP_BR_declineFireWaterSmokeMold.value",
+                  "@fact:CIP_BR_declineFoundationWork.value",
+                  "@fact:CIP_BR_declineHistoricLandmark.value",
+                  "@fact:CIP_BR_declineInsFraudArson.value",
+                  "@fact:CIP_BR_declineNonConvConst.value",
+                  "@fact:CIP_BR_declineRiskOverWater.value",
+                  "@fact:CIP_BR_declineSolarPanels.value",
+                  "@fact:CIP_BR_declineWildFireHazard.value",
+                  "@fact:CIP_BR_declineHurricaneHazard.value",
+                  "@fact:CIP_BR_declineCoastDistance.value"
+                ],
+                "operator": "or"
+              },
+              "CIP_BR_declineRiskOverWater.value": {
+                "input": [
+                  "@fact:CIP_BR_RiskOverWater.value",
+                  "yes"
+                ],
+                "operator": "="
+              },
+              "CIP_BR_declineSolarPanels.value": {
+                "input": [
+                  {
+                    "input": [
+                      "@fact:CIP_BR_SolarPanels.value",
+                      "yes"
+                    ],
+                    "operator": "="
+                  },
+                  "@fact:CIP_BR_RENOVATION.value"
+                ],
+                "operator": "and"
+              },
+              "CIP_BR_declineWildFireHazard.value": {
+                "input": [
+                  "@fact:CIP_BR_Haz_FireScore.value",
+                  "F"
+                ],
+                "operator": "="
+              },
+              "RDR_CIP_BR_declined_points.markdown": [
+                {
+                  "condition": {
+                    "input": [
+                      "@fact:CIP_BR_declineQuote.value",
+                      true
+                    ],
+                    "operator": "="
+                  },
+                  "outcome": {
+                    "input": [
+                      {
+                        "input": [
+                          [
+                            "@fact:CIP_BR_declineWildFireHazard.value",
+                            "- Property is in region with unacceptable wildfire exposure."
+                          ],
+                          [
+                            "@fact:CIP_BR_declineHurricaneHazard.value",
+                            "- Property is in region with unacceptable hurricane exposure."
+                          ],
+                          [
+                            "@fact:CIP_BR_declineWestCoast.value",
+                            "- Property is in ineligible coastal region."
+                          ],
+                          [
+                            "@fact:CIP_BR_declineEastCoast.value",
+                            "- Property is in ineligible coastal region."
+                          ],
+                          [
+                            "@fact:CIP_BR_declineRiskOverWater.value",
+                            "- Risk is located entirely or partially over water."
+                          ],
+                          [
+                            "@fact:CIP_BR_declineNonConvConst.value",
+                            "- Risk contains non-conventional construction elements or any geodesic construction."
+                          ],
+                          [
+                            "@fact:CIP_BR_declineBankruptcy.value",
+                            "- Applicant has had a foreclosure, repossession, or bankruptcy in the past five years."
+                          ],
+                          [
+                            "@fact:CIP_BR_declineInsFraudArson.value",
+                            "- Applicant has been indicted or convicted of any insurance fraud or arson."
+                          ],
+                          [
+                            "@fact:CIP_BR_declineSolarPanels.value",
+                            "- Presence of solar panels."
+                          ],
+                          [
+                            "@fact:CIP_BR_declineHistoricLandmark.value",
+                            "- Existing structure is a historic landmark or registered with any historical agency."
+                          ],
+                          [
+                            "@fact:CIP_BR_declineFireWaterSmokeMold.value",
+                            "- Work includes fire, water, smoke, or mold restoration/remediation."
+                          ],
+                          [
+                            "@fact:CIP_BR_declineFoundationWork.value",
+                            "- Work includes foundation repair, reinforcement, lifting, leveling, or moving a structure from its existing foundation to another location."
+                          ],
+                          [
+                            "@fact:CIP_BR_declineCoastDistance.value",
+                            "- Property is ineligible coastal region."
+                          ]
+                        ],
+                        "operator": "generate-array"
+                      },
+                      "$[*]",
+                      "\n"
+                    ],
+                    "operator": "jPath"
+                  }
+                }
+              ]
+            }
+          },
+          "options": {
+            "timeout": 20000,
+            "attempts": 2
+          },
+          "schema": {}
+        },
+        "id": "CHECK_UWING_RULES",
+        "position": {
+          "x": 1006.1458566107526,
+          "y": -142.20459887888697
+        },
+        "type": "custom",
+        "origin": [
+          0.5,
+          0
+        ],
+        "measured": {
+          "height": 80,
+          "width": 80
+        },
+        "subject": "ms.hub.config.workflow-node.1508781670.1968763177.CHECK_UWING_RULES",
+        "modified": 1755005857
+      },
+      {
+        "data": {
+          "id": "PRODUCT_SELECTION_RULEs",
+          "name": "Product Selection Rules",
+          "description": "Decide what product and capacity is selected",
+          "subject": "ms.compute.1753641292.function.1116417408",
+          "node_type": "function",
+          "payload": {
+            "facts": {
+              "CIP_BR_CompValueLimit.value": "$.trigger.CIP_BR_CompValueLimit",
+              "state.value": "$.GEOCODE_RESPONSe.state"
+            },
+            "rules": {
+              "productDecision.value": [
+                {
+                  "condition": {
+                    "input": [
+                      "@fact:state.value",
+                      [
+                        "CA",
+                        "FL",
+                        "NY"
+                      ]
+                    ],
+                    "operator": "in"
+                  },
+                  "outcome": "Product1"
+                },
+                {
+                  "condition": {
+                    "input": [
+                      {
+                        "input": [
+                          "@fact:state.value",
+                          [
+                            "MA",
+                            "TX"
+                          ]
+                        ],
+                        "operator": "in"
+                      },
+                      {
+                        "input": [
+                          "@fact:CIP_BR_CompValueLimit.value",
+                          10000000
+                        ],
+                        "operator": ">"
+                      }
+                    ],
+                    "operator": "and"
+                  },
+                  "outcome": "Product2"
+                },
+                {
+                  "outcome": "Product3"
+                }
+              ]
+            }
+          },
+          "options": {
+            "timeout": 20000,
+            "attempts": 2
+          },
+          "schema": {}
+        },
+        "id": "PRODUCT_SELECTION_RULEs",
+        "position": {
+          "x": 1019.6499672256494,
+          "y": 114.33873075886217
+        },
+        "type": "custom",
+        "origin": [
+          0.5,
+          0
+        ],
+        "measured": {
+          "height": 80,
+          "width": 80
+        },
+        "subject": "ms.hub.config.workflow-node.1508781670.1968763177.PRODUCT_SELECTION_RULEs",
+        "modified": 1755005857
+      },
+      {
+        "data": {
+          "id": "GEOCODE_RESPONSe",
+          "name": "Google Response Map",
+          "description": "Take the response and map it into the desired shape",
+          "node_type": "map",
+          "payload": {
+            "address": "$.GEOCODE_ADDRESs.data.results..address_components[?(@.types[0] === 'street_number')].long_name| |$..address_components[?(@.types[0] === 'route')].long_name",
+            "city": "$.GEOCODE_ADDRESs.data.results..address_components[?(@.types[0] === 'locality')].long_name",
+            "state": "$.GEOCODE_ADDRESs.data.results..address_components[?(@.types[0] === 'administrative_area_level_1')].short_name",
+            "zip": "$.GEOCODE_ADDRESs.data.results..address_components[?(@.types[0] === 'postal_code')].long_name"
+          },
+          "options": {
+            "flat_map": false,
+            "backoff_ms": 1000,
+            "timeout": 20000,
+            "attempts": 2,
+            "ignore_response_codes": []
+          },
+          "schema": {}
+        },
+        "id": "GEOCODE_RESPONSe",
+        "position": {
+          "x": 221.10242794670214,
+          "y": 150.09694996641193
+        },
+        "type": "custom",
+        "origin": [
+          0.5,
+          0
+        ],
+        "measured": {
+          "height": 80,
+          "width": 80
+        },
+        "subject": "ms.hub.config.workflow-node.1508781670.1968763177.GEOCODE_RESPONSe",
+        "modified": 1755005857
+      },
+      {
+        "data": {
+          "id": "CREATE_QUOTe",
+          "name": "Create Quote",
+          "description": "Map enrichment data and rule results for creating a quote",
+          "node_type": "map",
+          "payload": {
+            "hazard": "$.HAZARD_HUB_REQUESt.data.risks",
+            "productDecision": "$.PRODUCT_SELECTION_RULEs..outcome",
+            "submission": "$.trigger",
+            "underwritingDecision": "$.CHECK_UWING_RULES."
+          },
+          "options": {
+            "timeout": 20000,
+            "attempts": 2
+          },
+          "schema": {}
+        },
+        "id": "CREATE_QUOTe",
+        "position": {
+          "x": 1436.9322812774924,
+          "y": -12.945012040869257
+        },
+        "type": "custom",
+        "origin": [
+          0.5,
+          0
+        ],
+        "measured": {
+          "height": 80,
+          "width": 80
+        },
+        "subject": "ms.hub.config.workflow-node.1508781670.1968763177.CREATE_QUOTe",
+        "modified": 1755005857
+      }
+    ]
+  }
+}

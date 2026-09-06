@@ -1,0 +1,1866 @@
+{
+  "name": "quiva_documents",
+  "schema": {
+    "openapi": "3.0.3",
+    "info": {
+      "title": "Documents Service API",
+      "description": "A QuivaWorks service that manages document templates, documents, and e-signature workflows. All routes are served under the `/file-generator` gateway prefix.",
+      "version": "1.0.1"
+    },
+    "x-agent-syntax-rules": {
+      "expressions": {
+        "description": "All template content uses angular expression syntax",
+        "simple_substitution": "{field_name}",
+        "nested_access": "{object.property.subproperty}",
+        "array_access": "{array.0.field}",
+        "operators": {
+          "math": [
+            "+",
+            "-",
+            "*",
+            "/"
+          ],
+          "comparison": [
+            "==",
+            "!=",
+            ">",
+            "<",
+            ">=",
+            "<="
+          ],
+          "logical": [
+            "&&",
+            "||"
+          ],
+          "ternary": "{condition ? true_value : false_value}"
+        }
+      },
+      "control_structures": {
+        "conditional": "{#condition}content{/} or {#condition}content{/condition}",
+        "loop": "{#array}content{/} or {#array}content{/array}",
+        "note": "Both closing syntaxes valid; {/} is preferred"
+      },
+      "filters": {
+        "formatdate": {
+          "syntax": "{date | formatdate:\"pattern\":TIMEZONE:LOCALE}",
+          "required": [
+            "pattern",
+            "TIMEZONE (UTC offset)",
+            "LOCALE (e.g., en-US)"
+          ],
+          "example": "{invoice_date | formatdate:\"yyyy-MM-dd\":-5:en-US}",
+          "reference": "https://date-fns.org/v4.4.0/docs/format"
+        },
+        "formatcurrency": {
+          "syntax": "{amount | formatcurrency:CURRENCY:LOCALE:DECIMALS}",
+          "required": [
+            "CURRENCY (USD/EUR/GBP)",
+            "LOCALE (en-US/de-DE)",
+            "DECIMALS (true/false)"
+          ],
+          "example": "{total | formatcurrency:USD:en-US:true}",
+          "reference": "https://docxtemplater.com/docs/angular-parse/"
+        }
+      },
+      "critical_rules": [
+        "All opening tags must close: {#...}{/}",
+        "Missing payload fields render empty, not error",
+        "Dates must be ISO 8601 format (2024-01-15T10:00:00Z)",
+        "Filter parameters are positional and all required",
+        "Operator precedence: parentheses > multiply/divide > add/subtract",
+        "Validate syntax at POST /templates/validate before deploying"
+      ],
+      "common_mistakes": [
+        "Forgetting timezone/locale in formatdate filter",
+        "Mismatched closing tags (e.g., {#items}...{/})",
+        "Unclosed conditionals or loops",
+        "Non-ISO 8601 dates",
+        "Copying GET response structure into UPDATE payloads"
+      ],
+      "external_references": {
+        "angular_parser": "https://docxtemplater.com/docs/angular-parse/",
+        "date_formats": "https://date-fns.org/v4.4.0/docs/format",
+        "complete_guide": "https://api.quiva.ai/cdn/AGENT_0934d820-eae1-3f8d-9724-5e19b451ab77_README.md"
+      }
+    },
+    "servers": [
+      {
+        "url": "https://api.quiva.ai",
+        "description": "Production API server"
+      },
+      {
+        "url": "https://api.microstrate.io",
+        "description": "Staging server"
+      }
+    ],
+    "security": [
+      {
+        "bearerAuth": []
+      },
+      {
+        "apiKeyAuth": []
+      }
+    ],
+    "tags": [
+      {
+        "name": "Templates",
+        "description": "Template lifecycle \u2014 create, read, publish, validate, trigger, and delete document templates. Templates follow a **draft \u2192 published** model: writes (`POST`, `PATCH`) always target the draft version, and `POST /templates/{key}/publish` promotes the draft. Document generation only ever uses the published version, so drafts can be edited safely without affecting production output. A template's `source` is a DOCX file containing angular-expression tags rendered at trigger time."
+      },
+      {
+        "name": "Documents",
+        "description": "Document lifecycle \u2014 read, update, and delete generated documents. A document record is created immediately when a template is triggered and is updated asynchronously: first with the generated `output.key` (an `obj://` or `kv://` storage URI) or `errors`, then with `signatures` progress as signatories sign."
+      },
+      {
+        "name": "Signatures",
+        "description": "E-signature workflows powered by HelloSign (Dropbox Sign). Signature requests are created automatically when a triggered template defines `signatories`. Each signatory tracks a status lifecycle of `DRAFT \u2192 SENT \u2192 SIGNED`, with `EXPIRED` (validity window elapsed) and `FAILED` (delivery/signing error) as terminal failure states. Embedded signing URLs can be generated for signatures created in embedded mode."
+      }
+    ],
+    "paths": {
+      "/file-generator/templates/{key}": {
+        "get": {
+          "tags": [
+            "Templates"
+          ],
+          "summary": "Get template",
+          "description": "Retrieve a single document template by key.\n\nPass `?draft=true` to fetch the draft version; omit it (or set `false`) to fetch the published version. A template may exist as draft only (never published), published only (draft deleted after publish), or both \u2014 the two versions are independent records.\n\nThe returned `source.key` points at the DOCX file in `microstrate-documents` object storage bucket, that's being rendered when the template is triggered. Fields such as `output.name` and `signatories[].name`/`email` may contain expression placeholders (e.g. `{client_name}`) that are resolved against the trigger payload.",
+          "operationId": "getTemplate",
+          "x-resource-type": "service",
+          "x-resource": "microstrate.file-generator.get.template",
+          "parameters": [
+            {
+              "$ref": "#/components/parameters/TemplateKey"
+            },
+            {
+              "$ref": "#/components/parameters/QueryDraft"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Template retrieved successfully. The example below shows a fully configured invoice template: a DOCX source rendered to PDF, a templated output filename, and one signatory whose details are resolved from the trigger payload.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/TemplateResponse"
+                  },
+                  "example": {
+                    "body": {
+                      "key": "invoice-template",
+                      "label": "Standard Invoice",
+                      "source": {
+                        "key": "invoice.docx",
+                        "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      },
+                      "output": {
+                        "content_type": "application/pdf",
+                        "bucket": "microstrate-documents",
+                        "folder": "invoices",
+                        "name": "invoice-{invoice_number}"
+                      },
+                      "signatories": [
+                        {
+                          "name": "{client_name}",
+                          "email": "{client_email}",
+                          "validity": {
+                            "day": 7
+                          },
+                          "order": 0
+                        }
+                      ],
+                      "sub_templates": []
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            },
+            "500": {
+              "$ref": "#/components/responses/ServerError"
+            }
+          }
+        },
+        "patch": {
+          "tags": [
+            "Templates"
+          ],
+          "summary": "Update template",
+          "description": "Update an existing **draft** template. Unlike `POST /templates`, this does not check for pre-existence \u2014 it will create or overwrite the draft.\n\nThis is a merge-style upsert: the supplied fields are written over the draft's event stream, so partial bodies are fine (the example below updates only `output`). To *remove* a field entirely, use `PATCH /templates/{key}/unset` instead.\n\nChanges are not visible to document generation until the draft is re-published via `POST /templates/{key}/publish`.",
+          "operationId": "updateTemplate",
+          "x-resource-type": "service",
+          "x-resource": "microstrate.file-generator.patch.template",
+          "parameters": [
+            {
+              "$ref": "#/components/parameters/TemplateKey"
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateUpsertRequest"
+                },
+                "example": {
+                  "key": "invoice-template",
+                  "output": {
+                    "content_type": "application/pdf",
+                    "bucket": "microstrate-documents",
+                    "folder": "invoices.updated"
+                  }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Template draft updated successfully. The response returns the messaging subject of the draft record.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/SubjectResponse"
+                  },
+                  "example": {
+                    "subject": "ms.document.draft.template.invoice-template"
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            },
+            "500": {
+              "$ref": "#/components/responses/ServerError"
+            }
+          }
+        },
+        "delete": {
+          "tags": [
+            "Templates"
+          ],
+          "summary": "Delete template",
+          "description": "Delete a draft or published template. Set `?draft=true` to target the draft version; omit it to target the published version. Deleting one version does not affect the other.\n\nDeletion is implemented as a **poison-pill message** (`type: poison-pilled`) appended to the template's event stream \u2014 the underlying events are retained, but the aggregate resolves to deleted and the key disappears from list/get results. Deleting a published template immediately stops it from being triggerable.",
+          "operationId": "deleteTemplate",
+          "x-resource-type": "service",
+          "x-resource": "microstrate.file-generator.delete.template",
+          "parameters": [
+            {
+              "$ref": "#/components/parameters/TemplateKey"
+            },
+            {
+              "$ref": "#/components/parameters/QueryDraft"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Template deleted successfully.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/SuccessMessageResponse"
+                  },
+                  "example": {
+                    "message": "success"
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            },
+            "500": {
+              "$ref": "#/components/responses/ServerError"
+            }
+          }
+        }
+      },
+      "/file-generator/templates": {
+        "get": {
+          "tags": [
+            "Templates"
+          ],
+          "summary": "List templates",
+          "description": "List all templates. Pass `?draft=true` to list draft templates instead of published ones.\n\nThe response is paged stream-style: `results_total` is the number of items in this response, `total_messages` is the total available, and `next_sequence` is the cursor for the next page.",
+          "operationId": "listTemplates",
+          "x-resource-type": "service",
+          "x-resource": "microstrate.file-generator.get.templates",
+          "parameters": [
+            {
+              "$ref": "#/components/parameters/QueryDraft"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Templates listed successfully.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/TemplateListResponse"
+                  },
+                  "example": {
+                    "body": {
+                      "results": [
+                        {
+                          "key": "invoice-template",
+                          "label": "Standard Invoice",
+                          "source": {
+                            "key": "invoice.docx",
+                            "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                          },
+                          "output": {
+                            "content_type": "application/pdf",
+                            "bucket": "microstrate-documents",
+                            "folder": "invoices"
+                          },
+                          "signatories": [],
+                          "sub_templates": []
+                        }
+                      ],
+                      "results_total": 1,
+                      "next_sequence": 42,
+                      "total_messages": 1
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            },
+            "500": {
+              "$ref": "#/components/responses/ServerError"
+            }
+          }
+        },
+        "post": {
+          "tags": [
+            "Templates"
+          ],
+          "summary": "Create template",
+          "description": "Create a new **draft** template. Returns `402` if a template with the same key already exists (use `PATCH /templates/{key}` to update an existing draft).\n\nThe `source` object references a DOCX file already uploaded to `microstrate-documents` object storage bucket. That file is processed by replacing tags with data from payload when the template is triggered: tags inside the DOCX (e.g. `{client_name}`, `{#line_items}\u2026{/line_items}`, `{subtotal + tax}`) are evaluated against the trigger payload to produce the final output \u2014 a PDF when `output.content_type` is `application/pdf`, or a rendered DOCX. \n\nOther expression-aware fields:\n- `output.name` \u2014 output filename template, e.g. `invoice-{invoice_number}`; the extension (`.pdf`/`.docx`) is appended automatically based on `output.content_type`.\n- `signatories[].name` / `signatories[].email` \u2014 resolved against the payload before the Signature request is sent. Signatories whose rendered email is missing or invalid are skipped.\n- `sub_templates[].conditions` \u2014 rule-engine conditions evaluated against the payload; matching sub-templates are rendered and merged after the main template.\n\nIt is recommended to run `POST /templates/validate` on the DOCX content first to catch malformed tags.",
+          "operationId": "createTemplate",
+          "x-resource-type": "service",
+          "x-resource": "microstrate.file-generator.post.template",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateUpsertRequest"
+                },
+                "example": {
+                  "key": "invoice-template",
+                  "label": "Standard Invoice",
+                  "source": {
+                    "key": "invoice.docx",
+                    "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  },
+                  "output": {
+                    "name": "invoice-{invoice_number}",
+                    "content_type": "application/pdf",
+                    "bucket": "microstrate-documents",
+                    "folder": "invoices"
+                  },
+                  "signatories": [
+                    {
+                      "name": "{client_name}",
+                      "email": "{client_email}",
+                      "validity": {
+                        "day": 7
+                      },
+                      "order": 0
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Template created successfully.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/SubjectResponse"
+                  },
+                  "example": {
+                    "subject": "ms.document.draft.template.invoice-template"
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            },
+            "402": {
+              "description": "Template with this key already exists.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  },
+                  "example": {
+                    "error": "template with key: \"invoice-template\" already exists"
+                  }
+                }
+              }
+            },
+            "500": {
+              "$ref": "#/components/responses/ServerError"
+            }
+          }
+        }
+      },
+      "/file-generator/templates/{key}/publish": {
+        "post": {
+          "tags": [
+            "Templates"
+          ],
+          "summary": "Publish template",
+          "description": "Promote a draft template to published state. The published version is what `POST /templates/trigger` uses to generate documents \u2014 draft edits have no effect on generation until published.\n\nPublishing copies the current draft aggregate to the published record; subsequent draft edits do not leak into the published version. Returns `400` if no draft exists for the key.",
+          "operationId": "publishTemplate",
+          "x-resource-type": "service",
+          "x-resource": "microstrate.file-generator.post.template-publish",
+          "parameters": [
+            {
+              "$ref": "#/components/parameters/TemplateKey"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Template published successfully.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/SubjectResponse"
+                  },
+                  "example": {
+                    "subject": "ms.document.template.invoice-template"
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            },
+            "500": {
+              "$ref": "#/components/responses/ServerError"
+            }
+          }
+        }
+      },
+      "/file-generator/templates/validate": {
+        "post": {
+          "tags": [
+            "Templates"
+          ],
+          "summary": "Validate template",
+          "description": "Validate a base64-encoded template file before storing it.\n\nThe file is checked by rendering tags with empty data, and any tag errors are returned without persisting anything. The `errors` entries are error explanations, covering problems such as unclosed loop tags, duplicate/unopened close tags, and expressions that fail to compile.\n\nValidation is **syntactic**: it confirms the tags compile, not that the payload you eventually send will contain every referenced identifier \u2014 unresolved identifiers at trigger time render as an empty string rather than failing.\n\nAlways run this before `POST /templates` / `PATCH /templates/{key}` when the source DOCX changes \u2014 a template that stores an invalid source will fail every trigger.",
+          "operationId": "validateTemplate",
+          "x-resource-type": "service",
+          "x-resource": "microstrate.file-generator.post.template-validate",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidateTemplateRequest"
+                },
+                "example": {
+                  "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                  "content": "UEsDBBQABgAIAAAAIQDfpNJ..."
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Validation result returned.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ValidateTemplateResponse"
+                  },
+                  "examples": {
+                    "valid": {
+                      "summary": "Template compiles cleanly",
+                      "value": {
+                        "is_valid": true,
+                        "errors": []
+                      }
+                    },
+                    "invalid": {
+                      "summary": "Template has tag errors",
+                      "description": "Each entry is an error explanation for one failing tag.",
+                      "value": {
+                        "is_valid": false,
+                        "errors": [
+                          "The tag beginning with \"{#line_items\" is unclosed",
+                          "The scope parser for the tag \"subtotal +\" failed to compile"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            },
+            "500": {
+              "$ref": "#/components/responses/ServerError"
+            }
+          }
+        }
+      },
+      "/file-generator/templates/{key}/unset": {
+        "post": {
+          "tags": [
+            "Templates"
+          ],
+          "summary": "Unset template paths",
+          "description": "Remove specific fields from a **draft** template by dot-notation path.\n\nNOTE: although this is a field-removal operation, the gateway routes it as **POST** `/file-generator/templates/{key}/unset` (the document equivalent is PATCH). Each path is unset as its own `type: unset` event on the template stream. Re-publish for the change to affect generation.",
+          "operationId": "unsetTemplatePaths",
+          "x-resource-type": "service",
+          "x-resource": "microstrate.file-generator.patch.template-unset",
+          "parameters": [
+            {
+              "$ref": "#/components/parameters/TemplateKey"
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnsetPathsRequest"
+                },
+                "example": {
+                  "key": "invoice-template",
+                  "paths": [
+                    "output.folder",
+                    "signatories"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Paths unset successfully.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/SuccessMessageResponse"
+                  },
+                  "example": {
+                    "message": "success"
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            },
+            "500": {
+              "$ref": "#/components/responses/ServerError"
+            }
+          }
+        }
+      },
+      "/file-generator/templates/trigger": {
+        "post": {
+          "tags": [
+            "Templates"
+          ],
+          "summary": "Trigger template",
+          "description": "Generate one or more documents from **published** templates.\n\nEach entry in `list` names a template key and may override its stored `output` configuration. The shared `payload` object is the data context for **angular expression evaluation**: every key in the payload becomes an identifier available to tags inside the template's source DOCX, to the `output.name` filename template, to `signatories[].name`/`email`, and (as `<key>.value` facts) to `sub_templates[].conditions`. Expressions support nested property access (`{client.address.city}`), operators (`{subtotal + tax}`, `{is_overdue ? \"OVERDUE\" : \"\"}`), condition blocks (`{#discount > 0}\u2026{/}`), loops (`{#line_items}{description} \u2014 {qty * unit_price}{/line_items}`), and the built-in filters.\n\n**This is an asynchronous operation.** The `200` response confirms each job was queued (or reports per-template validation errors) and returns the document `subject`. A document record is created immediately with `output: null`; the trigger consumer then fetches the published template and its matching sub-templates, renders them against the payload, merges the results, and updates the record with `output.key` (the storage URI of the generated file) \u2014 or with `errors` if rendering failed. Poll `GET /documents/{key}` to observe completion. If the template defines signatories, the signature request is dispatched automatically after rendering succeeds (each signatory starts as `DRAFT`, moving to `SENT` once the request is created).\n\nThe generated file is written to `{store}://{bucket}/{filepath}` where trigger-level `output` overrides take precedence over the template's stored `output`. Buckets may target the object store (`obj://`, default) or the key-value store (`kv://`).",
+          "operationId": "triggerTemplate",
+          "x-resource-type": "service",
+          "x-resource": "microstrate.file-generator.post.template-trigger",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriggerTemplateRequest"
+                },
+                "example": {
+                  "payload": {
+                    "client_name": "Acme Corp",
+                    "client_email": "billing@acme.com",
+                    "invoice_number": "INV-2026-014",
+                    "currency": "EUR",
+                    "line_items": [
+                      {
+                        "description": "Consulting",
+                        "qty": 10,
+                        "unit_price": 120
+                      },
+                      {
+                        "description": "Support retainer",
+                        "qty": 1,
+                        "unit_price": 800
+                      }
+                    ],
+                    "subtotal": 2000,
+                    "tax": 400
+                  },
+                  "list": [
+                    {
+                      "template": "invoice-template",
+                      "output": {
+                        "folder": "invoices.2026"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Trigger jobs queued. The response is per-template: entries with a `subject` were queued successfully (the subject identifies the document record to poll); entries with `errors` failed validation and no job was queued for them. A `200` therefore does not guarantee every template was triggered \u2014 check each result.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/TriggerTemplateResponse"
+                  },
+                  "example": [
+                    {
+                      "template": "invoice-template",
+                      "subject": "ms.document.document.invoices.2026.invoice-INV-2026-014.pdf"
+                    }
+                  ]
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            },
+            "500": {
+              "$ref": "#/components/responses/ServerError"
+            }
+          }
+        }
+      },
+      "/file-generator/documents/{key}": {
+        "get": {
+          "tags": [
+            "Documents"
+          ],
+          "summary": "Get document",
+          "description": "Retrieve a single document by key.\n\nDocuments created by `POST /templates/trigger` progress through states observable here:\n- **Queued**: `output: null`, `errors: null` \u2014 rendering in progress.\n- **Generated**: `output.key` set to the storage URI (`obj://bucket/path` or `kv://bucket/path`) of the rendered file.\n- **Failed**: `errors` populated with rendering errors; `output` stays null.\n- **Signing**: `signatures` array populated once a HelloSign request is sent; each signatory's `status` advances `SENT \u2192 SIGNED` (or `EXPIRED`/`FAILED`) as webhook events arrive.",
+          "operationId": "getDocument",
+          "x-resource-type": "service",
+          "x-resource": "microstrate.file-generator.get.document",
+          "parameters": [
+            {
+              "$ref": "#/components/parameters/DocumentKey"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Document retrieved successfully.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/DocumentResponse"
+                  },
+                  "example": {
+                    "body": {
+                      "created_at": "2026-03-15T10:30:00Z",
+                      "name": "acme-nda-2024.pdf",
+                      "output": {
+                        "key": "obj://microstrate-documents/contracts.acme-nda-2024.pdf"
+                      },
+                      "template": {
+                        "key": "nda-template"
+                      },
+                      "signatures": [
+                        {
+                          "name": "Jane Smith",
+                          "email": "jane@acme.com",
+                          "expiry": "2026-03-22T10:30:00Z",
+                          "status": "SIGNED",
+                          "order": 0,
+                          "signed_at": "2026-03-16T14:22:10Z",
+                          "request": {
+                            "id": "sr_abc123",
+                            "signature_id": "hs_sig_xyz789",
+                            "is_embedded": true
+                          },
+                          "error": null
+                        }
+                      ],
+                      "errors": null
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            },
+            "500": {
+              "$ref": "#/components/responses/ServerError"
+            }
+          }
+        },
+        "patch": {
+          "tags": [
+            "Documents"
+          ],
+          "summary": "Update document",
+          "description": "Create or update a document record directly. Used to manually set document metadata outside of the template trigger workflow \u2014 for example registering an externally produced file, or correcting metadata on an existing record.\n\nThe `key` is required and derives the document's storage subject. This is an upsert: it creates the record if absent and merges supplied fields if present.",
+          "operationId": "upsertDocument",
+          "x-resource-type": "service",
+          "x-resource": "microstrate.file-generator.patch.document",
+          "parameters": [
+            {
+              "$ref": "#/components/parameters/DocumentKey"
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpsertDocumentRequest"
+                },
+                "example": {
+                  "key": "contracts/acme-nda-2024.docx",
+                  "name": "Acme NDA 2024",
+                  "template": {
+                    "key": "nda-template"
+                  }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Document updated successfully.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/SubjectResponse"
+                  },
+                  "example": {
+                    "subject": "ms.document.document.contracts.acme-nda-2024.docx"
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            },
+            "500": {
+              "$ref": "#/components/responses/ServerError"
+            }
+          }
+        },
+        "delete": {
+          "tags": [
+            "Documents"
+          ],
+          "summary": "Delete document",
+          "description": "Delete a document record. Implemented as a **poison-pill message** (`type: poison-pilled`) on the document's event stream \u2014 the record disappears from get/list results.\n\nNote: this deletes the document *record* (metadata, signature state). The generated file referenced by `output.key` remains in object/KV storage and must be removed separately if required.",
+          "operationId": "deleteDocument",
+          "x-resource-type": "service",
+          "x-resource": "microstrate.file-generator.delete.document",
+          "parameters": [
+            {
+              "$ref": "#/components/parameters/DocumentKey"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Document deleted successfully.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/SuccessMessageResponse"
+                  },
+                  "example": {
+                    "message": "success"
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            },
+            "500": {
+              "$ref": "#/components/responses/ServerError"
+            }
+          }
+        }
+      },
+      "/file-generator/documents": {
+        "get": {
+          "tags": [
+            "Documents"
+          ],
+          "summary": "List documents",
+          "description": "List documents matching a subject query.\n\nDocument subjects live under `ms.document.document.>` and mirror the sanitised output filepath, with folders as subject tokens (a document written to `contracts/acme-nda-2024.pdf` lives under `contracts.acme-nda-2024.pdf` within that namespace). The required `query` parameter is appended to the namespace and supports stream wildcard patterns:\n- `contracts.*` \u2014 direct children of `contracts` (single level)\n- `contracts.>` \u2014 everything under `contracts` at any depth\n- `invoices.2026.*` \u2014 documents in the `invoices/2026` folder\n\nMissing `query` returns `400` with `` `query` query param is required ``.",
+          "operationId": "listDocuments",
+          "x-resource-type": "service",
+          "x-resource": "microstrate.file-generator.get.documents",
+          "parameters": [
+            {
+              "name": "query",
+              "in": "query",
+              "required": true,
+              "description": "Stream subject query filter, e.g. `contracts.*` or `contracts.>`.",
+              "schema": {
+                "type": "string",
+                "example": "contracts.*"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Documents listed successfully.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/DocumentListResponse"
+                  },
+                  "example": {
+                    "body": {
+                      "results": [
+                        {
+                          "created_at": "2024-03-15T10:30:00Z",
+                          "name": "acme-nda-2024.docx",
+                          "output": {
+                            "key": "obj://microstrate-documents/contracts.acme-nda-2024.pdf"
+                          },
+                          "template": {
+                            "key": "nda-template"
+                          },
+                          "signatures": null,
+                          "errors": null
+                        }
+                      ],
+                      "results_total": 1,
+                      "next_sequence": 99,
+                      "total_messages": 1
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            },
+            "500": {
+              "$ref": "#/components/responses/ServerError"
+            }
+          }
+        }
+      },
+      "/file-generator/documents/{key}/unset": {
+        "patch": {
+          "tags": [
+            "Documents"
+          ],
+          "summary": "Unset document paths",
+          "description": "Remove specific fields from a document record by dot-notation path. Each path is unset as its own `type: unset` event. A common use is clearing `errors` and `output` before re-triggering generation for the same document key.",
+          "operationId": "unsetDocumentPaths",
+          "x-resource-type": "service",
+          "x-resource": "microstrate.file-generator.patch.document-unset",
+          "parameters": [
+            {
+              "$ref": "#/components/parameters/DocumentKey"
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnsetPathsRequest"
+                },
+                "example": {
+                  "key": "contracts.acme-nda-2024.docx",
+                  "paths": [
+                    "errors",
+                    "output"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Paths unset successfully.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/SuccessMessageResponse"
+                  },
+                  "example": {
+                    "message": "success"
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            },
+            "500": {
+              "$ref": "#/components/responses/ServerError"
+            }
+          }
+        }
+      },
+      "/file-generator/documents/{key}/signature-url": {
+        "get": {
+          "tags": [
+            "Signatures"
+          ],
+          "summary": "Get document signature URL",
+          "description": "Generate an embedded signing URL for a specific signature on a document, suitable for loading in an iframe.\n\nOnly available for signatures created in **embedded signing mode** (`request.is_embedded: true` on the document's signatory record). Embedded mode is an account-level configuration \u2014 all signatures of a request share it. Requesting a URL for an unknown `signature_id` or a non-embedded signature returns a `500` with the error message (e.g. `Signature url is only available in embedded mode: \u2026`).\n\nEmbedded URLs are short-lived; generate one immediately before presenting the signing UI rather than storing it.",
+          "operationId": "getDocumentSignatureUrl",
+          "x-resource-type": "service",
+          "x-resource": "microstrate.file-generator.get.document-signature-url",
+          "parameters": [
+            {
+              "$ref": "#/components/parameters/DocumentKey"
+            },
+            {
+              "name": "signature_id",
+              "in": "query",
+              "required": true,
+              "description": "HelloSign signature ID.",
+              "schema": {
+                "type": "string",
+                "example": "hs_sig_xyz789"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Embedded signing URL generated successfully. Load this URL with the HelloSign embedded JS client; it expires shortly after creation.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/SignatureUrlResponse"
+                  },
+                  "example": {
+                    "signature_url": "https://app.hellosign.com/sign/abc123?client_id=cid_xyz&skip_domain_verification=true"
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            },
+            "500": {
+              "$ref": "#/components/responses/ServerError"
+            }
+          }
+        }
+      },
+      "/file-generator/webhooks/hellosign/{account}": {
+        "post": {
+          "tags": [
+            "Signatures"
+          ],
+          "summary": "HelloSign callback",
+          "description": "Webhook endpoint for HelloSign signature events. **Called by the HelloSign platform, not by internal services** \u2014 configure it as the callback URL in the HelloSign app settings. The event arrives as a multipart form field named `json`.\n\nHandled event types:\n- `signature_request_signed` \u2014 one signatory signed; their status on the document becomes `SIGNED` (matched by signer name + email).\n- `signature_request_all_signed` \u2014 all signatories signed; the fully executed PDF is downloaded from HelloSign and written back over the document's output location in storage.\n- `signature_request_invalid` \u2014 the request failed; affected signatories are marked `FAILED` with the `error` field populated.\n\nUnrecognised event types are silently ignored. Each event's `event_hash` is verified as HMAC-SHA256(`event_time` + `event_type`) using the account's HelloSign API key; events with a hash mismatch are discarded. The endpoint **always** responds `200 Hello API Event Received` regardless of processing outcome.",
+          "operationId": "hellosignCallback",
+          "x-is-public": true,
+          "x-resource-type": "service",
+          "x-resource": "microstrate.file-generator.post.hellosign-callback",
+          "security": [],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "multipart/form-data": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "json": {
+                      "type": "string",
+                      "description": "JSON-encoded HelloSign event payload. Contains `event` (type, time, HMAC hash) and `signature_request` (signatures with status, plus `metadata.subject` / `metadata.key` that route the event back to the originating document)."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Event received. The body is the plain string `Hello API Event Received`. The handler responds `200` even when event processing fails (hash mismatch, unknown account, lookup errors) so that HelloSign does not retry \u2014 processing errors are logged server-side only.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "string",
+                    "example": "Hello API Event Received"
+                  },
+                  "example": "Hello API Event Received"
+                }
+              }
+            }
+          },
+          "parameters": [
+            {
+              "name": "account",
+              "in": "path",
+              "required": true,
+              "description": "Account id the webhook event is routed to.",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "components": {
+      "securitySchemes": {
+        "bearerAuth": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT",
+          "description": "JWT bearer token. The service engine reads only `Authorization: Bearer <jwt>` and derives the account/tenant from it."
+        },
+        "apiKeyAuth": {
+          "type": "apiKey",
+          "in": "header",
+          "name": "X-Api-Key",
+          "description": "Static API key. Accepted at the gateway, which swaps it for a JWT before the service sees the request (confirmed working for reads)."
+        }
+      },
+      "parameters": {
+        "TemplateKey": {
+          "name": "key",
+          "in": "path",
+          "required": true,
+          "description": "Unique template key.",
+          "schema": {
+            "type": "string",
+            "example": "invoice-template"
+          }
+        },
+        "DocumentKey": {
+          "name": "key",
+          "in": "path",
+          "required": true,
+          "description": "Unique document key, typically a file path.",
+          "schema": {
+            "type": "string",
+            "example": "contracts/acme-nda-2024.docx"
+          }
+        },
+        "QueryDraft": {
+          "name": "draft",
+          "in": "query",
+          "required": false,
+          "description": "When `true`, targets the draft version of a template. Defaults to published.",
+          "schema": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "schemas": {
+        "TemplateSignatoryValidity": {
+          "type": "object",
+          "description": "How long the signatory has to complete signing, measured from when the signature request is sent. The day/week/month/year components are summed; once elapsed, the signature is marked `EXPIRED` and the HelloSign request is cancelled.",
+          "properties": {
+            "day": {
+              "type": "integer",
+              "example": 7
+            },
+            "week": {
+              "type": "integer",
+              "example": 0
+            },
+            "month": {
+              "type": "integer",
+              "example": 0
+            },
+            "year": {
+              "type": "integer",
+              "example": 0
+            }
+          }
+        },
+        "TemplateSignatory": {
+          "type": "object",
+          "required": [
+            "name",
+            "email",
+            "validity"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Signatory name. Supports single-brace angular expression placeholders resolved against the trigger payload, e.g. `{client_name}`. The rendered value is trimmed and truncated to 100 characters (HelloSign limit).",
+              "example": "{client_name}"
+            },
+            "email": {
+              "type": "string",
+              "description": "Signatory email. Supports single-brace angular expression placeholders resolved against the trigger payload, e.g. `{client_email}`. The rendered value is trimmed and lowercased; signatories with a missing or invalid rendered email (or empty name) are skipped \u2014 if none remain, no signature request is sent and the document's `signatures` is `null`.",
+              "example": "{client_email}"
+            },
+            "validity": {
+              "$ref": "#/components/schemas/TemplateSignatoryValidity"
+            },
+            "order": {
+              "type": "integer",
+              "description": "Signing order index (0-based). Defaults to the signatory's position in the array.",
+              "example": 0
+            }
+          }
+        },
+        "TemplateSubTemplate": {
+          "type": "object",
+          "required": [
+            "key"
+          ],
+          "properties": {
+            "key": {
+              "type": "string",
+              "description": "Key of the sub-template to merge.",
+              "example": "terms-and-conditions"
+            },
+            "conditions": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Rule-engine condition object evaluated against the trigger payload; the sub-template is only included when it resolves to true. Payload keys are exposed as facts named `<key>.value` (e.g. payload `client_region` \u2192 fact `client_region.value`).",
+              "example": {
+                "all": [
+                  {
+                    "fact": "client_region.value",
+                    "operator": "equal",
+                    "value": "EU"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "TemplateOutput": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Output filename template, rendered against the trigger payload with single-brace angular expressions (e.g. `invoice-{invoice_number}` \u2192 `invoice-INV-2026-014`). Defaults to the template key when omitted or when rendering fails. The `.pdf`/`.docx` extension is appended automatically from `content_type` \u2014 do not include it.",
+              "example": "invoice-{invoice_number}"
+            },
+            "content_type": {
+              "type": "string",
+              "description": "Output MIME type. DOCX sources can render to PDF or DOCX; PDF sources can only output PDF (PDF\u2192DOCX conversion is not supported).",
+              "enum": [
+                "application/pdf",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              ],
+              "example": "application/pdf"
+            },
+            "bucket": {
+              "type": "string",
+              "description": "Storage bucket. May be prefixed with `obj://` (object store, default) or `kv://` (key-value store) to select the storage backend. Defaults to the service's document bucket.",
+              "example": "microstrate-documents"
+            },
+            "folder": {
+              "type": "string",
+              "description": "Output folder path within the bucket.",
+              "example": "invoices/2024"
+            }
+          },
+          "description": "Where and how the rendered document is written. The final storage key is `{bucket}/{folder}/{name}.{ext}` with the extension derived from `content_type`."
+        },
+        "Template": {
+          "type": "object",
+          "required": [
+            "key"
+          ],
+          "properties": {
+            "key": {
+              "type": "string",
+              "description": "Unique identifier for the template.",
+              "example": "invoice-template"
+            },
+            "label": {
+              "type": "string",
+              "description": "Human-readable display name.",
+              "example": "Standard Invoice"
+            },
+            "source": {
+              "type": "object",
+              "required": [
+                "key",
+                "content_type"
+              ],
+              "description": "Reference to the source template file in object storage (the document object store bucket). DOCX sources are processed with the angular expression parser: tags such as `{client_name}`, `{#items}\u2026{/items}` (loops), `{price + tax}` (operators), and `{amount | formatcurrency:'EUR'}` (filters) are evaluated against the trigger payload to produce the final output. PDF sources (`application/pdf`) are passed through \u2014 and merged with sub-templates \u2014 without expression rendering, and can only output PDF.",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "description": "Template file reference. Either a simple path (uses default `microstrate-documents` bucket) or a full storage URL. Formats: `templates/invoice.docx` (default) | `obj://bucket-name/path/file.docx` (object store) | `kv://bucket-name/path/file.docx` (key-value store).",
+                  "examples": [
+                    "templates/invoice.docx",
+                    "obj://microstrate-documents/templates/invoice.docx",
+                    "obj://external-bucket/templates/contract.docx"
+                  ]
+                },
+                "content_type": {
+                  "type": "string",
+                  "description": "MIME type of the source file.",
+                  "example": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                }
+              }
+            },
+            "output": {
+              "$ref": "#/components/schemas/TemplateOutput"
+            },
+            "signatories": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/TemplateSignatory"
+              },
+              "description": "Signatories to request e-signatures from once the document is generated. `name` and `email` support expression placeholders resolved against the trigger payload; entries whose rendered email is missing or invalid are skipped. An empty/absent array means no signature request is sent."
+            },
+            "sub_templates": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/TemplateSubTemplate"
+              },
+              "description": "Additional published templates rendered with the same payload and merged after the main template in array order. Entries with `conditions` are included only when the rule-engine conditions evaluate to true against the trigger payload."
+            },
+            "modified": {
+              "type": "integer",
+              "readOnly": true,
+              "description": "Server-set last-modified unix timestamp (read-only)."
+            },
+            "sequence": {
+              "type": "integer",
+              "readOnly": true,
+              "description": "Event-stream sequence number (read-only)."
+            },
+            "subject": {
+              "type": "string",
+              "readOnly": true,
+              "description": "Messaging subject of the aggregate (read-only)."
+            },
+            "type": {
+              "type": "string",
+              "readOnly": true,
+              "description": "Last event type, e.g. created/upserted/published (read-only)."
+            }
+          },
+          "description": "A document template. The `source` DOCX is rendered with angular expression parser when the template is triggered; `output` controls where and in what format the rendered file is written."
+        },
+        "TemplateUpsertRequest": {
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/Template"
+            }
+          ],
+          "description": "Request body for creating or updating a template."
+        },
+        "DocumentSignatoryRequest": {
+          "type": "object",
+          "description": "Signature request object attached to the signatory after a HelloSign request is sent.",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "HelloSign signature request ID.",
+              "example": "sr_abc123"
+            },
+            "signature_id": {
+              "type": "string",
+              "description": "HelloSign per-signatory signature ID.",
+              "example": "hs_sig_xyz789"
+            },
+            "is_embedded": {
+              "type": "boolean",
+              "description": "Whether the signing is done via an embedded iframe.",
+              "example": true
+            }
+          }
+        },
+        "DocumentSignatory": {
+          "type": "object",
+          "required": [
+            "name",
+            "email",
+            "expiry",
+            "status"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "example": "Jane Smith"
+            },
+            "email": {
+              "type": "string",
+              "format": "email",
+              "example": "jane@acme.com"
+            },
+            "expiry": {
+              "type": "string",
+              "format": "date-time",
+              "description": "ISO 8601 datetime after which the signing request expires.",
+              "example": "2024-03-22T10:30:00Z"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "SENT",
+                "SIGNED",
+                "EXPIRED",
+                "FAILED"
+              ],
+              "description": "Current signing status.",
+              "example": "SIGNED"
+            },
+            "order": {
+              "type": "integer",
+              "description": "Signing order index (0-based).",
+              "example": 0
+            },
+            "signed_at": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true,
+              "description": "ISO 8601 datetime when the signatory signed. Null if not yet signed.",
+              "example": "2024-03-16T14:22:10Z"
+            },
+            "request": {
+              "nullable": true,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/DocumentSignatoryRequest"
+                }
+              ]
+            },
+            "error": {
+              "type": "string",
+              "nullable": true,
+              "description": "Error message if the signature request failed.",
+              "example": null
+            }
+          },
+          "description": "Per-signatory e-signature state on a document. Status lifecycle: `DRAFT` (created at trigger time, request not yet sent) \u2192 `SENT` (HelloSign request dispatched; `request` populated) \u2192 `SIGNED`, or `EXPIRED` (validity window elapsed \u2014 an expiry cron marks the signature and cancels the HelloSign request) / `FAILED` (delivery or signing error \u2014 see `error`). The `expiry` timestamp is computed at trigger time as now + the template signatory's `validity`."
+        },
+        "Document": {
+          "type": "object",
+          "properties": {
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "ISO 8601 datetime when the document was created.",
+              "example": "2024-03-15T10:30:00Z"
+            },
+            "name": {
+              "type": "string",
+              "description": "Human-readable filename.",
+              "example": "acme-nda-2024.pdf"
+            },
+            "output": {
+              "nullable": true,
+              "type": "object",
+              "description": "Reference to the generated output file in object storage.",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "description": "Object store URI for the generated file.",
+                  "example": "obj://microstrate-documents/contracts/acme-nda-2024.pdf"
+                }
+              }
+            },
+            "template": {
+              "type": "object",
+              "description": "Reference to the template used to generate this document.",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "example": "nda-template"
+                }
+              }
+            },
+            "signatures": {
+              "type": "array",
+              "nullable": true,
+              "items": {
+                "$ref": "#/components/schemas/DocumentSignatory"
+              }
+            },
+            "errors": {
+              "type": "array",
+              "nullable": true,
+              "items": {
+                "type": "string"
+              },
+              "description": "Generation errors, if the document failed to produce output.",
+              "example": null
+            },
+            "modified": {
+              "type": "integer",
+              "readOnly": true,
+              "description": "Server-set last-modified unix timestamp (read-only)."
+            },
+            "sequence": {
+              "type": "integer",
+              "readOnly": true,
+              "description": "Event-stream sequence number (read-only)."
+            },
+            "subject": {
+              "type": "string",
+              "readOnly": true,
+              "description": "Messaging subject of the aggregate (read-only)."
+            },
+            "type": {
+              "type": "string",
+              "readOnly": true,
+              "description": "Last event type, e.g. created/upserted/published (read-only)."
+            }
+          },
+          "description": "A generated (or registered) document record. `output.key` is the storage URI of the rendered file; `signatures` tracks per-signatory e-signature state; `errors` is populated when generation fails."
+        },
+        "UpsertDocumentRequest": {
+          "type": "object",
+          "required": [
+            "key"
+          ],
+          "properties": {
+            "key": {
+              "type": "string",
+              "description": "Document key \u2014 used to derive the storage subject.",
+              "example": "contracts/acme-nda-2024.docx"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "name": {
+              "type": "string",
+              "example": "Acme NDA 2024"
+            },
+            "output": {
+              "nullable": true,
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "example": "obj://microstrate-documents/contracts/acme-nda-2024.pdf"
+                }
+              }
+            },
+            "template": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "example": "nda-template"
+                }
+              }
+            },
+            "signatures": {
+              "type": "array",
+              "nullable": true,
+              "items": {
+                "$ref": "#/components/schemas/DocumentSignatory"
+              }
+            },
+            "errors": {
+              "type": "array",
+              "nullable": true,
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "UnsetPathsRequest": {
+          "type": "object",
+          "required": [
+            "key",
+            "paths"
+          ],
+          "properties": {
+            "key": {
+              "type": "string",
+              "description": "Key of the record to modify.",
+              "example": "invoice-template"
+            },
+            "paths": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Dot-notation field paths to remove.",
+              "example": [
+                "output.folder",
+                "signatories"
+              ]
+            }
+          }
+        },
+        "ValidateTemplateRequest": {
+          "type": "object",
+          "required": [
+            "content_type",
+            "content"
+          ],
+          "properties": {
+            "content_type": {
+              "type": "string",
+              "enum": [
+                "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "application/xml"
+              ],
+              "example": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            },
+            "content": {
+              "type": "string",
+              "format": "byte",
+              "description": "Base64-encoded template file content. The file is compiled with angular expression parser and any tag errors are reported \u2014 nothing is persisted.",
+              "example": "UEsDBBQABgAIAAAAIQDfpNJ..."
+            }
+          }
+        },
+        "TriggerOutputOverride": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "example": "invoice-{invoice_number}"
+            },
+            "content_type": {
+              "type": "string",
+              "example": "application/pdf"
+            },
+            "bucket": {
+              "type": "string",
+              "example": "microstrate-documents"
+            },
+            "folder": {
+              "type": "string",
+              "example": "invoices.2024"
+            }
+          },
+          "description": "Per-trigger overrides for the template's stored `output` configuration. Any field provided here takes precedence; omitted fields fall back to the template, then to service defaults."
+        },
+        "TemplateTriggerItem": {
+          "type": "object",
+          "required": [
+            "template"
+          ],
+          "properties": {
+            "template": {
+              "type": "string",
+              "description": "Key of the published template to trigger.",
+              "example": "invoice-template"
+            },
+            "output": {
+              "$ref": "#/components/schemas/TriggerOutputOverride"
+            }
+          }
+        },
+        "TriggerTemplateRequest": {
+          "type": "object",
+          "required": [
+            "payload",
+            "list"
+          ],
+          "properties": {
+            "payload": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Data context (source) for all template expressions. **No schema required \u2014 completely flexible and user-defined.** Every key in the payload becomes an identifier available in template tags. Example: payload `{\"client_name\": \"Acme\", \"invoice_number\": \"INV-001\"}` makes `{client_name}` and `{invoice_number}` available in the template. Nested objects and arrays are fully traversable: `{client.address.city}`, `{items.0.price}`, `{#items}...{/items}`. Missing fields render as empty (not errors) \u2014 use conditionals like `{#field}...{/}` to handle optional data. Structure your payload to match the identifiers referenced in your template; the API does not validate field matching.",
+              "example": {
+                "client_name": "Acme Corp",
+                "client_email": "billing@acme.com",
+                "invoice_number": "INV-2024-001",
+                "amount": "5000.00"
+              }
+            },
+            "list": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/TemplateTriggerItem"
+              },
+              "description": "One or more template trigger entries. Each queues an independent generation job rendered against the shared `payload`; per-entry `output` overrides take precedence over the template's stored output configuration."
+            }
+          }
+        },
+        "TriggerResult": {
+          "type": "object",
+          "required": [
+            "template"
+          ],
+          "properties": {
+            "template": {
+              "type": "string",
+              "description": "Template key that was triggered.",
+              "example": "invoice-template"
+            },
+            "subject": {
+              "type": "string",
+              "description": "Messaging subject of the queued document (`ms.document.document.{sanitised filepath}`). Present on success \u2014 poll `GET /documents/{key}` with the corresponding key to observe generation progress.",
+              "example": "ms.document.document.invoices.2026.invoice-INV-2026-014.pdf"
+            },
+            "errors": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Validation or processing errors. Present on failure.",
+              "example": [
+                "Document template with key: invoice-template does not have a template source"
+              ]
+            }
+          }
+        },
+        "TemplateResponse": {
+          "type": "object",
+          "properties": {
+            "body": {
+              "$ref": "#/components/schemas/Template"
+            },
+            "metadata": {
+              "type": "object",
+              "nullable": true,
+              "description": "Optional data-point metadata about the aggregate."
+            }
+          }
+        },
+        "TemplateListResponse": {
+          "type": "object",
+          "properties": {
+            "body": {
+              "type": "object",
+              "properties": {
+                "results": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Template"
+                  }
+                },
+                "results_total": {
+                  "type": "integer",
+                  "description": "Number of results in this response.",
+                  "example": 3
+                },
+                "next_sequence": {
+                  "type": "integer",
+                  "description": "Sequence number to use for the next page.",
+                  "example": 42
+                },
+                "total_messages": {
+                  "type": "integer",
+                  "description": "Total number of messages in the stream for this subject.",
+                  "example": 3
+                }
+              }
+            }
+          }
+        },
+        "DocumentResponse": {
+          "type": "object",
+          "properties": {
+            "body": {
+              "$ref": "#/components/schemas/Document"
+            },
+            "metadata": {
+              "type": "object",
+              "nullable": true,
+              "description": "Optional data-point metadata about the aggregate."
+            }
+          }
+        },
+        "DocumentListResponse": {
+          "type": "object",
+          "properties": {
+            "body": {
+              "type": "object",
+              "properties": {
+                "results": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Document"
+                  }
+                },
+                "results_total": {
+                  "type": "integer",
+                  "description": "Number of results in this response.",
+                  "example": 5
+                },
+                "next_sequence": {
+                  "type": "integer",
+                  "description": "Sequence number to use for the next page.",
+                  "example": 99
+                },
+                "total_messages": {
+                  "type": "integer",
+                  "description": "Total number of messages in the stream for this subject.",
+                  "example": 5
+                }
+              }
+            }
+          }
+        },
+        "SubjectResponse": {
+          "type": "object",
+          "properties": {
+            "subject": {
+              "type": "string",
+              "description": "Messaging subject of the created or updated record. Formats: draft template `ms.document.draft.template.{key}`, published template `ms.document.template.{key}`, document `ms.document.document.{key}` \u2014 with keys sanitised into subject tokens (`/` \u2192 `.`, spaces \u2192 `_`, other special characters \u2192 `uXXXX` codes).",
+              "example": "ms.document.draft.template.invoice-template"
+            }
+          }
+        },
+        "SuccessMessageResponse": {
+          "type": "object",
+          "properties": {
+            "message": {
+              "type": "string",
+              "example": "success"
+            }
+          }
+        },
+        "ValidateTemplateResponse": {
+          "type": "object",
+          "properties": {
+            "is_valid": {
+              "type": "boolean",
+              "example": true
+            },
+            "errors": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "example": []
+            }
+          }
+        },
+        "TriggerTemplateResponse": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/TriggerResult"
+          }
+        },
+        "SignatureUrlResponse": {
+          "type": "object",
+          "properties": {
+            "signature_url": {
+              "type": "string",
+              "format": "uri",
+              "description": "Embedded HelloSign signing URL, with `client_id` and `skip_domain_verification=true` already appended. Returned as snake_case `signature_url` at the gateway.",
+              "example": "https://app.hellosign.com/sign/abc123?client_id=cid_xyz&skip_domain_verification=true"
+            }
+          }
+        },
+        "ErrorResponse": {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string",
+              "example": "\"key\" is required"
+            }
+          }
+        }
+      },
+      "responses": {
+        "BadRequest": {
+          "description": "Invalid or missing request parameters.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse"
+              },
+              "example": {
+                "error": "\"key\" is required"
+              }
+            }
+          }
+        },
+        "Unauthorized": {
+          "description": "Missing or invalid Authorization header.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse"
+              },
+              "example": {
+                "error": "Authorization header with a bearer token is required"
+              }
+            }
+          }
+        },
+        "ServerError": {
+          "description": "Internal server error.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse"
+              },
+              "example": {
+                "error": "server error"
+              }
+            }
+          }
+        }
+      }
+    },
+    "x-engine-gotchas": [
+      "All routes are under the `/file-generator` gateway prefix. Single resources use a path param (`/file-generator/templates/{key}`), not `?key=`.",
+      "Update is PATCH (a merge-style upsert over the event stream); use the `/unset` routes to remove fields. Template unset is POST `/file-generator/templates/{key}/unset`; document unset is PATCH `/file-generator/documents/{key}/unset` (a gateway asymmetry).",
+      "Responses: the gateway returns the service `body` field directly (the HTTP status carries status_code). Reads => `{ body: <payload>, metadata? }` (lists: `body.results` / `body.results_total`). Mutations => the payload directly (`{subject}` | `{message:\"success\"}`); trigger => a bare array; validate => `{is_valid,errors}`. Errors => `{ error }`.",
+      "GET/PATCH on a missing OR deleted resource returns 500 `{ error: \"resource not found\" }` (404 is only a wrong route). PATCH to a non-existent template key is create-or-overwrite (silently creates a draft).",
+      "Trigger is asynchronous: the 200 is `[{template, subject} | {template, errors}]`; poll GET `/file-generator/documents/{key}`. A template with no resolvable output.content_type (override or stored) cannot be triggered.",
+      "Read aggregates carry extra event-sourcing fields (modified, sequence, subject, type) that are not part of the writable schema.",
+      "The service also has AI-generation handlers (pptx, docx-generator, docx-editor, pdf-python, xlsx, html-pdf) but they are NOT in the gateway route registry (quiva-endpoints.json) and are not REST-callable."
+    ]
+  }
+}

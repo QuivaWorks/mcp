@@ -1,0 +1,24 @@
+{
+  "id": "UNDERWRITING",
+  "name": "Underwriting",
+  "description": "Underwriter work items for Builders Risk: reviewing priced quotes, completing policy setup, chasing payment and working the renewal digest. Most tasks here are raised by the underwriting flows.",
+  "default_status": "open",
+  "statuses": [
+    { "id": "open", "name": "Open", "color": "#6B7280", "order": 1, "complete": false, "is_visible": true },
+    { "id": "in_progress", "name": "In Progress", "color": "#3B82F6", "order": 2, "complete": false, "is_visible": true },
+    { "id": "completed", "name": "Completed", "color": "#10B981", "order": 3, "complete": true, "is_visible": true },
+    { "id": "cancelled", "name": "Cancelled", "color": "#EF4444", "order": 4, "complete": true, "is_visible": true }
+  ],
+  "record_config_ids": ["Client", "UWClient", "UWQuote", "UWPolicy"],
+  "record_configs": [
+    { "id": "Client" },
+    { "id": "UWClient" },
+    { "id": "UWQuote" },
+    { "id": "UWPolicy" }
+  ],
+  "_notes": {
+    "statuses": "The four states named in Builders.md §3.7.2 (Open / In Progress / Completed / Cancelled). `complete: true` on the last two is what makes them count as closed.",
+    "record_configs": "Both keys are set deliberately. Harvested live spaces carry `record_config_ids` AND `record_configs[{id}]`, and the frontend reads them differently — see microstrate/src/components/spaces/records/space-record-configs.utils.ts. Setting only one leaves the record tabs half-wired.",
+    "client": "`Client` is the SHARED personal-contact record every account already has (financial_advisor's). It is REFERENCED here, never redefined — a record config with that id already exists and deployVerticals uses the create subject, which 409s. UWClient is this vertical's own commercial applicant record."
+  }
+}

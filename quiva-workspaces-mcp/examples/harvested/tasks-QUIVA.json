@@ -1,0 +1,108 @@
+{
+  "slug": "tasks-QUIVA",
+  "kind": "tasks",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "space_id": "QUIVA",
+    "harvested_from": "GET /workspaces/space/QUIVA/tasks (4 of 8 kept)"
+  },
+  "teaches": [
+    "4 real tasks with server-generated ids ({SPACEID}-{n})",
+    "task fields in live use: priority, status, folder, order, time_tracking, due_date, description, reporter",
+    "status values reference the SPACE's status ids: done, review, in_progress, backlog",
+    "priority values reference the SPACE's priority ids: highest, medium",
+    "url is server-built: /en/hub/spaces/{SPACE}/tasks?task={TASK-ID}"
+  ],
+  "tasks": [
+    {
+      "assignees": [
+        "<<REDACTED:user-id>>",
+        "<<REDACTED:user-id>>",
+        "<<REDACTED:user-id>>"
+      ],
+      "created_at": "2026-06-01T09:36:19Z",
+      "created_by": "<<REDACTED:user-id>>",
+      "description": "I am finally setting the description of this task",
+      "due_date": "2026-06-23T08:00:00Z",
+      "id": "QUIVA-3",
+      "priority": "highest",
+      "reporter": "<<REDACTED:user-id>>",
+      "space_id": "QUIVA",
+      "status": "done",
+      "title": "add assistant to workspaces UI",
+      "updated_at": "2026-06-05T15:10:03Z",
+      "url": "https://app.microstrate.io/en/hub/spaces/QUIVA/tasks?task=QUIVA-3"
+    },
+    {
+      "assignees": [
+        "<<REDACTED:user-id>>"
+      ],
+      "created_at": "2026-06-01T11:08:15Z",
+      "created_by": "<<REDACTED:user-id>>",
+      "description": "Updated",
+      "due_date": "2026-06-09T08:00:00Z",
+      "id": "QUIVA-4",
+      "reporter": "<<REDACTED:user-id>>",
+      "space_id": "QUIVA",
+      "status": "review",
+      "title": "Onboarding new customer - Ted the Poet",
+      "updated_at": "2026-06-05T15:33:11Z",
+      "url": "https://app.microstrate.io/en/hub/spaces/QUIVA/tasks?task=QUIVA-4"
+    },
+    {
+      "assignees": [
+        "<<REDACTED:user-id>>"
+      ],
+      "created_at": "2026-06-01T11:37:51Z",
+      "created_by": "<<REDACTED:user-id>>",
+      "description": "Hi @",
+      "due_date": "2026-06-09T00:00:00Z",
+      "id": "QUIVA-5",
+      "order": 2000,
+      "space_id": "QUIVA",
+      "status": "in_progress",
+      "time_tracking": {
+        "estimate": {
+          "time_in_seconds": 0
+        },
+        "logs": [
+          {
+            "created_at": "2026-07-30T09:13:53.022Z",
+            "id": "time_log_0bc44929-e7f3-4381-95e8-076f9cab5462",
+            "started_at": "2026-07-30T09:13:40.496Z",
+            "time_spent": {
+              "time_in_seconds": 144000
+            },
+            "updated_at": "2026-07-30T09:13:53.022Z",
+            "user": {
+              "id": "<<REDACTED:user-id>>",
+              "name": "<<REDACTED:person-name>>"
+            }
+          }
+        ]
+      },
+      "title": "Rehouse the 2 little pigs in a house made of bricks",
+      "updated_at": "2026-07-30T09:13:53Z",
+      "url": "https://app.microstrate.io/en/hub/spaces/QUIVA/tasks?task=QUIVA-5"
+    },
+    {
+      "assignees": [],
+      "attachments": [],
+      "created_at": "2026-07-27T08:35:29Z",
+      "created_by": "<<REDACTED:user-id>>",
+      "folder": "spaces.QUIVA",
+      "id": "QUIVA-11",
+      "priority": "medium",
+      "space_id": "QUIVA",
+      "status": "backlog",
+      "time_tracking": {
+        "estimate": {
+          "time_in_seconds": 18000
+        }
+      },
+      "title": "test",
+      "updated_at": "2026-07-30T09:51:18Z",
+      "url": "https://app.microstrate.io/en/hub/spaces/QUIVA/tasks?task=QUIVA-11"
+    }
+  ]
+}

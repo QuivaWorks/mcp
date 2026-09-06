@@ -1,0 +1,6 @@
+{
+  "id": "crm_sales_call",
+  "title": "Sales Call Summary",
+  "format": "markdown",
+  "content": "Summarise this sales call for a CRM record. Be concise and factual — this is read later by someone who was not on the call.\n\n## Attendees\nWho was on the call, and their role or company where stated.\n\n## What was discussed\nThe main topics, in the order they came up. Two or three sentences each at most.\n\n## Requirements and pain points\nWhat the customer said they need, and what is currently causing them problems. Quote them where the wording matters.\n\n## Objections and concerns\nAnything raised as a blocker — price, timing, integration, a competitor, internal approval. Note how it was handled, if it was.\n\n## Commercials mentioned\nAny figures, products, discounts, contract lengths or renewal dates discussed. If none, say so.\n\n## Decision makers\nWho was named as involved in the decision, and who has the budget, if stated.\n\n## Agreed next steps\nOne line per action: what, who owns it, and by when. Only include what was actually agreed, not what you think should happen.\n\n## Sentiment\nOne of Positive, Neutral or Negative, with one sentence of justification.\n\nIf something in this template was not covered on the call, write \"Not discussed\" under that heading rather than leaving it out or guessing."
+}

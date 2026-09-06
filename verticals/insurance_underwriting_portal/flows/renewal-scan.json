@@ -1,0 +1,104 @@
+{
+  "name": "Daily Renewal Scan",
+  "description": "Daily. Reads active policies, finds those expiring in about 30 days, and raises ONE digest task listing them. A digest rather than a renewal quote per policy because a flow cannot loop — it reads many records but writes to one place. This flow is on a SCHEDULE, so unlike the two record-triggered flows it genuinely runs.",
+  "config": {
+    "static": {
+      "window_days_from": 29,
+      "window_days_to": 31
+    },
+    "nodes": [
+      {
+        "id": "SCHEDULE",
+        "data": {
+          "id": "SCHEDULE",
+          "name": "Daily renewal scan",
+          "node_type": "trigger",
+          "trigger_type": "schedule",
+          "payload": {
+            "trigger_on": "2026-08-05T07:00:00Z",
+            "trigger_every": "24h",
+            "trigger": {}
+          }
+        }
+      },
+      {
+        "id": "LIST_POLICIES",
+        "data": {
+          "id": "LIST_POLICIES",
+          "name": "Read the policies",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/records/UWPolicy",
+            "method": "GET",
+            "headers": { "Authorization": "Bearer |$.env.auth_token" },
+            "query": { "limit": 500 }
+          }
+        }
+      },
+      {
+        "id": "FIND_RENEWALS",
+        "data": {
+          "id": "FIND_RENEWALS",
+          "name": "Find policies expiring in about 30 days",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function(){var rows=(list&&list.results)||list||[];var from=Number(windowFrom)||29;var to=Number(windowTo)||31;var out=[],now=Date.now();for(var i=0;i<rows.length;i++){var d=rows[i].data||{};if(String(d.status||'')!=='Active')continue;if(!d.expiration_date)continue;var exp=Date.parse(d.expiration_date);if(isNaN(exp))continue;var days=Math.floor((exp-now)/86400000);if(days>=from&&days<=to){out.push('- '+(d.policy_reference||rows[i].id)+' — '+(d.insured_name||'unnamed')+' — '+(d.project_name||'no project')+' — expires '+d.expiration_date+' ('+days+' days) — premium '+(d.premium||0));}}return{count:out.length,body:out.join('\\n')||'None.'};})();",
+            "params": {
+              "list": "$.LIST_POLICIES.data",
+              "windowFrom": "$.static.window_days_from",
+              "windowTo": "$.static.window_days_to"
+            }
+          }
+        }
+      },
+      {
+        "id": "CHECK_ANY",
+        "data": {
+          "id": "CHECK_ANY",
+          "name": "Anything due?",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": { "operator": ">", "input": ["$.FIND_RENEWALS.count", 0] },
+              "outcome": "CREATE_DIGEST"
+            },
+            { "outcome": "RESOLVE_SUCCESS" }
+          ]
+        }
+      },
+      {
+        "id": "CREATE_DIGEST",
+        "data": {
+          "id": "CREATE_DIGEST",
+          "name": "Raise the renewal digest",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/workspaces/task",
+            "method": "POST",
+            "headers": { "Authorization": "Bearer |$.env.auth_token" },
+            "data": {
+              "space_id": "UNDERWRITING",
+              "title": "Renewal review needed",
+              "description": "These active policies expire in about 30 days. Raise a renewal quote for each:\n\n|$.FIND_RENEWALS.body",
+              "status": "open",
+              "priority": "high",
+              "tags": ["underwriting", "digest", "renewal"]
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      { "id": "e_SCHEDULE_LIST", "source": "SCHEDULE", "target": "LIST_POLICIES" },
+      { "id": "e_LIST_FIND", "source": "LIST_POLICIES", "target": "FIND_RENEWALS" },
+      { "id": "e_FIND_CHECK", "source": "FIND_RENEWALS", "target": "CHECK_ANY" },
+      { "id": "e_CHECK_DIGEST", "source": "CHECK_ANY", "target": "CREATE_DIGEST" }
+    ],
+    "result": {
+      "status": "success",
+      "due_for_renewal": "$.FIND_RENEWALS.count"
+    }
+  }
+}

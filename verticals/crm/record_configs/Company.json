@@ -1,0 +1,265 @@
+{
+  "id": "Company",
+  "name": "Company",
+  "description": "An organisation the account sells to: prospect, customer, partner or competitor. Deals and contacts hang off it.",
+  "schema": {
+    "type": "object",
+    "required": ["company_name", "account_type"],
+    "properties": {
+      "company_name": { "type": "string", "title": "Company name" },
+      "website_url": { "type": "string", "title": "Website" },
+      "industry": {
+        "type": "string",
+        "title": "Industry",
+        "enum": ["SaaS", "Financial Services", "Healthcare", "Manufacturing", "Retail", "Tech", "Other"]
+      },
+      "company_size": {
+        "type": "string",
+        "title": "Company size",
+        "enum": ["1-10", "11-50", "51-200", "201-500", "500-1000", "1000+"]
+      },
+      "account_type": {
+        "type": "string",
+        "title": "Account type",
+        "enum": ["Prospect", "Customer", "Partner", "Competitor"]
+      },
+      "account_status": {
+        "type": "string",
+        "title": "Account status",
+        "enum": ["Active", "At Risk", "Churned", "Inactive"]
+      },
+      "primary_owner_user_id": { "type": "string", "title": "Account owner" },
+      "arr_value": { "type": "number", "title": "ARR", "minimum": 0 },
+      "contract_renewal_date": { "type": "string", "title": "Contract renewal date", "format": "date" },
+      "days_to_renewal": { "type": "number", "title": "Days to renewal" },
+      "open_deal_value": { "type": "number", "title": "Open deal value", "minimum": 0 },
+      "contact_count": { "type": "number", "title": "Contacts" },
+      "deal_count": { "type": "number", "title": "Deals" },
+      "last_activity_date": { "type": "string", "title": "Last activity", "format": "date" },
+      "notes": { "type": "string", "title": "Notes" }
+    }
+  },
+  "views": {
+    "forms": [
+      {
+        "id": "default",
+        "title": "Company",
+        "description": "Create or edit a company record.",
+        "layout": {
+          "type": "grid",
+          "props": { "gridTemplateColumns": "1fr", "gap": 16 },
+          "children": [
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "2fr 1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "company_name",
+                  "inputType": "text",
+                  "props": { "label": "Company name", "placeholder": "Acme Corporation" }
+                },
+                {
+                  "type": "field",
+                  "field": "website_url",
+                  "inputType": "text",
+                  "props": { "label": "Website", "placeholder": "https://acme.com" }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr 1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "industry",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "Industry",
+                    "options": [
+                      { "value": "SaaS", "text": "SaaS" },
+                      { "value": "Financial Services", "text": "Financial Services" },
+                      { "value": "Healthcare", "text": "Healthcare" },
+                      { "value": "Manufacturing", "text": "Manufacturing" },
+                      { "value": "Retail", "text": "Retail" },
+                      { "value": "Tech", "text": "Tech" },
+                      { "value": "Other", "text": "Other" }
+                    ]
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "company_size",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "Company size",
+                    "options": [
+                      { "value": "1-10", "text": "1-10" },
+                      { "value": "11-50", "text": "11-50" },
+                      { "value": "51-200", "text": "51-200" },
+                      { "value": "201-500", "text": "201-500" },
+                      { "value": "500-1000", "text": "500-1000" },
+                      { "value": "1000+", "text": "1000+" }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr 1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "account_type",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "Account type",
+                    "options": [
+                      { "value": "Prospect", "text": "Prospect" },
+                      { "value": "Customer", "text": "Customer" },
+                      { "value": "Partner", "text": "Partner" },
+                      { "value": "Competitor", "text": "Competitor" }
+                    ]
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "account_status",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "Account status",
+                    "options": [
+                      { "value": "Active", "text": "Active" },
+                      { "value": "At Risk", "text": "At Risk" },
+                      { "value": "Churned", "text": "Churned" },
+                      { "value": "Inactive", "text": "Inactive" }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr 1fr 1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "primary_owner_user_id",
+                  "inputType": "text",
+                  "props": { "label": "Account owner", "helpText": { "markdown": "User id of the account executive." } }
+                },
+                {
+                  "type": "field",
+                  "field": "arr_value",
+                  "inputType": "currency",
+                  "props": { "label": "ARR", "min": 0, "decimalPlace": 2 },
+                  "rules": [
+                    {
+                      "id": "arr_value.visible",
+                      "property": "visible",
+                      "logic": { "==": [{ "var": "account_type" }, "Customer"] },
+                      "description": "ARR is shown only when Account type is Customer."
+                    }
+                  ]
+                },
+                {
+                  "type": "field",
+                  "field": "contract_renewal_date",
+                  "inputType": "date",
+                  "props": { "label": "Contract renewal date" },
+                  "rules": [
+                    {
+                      "id": "contract_renewal_date.visible",
+                      "property": "visible",
+                      "logic": { "==": [{ "var": "account_type" }, "Customer"] },
+                      "description": "Contract renewal date is shown only when Account type is Customer."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "notes",
+                  "inputType": "textarea",
+                  "props": { "label": "Notes", "placeholder": "Internal notes about this company." }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr 1fr 1fr 1fr 1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "open_deal_value",
+                  "inputType": "currency",
+                  "props": { "label": "Open deal value", "min": 0, "decimalPlace": 2 },
+                  "rules": [
+                    { "id": "open_deal_value.readonly", "property": "readonly", "logic": true, "description": "Written by the deal-rollup flow." }
+                  ]
+                },
+                {
+                  "type": "field",
+                  "field": "deal_count",
+                  "inputType": "number",
+                  "props": { "label": "Deals" },
+                  "rules": [
+                    { "id": "deal_count.readonly", "property": "readonly", "logic": true, "description": "Written by the deal-rollup flow." }
+                  ]
+                },
+                {
+                  "type": "field",
+                  "field": "contact_count",
+                  "inputType": "number",
+                  "props": { "label": "Contacts" },
+                  "rules": [
+                    { "id": "contact_count.readonly", "property": "readonly", "logic": true, "description": "Written by the company-stats flow." }
+                  ]
+                },
+                {
+                  "type": "field",
+                  "field": "days_to_renewal",
+                  "inputType": "number",
+                  "props": { "label": "Days to renewal" },
+                  "rules": [
+                    { "id": "days_to_renewal.readonly", "property": "readonly", "logic": true, "description": "Written by the renewal-reminder flow." }
+                  ]
+                },
+                {
+                  "type": "field",
+                  "field": "last_activity_date",
+                  "inputType": "date",
+                  "props": { "label": "Last activity" },
+                  "rules": [
+                    { "id": "last_activity_date.readonly", "property": "readonly", "logic": true, "description": "Written by the activity-sync flow." }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "table": {
+      "type": "table",
+      "columns": [
+        { "field": "company_name", "order": 1 },
+        { "field": "industry", "order": 2 },
+        { "field": "account_type", "order": 3 },
+        { "field": "account_status", "order": 4 },
+        { "field": "open_deal_value", "order": 5 },
+        { "field": "deal_count", "order": 6 },
+        { "field": "contact_count", "order": 7 },
+        { "field": "last_activity_date", "order": 8 },
+        { "field": "primary_owner_user_id", "order": 9 }
+      ]
+    }
+  }
+}

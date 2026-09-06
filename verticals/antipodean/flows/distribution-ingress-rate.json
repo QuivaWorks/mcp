@@ -1,0 +1,410 @@
+{
+ "name": "distribution-ingress-rate",
+ "description": "Publisher side, the ingress. Gateway POST /d/{distribution_id}/rate. Resolves the distributor from the server-stamped route param (a caller cannot forge it, and an msr- key is scoped to one concrete path), applies the declared-field allowlist, enforces (quote_id, version) idempotency, mints the immutable submission, runs flow 1 and projects the decision back. config.result names PREPARE -- the last node EVERY branch reaches -- so a replay or a refusal cannot 504 an awaited submit; the decision itself reaches the broker on their own outcome record, which is what section 1.7's UX expects.",
+ "config": {
+  "static": {
+   "space_id": "ANTIPODEAN",
+   "distribution_accounts": {
+    "DIST-PILOT-1": "9227248058"
+   },
+   "answer_allowlist": [
+    "ahcl01_client_info",
+    "ahcl01_laser_treatments",
+    "ahcl01_manufacture_products",
+    "ahcl01_staff_qualified",
+    "ahcl02_accurate_records",
+    "ahcl02_ahpra_registered",
+    "ahcl02_contractors_pii",
+    "ahcl02_manufacture_products",
+    "ahcl02_medical_history",
+    "ahcl03_accurate_records",
+    "ahcl03_contractors_pii",
+    "ahcl03_informed_consent",
+    "ahcl03_manufacture_products",
+    "ahcl03_medical_history",
+    "ahcl03_qualified",
+    "ahcl04_accurate_records",
+    "ahcl04_informed_consent",
+    "ahcl04_manufacture_products",
+    "ahcl04_medical_history",
+    "ahcl04_practitioners_insured",
+    "ahcl04_practitioners_licensed",
+    "ahcl05_accurate_records",
+    "ahcl05_clinical_trials",
+    "ahcl05_informed_consent",
+    "ahcl05_manufacture_products",
+    "ahcl05_practitioners_insured",
+    "ahcl05_practitioners_licensed",
+    "attachments",
+    "clm_bankruptcy",
+    "clm_claim_product_reference",
+    "clm_criminal_conviction",
+    "clm_fraud_crime",
+    "clm_insurance_declined",
+    "clm_prior_claims",
+    "clm_prior_claims_similar",
+    "clm_professional_complaint",
+    "clm_tax_audit",
+    "cpl_claims_preparation_cost",
+    "cpl_excess",
+    "cpl_limit_pi",
+    "cpl_limit_pl",
+    "gen_business_address",
+    "gen_occupation",
+    "gen_policyholder_name",
+    "gen_revenue_act",
+    "gen_revenue_nsw",
+    "gen_revenue_nt",
+    "gen_revenue_overseas",
+    "gen_revenue_qld",
+    "gen_revenue_sa",
+    "gen_revenue_tas",
+    "gen_revenue_vic",
+    "gen_revenue_wa",
+    "gen_total_revenue",
+    "gen_total_staff",
+    "gen_total_wages",
+    "gp01_accidental_damage",
+    "gp01_cover_limit",
+    "gp01_excess",
+    "gp01_specified_items",
+    "itcl01_aerospace_systems",
+    "itcl01_ai_client_data",
+    "itcl01_ai_human_audit",
+    "itcl01_ai_regulation_impact",
+    "itcl01_bcp_and_drp",
+    "itcl01_contracts_legal_review",
+    "itcl01_dev_methodology",
+    "itcl01_final_acceptance_test",
+    "itcl01_financial_systems",
+    "itcl01_gambling",
+    "itcl01_indemnify_third_party",
+    "itcl01_limit_liability",
+    "itcl01_medical_applications",
+    "itcl01_military_systems",
+    "itcl01_oil_gas_power",
+    "itcl01_pornographic_material",
+    "itcl01_privacy_infosec_policy",
+    "itcl01_staff_qualified",
+    "itcl01_tqm_strategy",
+    "itcl01_unchecked_gen_ai",
+    "itcl01_written_client_agreements"
+   ]
+  },
+  "result": "$.PREPARE",
+  "nodes": [
+   {
+    "id": "TRIGGER_RATE",
+    "data": {
+     "id": "TRIGGER_RATE",
+     "node_type": "trigger",
+     "payload": {},
+     "name": "Broker submit (gateway POST /d/{distribution_id}/rate)"
+    }
+   },
+   {
+    "id": "INGRESS",
+    "data": {
+     "id": "INGRESS",
+     "node_type": "eval",
+     "payload": {
+      "code": "(function () {\n  var h = hdrs || {};\n  // Preferred: the route param cerberus derives from the matched pattern and\n  // stamps LAST, after the caller's own headers are copied -- unforgeable.\n  var distId = String(h['x-param-distribution_id'] || '');\n  if (distId === '') {\n    // Fallback, and the reason it is written this way: x-url on a TENANT\n    // gateway is /<gateway-id>/<mapping path>, not the path the client sent.\n    // Measured, not assumed: POST /d/DIST-PILOT-1/rate arrived as\n    // /vwqpwsvi9dms/d/DIST-PILOT-1/rate. Counting from the END is the only\n    // form that survives that prefix.\n    var u = String(h['x-url'] || '').split('/');\n    distId = u.length >= 2 ? u[u.length - 2] : '';\n  }\n  var p = trg || {};\n  function cleanId(v) {\n    var s = String(v == null ? '' : v);\n    return /^[A-Za-z0-9_-]{1,128}$/.test(s) ? s : '';\n  }\n  var quoteId = cleanId(p.quote_id);\n  var ver = Number(p.version);\n  var answers = (p.answers && typeof p.answers === 'object' && !Array.isArray(p.answers)) ? p.answers : {};\n\n  // The contract check. Not a privacy filter: it refuses fields the manifest\n  // does not declare because that is schema drift, and drift is how a broker's\n  // form and the publisher's schema silently diverge. It also means nothing\n  // undeclared can reach the submission record at all.\n  var copied = {}, rejected = [], k;\n  for (k in answers) {\n    if (!Object.prototype.hasOwnProperty.call(answers, k)) continue;\n    if (allow.indexOf(k) === -1) { rejected.push(k); continue; }\n    copied[k] = answers[k];\n  }\n\n  var problems = [];\n  if (distId === '') problems.push('no distribution id on the request path');\n  if (quoteId === '') problems.push('missing or malformed quote_id');\n  if (!isFinite(ver) || ver < 1 || Math.floor(ver) !== ver) problems.push('version must be a positive integer');\n  if (rejected.length > 0) problems.push('undeclared fields: ' + rejected.slice(0, 12).join(', '));\n\n  return {\n    ok: problems.length === 0,\n    problems: problems,\n    distribution_id: distId,\n    quote_id: quoteId,\n    version: isFinite(ver) ? ver : 0,\n    quote_reference: String(p.quote_reference || ''),\n    submitted_by: String(p.submitted_by || ''),\n    origin: (p.origin === 'publisher-renewal') ? 'publisher-renewal' : 'broker-submit',\n    selected_products: Array.isArray(p.selected_products) ? p.selected_products : [],\n    product_code_list: String(p.product_code_list || (Array.isArray(p.selected_products) ? p.selected_products.join(',') : '')),\n    product_version: String(p.product_version || ''),\n    answers: copied,\n    rejected: rejected,\n    broker_filter: JSON.stringify([{ field: 'distribution_id', keyword: distId }]),\n    submission_filter: JSON.stringify([{ field: 'quote_id', keyword: quoteId }])\n  };\n})();",
+      "params": {
+       "trg": "$.trigger",
+       "hdrs": "$.env.headers",
+       "allow": "$.static.answer_allowlist"
+      }
+     },
+     "name": "Ingress: resolve the distributor, apply the contract allowlist"
+    }
+   },
+   {
+    "id": "LOAD_BROKER",
+    "data": {
+     "id": "LOAD_BROKER",
+     "node_type": "http",
+     "payload": {
+      "url": "https://api.microstrate.io/records",
+      "method": "GET",
+      "headers": {
+       "Authorization": "Bearer |$.env.auth_token",
+       "Content-Type": "application/json"
+      },
+      "query": {
+       "space_id": "$.static.space_id",
+       "config_id": "broker_config",
+       "filter": "$.INGRESS.broker_filter",
+       "limit": 5
+      }
+     },
+     "name": "Load the distribution"
+    }
+   },
+   {
+    "id": "LOAD_SUBMISSIONS",
+    "data": {
+     "id": "LOAD_SUBMISSIONS",
+     "node_type": "http",
+     "payload": {
+      "url": "https://api.microstrate.io/records",
+      "method": "GET",
+      "headers": {
+       "Authorization": "Bearer |$.env.auth_token",
+       "Content-Type": "application/json"
+      },
+      "query": {
+       "space_id": "$.static.space_id",
+       "config_id": "submission_config",
+       "filter": "$.INGRESS.submission_filter",
+       "limit": 50
+      }
+     },
+     "name": "Submissions already held for this quote"
+    }
+   },
+   {
+    "id": "PREPARE",
+    "data": {
+     "id": "PREPARE",
+     "node_type": "eval",
+     "payload": {
+      "code": "(function () {\n  if (!ing.ok) return { action: 'refuse', accepted: false, reason: ing.problems.join('; '), quote_id: ing.quote_id, version: ing.version, submission_id: '' };\n\n  var brows = (brk && brk.results) ? brk.results : [];\n  var bseen = {}, buniq = [];\n  for (var i = 0; i < brows.length; i++) { var b = brows[i] || {}; if (!b.id || bseen[b.id]) continue; bseen[b.id] = true; buniq.push(b); }\n  // The distributor's OWN account id, from the registry -- never the\n  // publisher's. On a loopback pilot the two are the same value, so taking it\n  // from the wrong place passes every test and mislabels every submission the\n  // moment a second distributor exists.\n  var acct = String((accounts && accounts[ing.distribution_id]) || '');\n  if (acct === '') return { action: 'refuse', accepted: false, reason: 'distribution ' + ing.distribution_id + ' has no account registered', quote_id: ing.quote_id, version: ing.version, submission_id: '' };\n\n  if (buniq.length === 0) return { action: 'refuse', accepted: false, reason: 'no distribution registered as ' + ing.distribution_id, quote_id: ing.quote_id, version: ing.version, submission_id: '' };\n  var bd = buniq[0].data || {};\n  if (String(bd.broker_status) !== 'active') return { action: 'refuse', accepted: false, reason: 'distribution ' + ing.distribution_id + ' is ' + String(bd.broker_status), quote_id: ing.quote_id, version: ing.version, submission_id: '' };\n\n  var srows = (subs && subs.results) ? subs.results : [];\n  var sseen = {}, byVersion = {}, maxV = 0;\n  for (var j = 0; j < srows.length; j++) {\n    var s = srows[j] || {};\n    if (!s.id || sseen[s.id]) continue;\n    sseen[s.id] = true;\n    var v = Number((s.data && s.data.version) || 0);\n    if (v > 0) { byVersion[v] = s.id; if (v > maxV) maxV = v; }\n  }\n\n  // (quoteId, version) idempotency, not quoteId alone: a retried submit of the\n  // same version returns the submission already minted rather than a second one.\n  if (byVersion[ing.version]) {\n    return { action: 'replay', accepted: true, reason: 'submission v' + ing.version + ' already exists', quote_id: ing.quote_id, version: ing.version, submission_id: byVersion[ing.version], broker_id: String(bd.broker_id || '') };\n  }\n  if (ing.version !== maxV + 1) {\n    return { action: 'refuse', accepted: false, reason: 'version ' + ing.version + ' is not the next version; the publisher holds v' + maxV, quote_id: ing.quote_id, version: ing.version, submission_id: '' };\n  }\n\n  var payload = { quote_id: ing.quote_id, version: ing.version, quote_reference: ing.quote_reference,\n    // String(): an all-digit static value reaches the engine as a NUMBER --\n    // the flows MCP's jsonValue preprocess JSON.parses any digit-leading\n    // string, and the schema wants a string. Same class as the ABN sent as\n    // a number that resolved to the wrong entity.\n    distributor_account_id: String(acct), received_at: new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z'),\n    origin: ing.origin, submitted_by: ing.submitted_by, product_version: ing.product_version,\n    product_code_list: ing.product_code_list, selected_products: ing.selected_products };\n  var k;\n  for (k in ing.answers) { if (Object.prototype.hasOwnProperty.call(ing.answers, k)) payload[k] = ing.answers[k]; }\n\n  return { action: 'create', accepted: true, reason: '', quote_id: ing.quote_id, version: ing.version, submission_id: '', broker_id: String(bd.broker_id || ''), payload: payload };\n})();",
+      "params": {
+       "ing": "$.INGRESS",
+       "brk": "$.LOAD_BROKER.data",
+       "subs": "$.LOAD_SUBMISSIONS.data",
+       "accounts": "$.static.distribution_accounts"
+      }
+     },
+     "name": "Version, gate and stamp"
+    }
+   },
+   {
+    "id": "GATE",
+    "data": {
+     "id": "GATE",
+     "node_type": "condition",
+     "payload": [
+      {
+       "condition": {
+        "operator": "=",
+        "input": [
+         "$.PREPARE.action",
+         "refuse"
+        ]
+       },
+       "outcome": "REFUSE"
+      },
+      {
+       "condition": {
+        "operator": "=",
+        "input": [
+         "$.PREPARE.action",
+         "replay"
+        ]
+       },
+       "outcome": "REPLAY"
+      },
+      {
+       "outcome": "CREATE_SUBMISSION"
+      }
+     ],
+     "name": "Refuse, replay or mint"
+    }
+   },
+   {
+    "id": "REFUSE",
+    "data": {
+     "id": "REFUSE",
+     "node_type": "error",
+     "payload": {
+      "message": "Submission refused: |$.PREPARE.reason",
+      "status_code": 400
+     },
+     "name": "Refuse"
+    }
+   },
+   {
+    "id": "REPLAY",
+    "data": {
+     "id": "REPLAY",
+     "node_type": "eval",
+     "payload": {
+      "code": "(function(){ return { replayed:true, submission_id:id, version:v }; })();",
+      "params": {
+       "id": "$.PREPARE.submission_id",
+       "v": "$.PREPARE.version"
+      }
+     },
+     "name": "Replay: this version is already held"
+    }
+   },
+   {
+    "id": "CREATE_SUBMISSION",
+    "data": {
+     "id": "CREATE_SUBMISSION",
+     "node_type": "http",
+     "payload": {
+      "url": "https://api.microstrate.io/records/submission_config",
+      "method": "POST",
+      "headers": {
+       "Authorization": "Bearer |$.env.auth_token",
+       "Content-Type": "application/json"
+      },
+      "data": {
+       "space_id": "$.static.space_id",
+       "folder": "$.PREPARE.quote_id",
+       "data": "$.PREPARE.payload"
+      }
+     },
+     "name": "Mint the immutable submission"
+    }
+   },
+   {
+    "id": "RUN_UW",
+    "data": {
+     "id": "RUN_UW",
+     "node_type": "flow",
+     "payload": {
+      "submission_id": "$.CREATE_SUBMISSION.data.id"
+     },
+     "name": "Underwrite (flow 1)",
+     "subject": "ms.hub.config.workflow.3788449144.854751885",
+     "await": true
+    }
+   },
+   {
+    "id": "INDEX_SETTLE",
+    "data": {
+     "id": "INDEX_SETTLE",
+     "node_type": "delay",
+     "payload": {
+      "time_ms": 2000
+     },
+     "name": "Let the index catch up (1s flush ticker)"
+    }
+   },
+   {
+    "id": "FIND_DECISION",
+    "data": {
+     "id": "FIND_DECISION",
+     "node_type": "http",
+     "payload": {
+      "url": "https://api.microstrate.io/records",
+      "method": "GET",
+      "headers": {
+       "Authorization": "Bearer |$.env.auth_token",
+       "Content-Type": "application/json"
+      },
+      "query": {
+       "space_id": "$.static.space_id",
+       "config_id": "decision_config",
+       "filter": "|[{\"field\":\"submission_id\",\"keyword\":\"|$.CREATE_SUBMISSION.data.id|\"}]",
+       "limit": 10
+      }
+     },
+     "name": "Find the decision flow 1 wrote"
+    }
+   },
+   {
+    "id": "CHOOSE_DECISION",
+    "data": {
+     "id": "CHOOSE_DECISION",
+     "node_type": "eval",
+     "payload": {
+      "code": "(function () {\n  var rows = (q && q.results) ? q.results : [];\n  var seen = {}, best = null;\n  for (var i = 0; i < rows.length; i++) {\n    var r = rows[i] || {};\n    if (!r.id || seen[r.id]) continue;\n    seen[r.id] = true;\n    if (best === null || Number((r.data && r.data.decision_seq) || 0) > Number((best.data && best.data.decision_seq) || 0)) best = r;\n  }\n  return { decision_id: best ? best.id : '', found: best !== null };\n})();",
+      "params": {
+       "q": "$.FIND_DECISION.data"
+      }
+     },
+     "name": "Newest decision for this submission"
+    }
+   },
+   {
+    "id": "PROJECT",
+    "data": {
+     "id": "PROJECT",
+     "node_type": "flow",
+     "payload": {
+      "decision_id": "$.CHOOSE_DECISION.decision_id"
+     },
+     "name": "Project the decision back",
+     "subject": "ms.hub.config.workflow.3788449144.3892168891",
+     "await": true
+    }
+   }
+  ],
+  "edges": [
+   {
+    "id": "TRIGGER_RATE-INGRESS",
+    "source": "TRIGGER_RATE",
+    "target": "INGRESS"
+   },
+   {
+    "id": "INGRESS-LOAD_BROKER",
+    "source": "INGRESS",
+    "target": "LOAD_BROKER"
+   },
+   {
+    "id": "INGRESS-LOAD_SUBMISSIONS",
+    "source": "INGRESS",
+    "target": "LOAD_SUBMISSIONS"
+   },
+   {
+    "id": "LOAD_BROKER-PREPARE",
+    "source": "LOAD_BROKER",
+    "target": "PREPARE"
+   },
+   {
+    "id": "LOAD_SUBMISSIONS-PREPARE",
+    "source": "LOAD_SUBMISSIONS",
+    "target": "PREPARE"
+   },
+   {
+    "id": "PREPARE-GATE",
+    "source": "PREPARE",
+    "target": "GATE"
+   },
+   {
+    "id": "GATE-REFUSE",
+    "source": "GATE",
+    "target": "REFUSE"
+   },
+   {
+    "id": "GATE-REPLAY",
+    "source": "GATE",
+    "target": "REPLAY"
+   },
+   {
+    "id": "GATE-CREATE_SUBMISSION",
+    "source": "GATE",
+    "target": "CREATE_SUBMISSION"
+   },
+   {
+    "id": "CREATE_SUBMISSION-RUN_UW",
+    "source": "CREATE_SUBMISSION",
+    "target": "RUN_UW"
+   },
+   {
+    "id": "RUN_UW-INDEX_SETTLE",
+    "source": "RUN_UW",
+    "target": "INDEX_SETTLE"
+   },
+   {
+    "id": "INDEX_SETTLE-FIND_DECISION",
+    "source": "INDEX_SETTLE",
+    "target": "FIND_DECISION"
+   },
+   {
+    "id": "FIND_DECISION-CHOOSE_DECISION",
+    "source": "FIND_DECISION",
+    "target": "CHOOSE_DECISION"
+   },
+   {
+    "id": "CHOOSE_DECISION-PROJECT",
+    "source": "CHOOSE_DECISION",
+    "target": "PROJECT"
+   }
+  ]
+ }
+}

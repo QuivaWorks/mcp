@@ -1,0 +1,482 @@
+{
+  "name": "referral-decide",
+  "description": "Flow 11. The underwriter's approve/decline on a referral task becomes ISSUED/DECLINED on decision_config, renders the quotation schedule (or decline notice) and sends the spec section 9 email. Started by a STREAM trigger on ms.workspaces.task.* (microstrate-workspaces), so EVERY task write in the account reaches gate 1 - title edits, assignment, reordering and the flow's own writes included. The trigger body is the partial UpdateTaskRequest and can never carry the record reference, which is why GET_TASK exists. No baseline snapshot: submission v1 IS the baseline (plan section 6.1). Handle precedence is task.source, then task.metadata.decision_id, then task.folder as the pre-migration fallback - contract artefact 4.",
+  "config": {
+    "edges": [
+      {
+        "source": "TRIGGER",
+        "target": "GATE_DELTA",
+        "id": "e_TRIGGER_GATE_DELTA",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.1610473599.e_TRIGGER_GATE_DELTA",
+        "modified": 1788353607
+      },
+      {
+        "source": "GATE_DELTA",
+        "target": "BR_DELTA",
+        "id": "e_GATE_DELTA_BR_DELTA",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.1610473599.e_GATE_DELTA_BR_DELTA",
+        "modified": 1788353607
+      },
+      {
+        "source": "BR_DELTA",
+        "target": "GET_TASK",
+        "id": "e_BR_DELTA_GET_TASK",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.1610473599.e_BR_DELTA_GET_TASK",
+        "modified": 1788353607
+      },
+      {
+        "source": "GET_TASK",
+        "target": "GATE_TASK",
+        "id": "e_GET_TASK_GATE_TASK",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.1610473599.e_GET_TASK_GATE_TASK",
+        "modified": 1788353607
+      },
+      {
+        "source": "GATE_TASK",
+        "target": "BR_TASK",
+        "id": "e_GATE_TASK_BR_TASK",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.1610473599.e_GATE_TASK_BR_TASK",
+        "modified": 1788353607
+      },
+      {
+        "source": "BR_TASK",
+        "target": "GET_DECISION",
+        "id": "e_BR_TASK_GET_DECISION",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.1610473599.e_BR_TASK_GET_DECISION",
+        "modified": 1788353607
+      },
+      {
+        "source": "GET_DECISION",
+        "target": "PREP",
+        "id": "e_GET_DECISION_PREP",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.1610473599.e_GET_DECISION_PREP",
+        "modified": 1788353607
+      },
+      {
+        "source": "PREP",
+        "target": "GET_SUBMISSION",
+        "id": "e_PREP_GET_SUBMISSION",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.1610473599.e_PREP_GET_SUBMISSION",
+        "modified": 1788353607
+      },
+      {
+        "source": "GET_SUBMISSION",
+        "target": "LOAD_BROKER",
+        "id": "e_GET_SUBMISSION_LOAD_BROKER",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.1610473599.e_GET_SUBMISSION_LOAD_BROKER",
+        "modified": 1788353607
+      },
+      {
+        "source": "LOAD_BROKER",
+        "target": "BUILD",
+        "id": "e_LOAD_BROKER_BUILD",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.1610473599.e_LOAD_BROKER_BUILD",
+        "modified": 1788353607
+      },
+      {
+        "source": "BUILD",
+        "target": "BR_IDEM",
+        "id": "e_BUILD_BR_IDEM",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.1610473599.e_BUILD_BR_IDEM",
+        "modified": 1788353607
+      },
+      {
+        "source": "BR_IDEM",
+        "target": "WRITE_DECISION",
+        "id": "e_BR_IDEM_WRITE_DECISION",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.1610473599.e_BR_IDEM_WRITE_DECISION",
+        "modified": 1788353607
+      },
+      {
+        "source": "WRITE_DECISION",
+        "target": "RENDER_DOC",
+        "id": "e_WRITE_DECISION_RENDER_DOC",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.1610473599.e_WRITE_DECISION_RENDER_DOC",
+        "modified": 1788353607
+      },
+      {
+        "source": "RENDER_DOC",
+        "target": "SEND_EMAIL",
+        "id": "e_RENDER_DOC_SEND_EMAIL",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.1610473599.e_RENDER_DOC_SEND_EMAIL",
+        "modified": 1788353607
+      },
+      {
+        "source": "SEND_EMAIL",
+        "target": "STAMP_REFS",
+        "id": "e_SEND_EMAIL_STAMP_REFS",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.1610473599.e_SEND_EMAIL_STAMP_REFS",
+        "modified": 1788353607
+      },
+      {
+        "source": "STAMP_REFS",
+        "target": "COMMENT",
+        "id": "e_STAMP_REFS_COMMENT",
+        "subject": "ms.hub.config.workflow-edge.draft.3788449144.1610473599.e_STAMP_REFS_COMMENT",
+        "modified": 1788353607
+      }
+    ],
+    "nodes": [
+      {
+        "data": {
+          "id": "TRIGGER",
+          "name": "Task write (stream trigger on ms.workspaces.task.*)",
+          "node_type": "trigger",
+          "trigger_type": "manual",
+          "payload": {}
+        },
+        "id": "TRIGGER",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.1610473599.TRIGGER",
+        "modified": 1788353607
+      },
+      {
+        "data": {
+          "id": "GATE_DELTA",
+          "name": "Gate 1 - is this delta a decision?",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function () {\n  // The published body is the partial UpdateTaskRequest (workspaces-service\n  // handler/tasks.go:305-311), NOT the task. It carries `status` only when the\n  // write changed it, and a title-only or assignment write carries no `status`\n  // key at all. That is the NORMAL case and it must resolve successfully, not\n  // error: every task write in the account reaches this node.\n  var t = (d && typeof d === 'object' && !Array.isArray(d)) ? d : {};\n  var id = (typeof t.id === 'string') ? t.id : '';\n  var has = Object.prototype.hasOwnProperty.call(t, 'status');\n  var s = (typeof t.status === 'string') ? t.status : '';\n\n  // A CLOSED allow-list with an explicit no-match branch. Never a fail-open\n  // else: an undefined status is accepted everywhere except the board, and it\n  // does fire this trigger (traps register, phase 0).\n  var DECIDES = { approved: 1, declined: 1 };\n  var ok = id !== '' && has && Object.prototype.hasOwnProperty.call(DECIDES, s);\n\n  var reason;\n  if (id === '') reason = 'ignored:delta-has-no-task-id';\n  else if (!has) reason = 'ignored:delta-carries-no-status-key';\n  else if (s === '') reason = 'ignored:status-key-is-not-a-string';\n  else if (!ok) reason = 'ignored:status-not-a-decision:' + s;\n  else reason = 'proceed:status-delta-is-a-decision:' + s;\n\n  return {\n    proceed: ok,\n    task_id: id,\n    delta_status: s,\n    delta_keys: Object.keys(t).sort().join(','),\n    reason: reason\n  };\n})()\n",
+            "params": {
+              "d": "$.trigger"
+            }
+          }
+        },
+        "id": "GATE_DELTA",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.1610473599.GATE_DELTA",
+        "modified": 1788353607
+      },
+      {
+        "data": {
+          "id": "BR_DELTA",
+          "name": "Proceed or resolve quietly",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "input": [
+                  "$.GATE_DELTA.proceed",
+                  true
+                ],
+                "operator": "="
+              },
+              "outcome": "GET_TASK"
+            },
+            {
+              "outcome": "RESOLVE_SUCCESS"
+            }
+          ]
+        },
+        "id": "BR_DELTA",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.1610473599.BR_DELTA",
+        "modified": 1788353607
+      },
+      {
+        "data": {
+          "id": "GET_TASK",
+          "name": "Read the task in full",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "method": "GET",
+            "url": "/workspaces/task/|$.GATE_DELTA.task_id"
+          }
+        },
+        "id": "GET_TASK",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.1610473599.GET_TASK",
+        "modified": 1788353607
+      },
+      {
+        "data": {
+          "id": "GATE_TASK",
+          "name": "Gate 2 - space, referral tag, re-read status, decision handle",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function () {\n  // The task read back in full. The delta could not carry the record reference\n  // (UpdateTaskRequest has no metadata field, model/api.go:600-627); the\n  // aggregate can, which is why the task-get exists at all.\n  var t = (task && typeof task === 'object' && !Array.isArray(task)) ? task : {};\n  var tags = Array.isArray(t.tags) ? t.tags : [];\n  var meta = (t.metadata && typeof t.metadata === 'object') ? t.metadata : {};\n  var status = (typeof t.status === 'string') ? t.status : '';\n\n  // Re-read, never the delta: the delta may be stale by the time the get\n  // returns, and only the aggregate carries space_id, tags and the handle.\n  var inSpace = t.space_id === space;\n  var isReferral = tags.indexOf('referral') >= 0;\n  var DECIDES = { approved: 'ACCEPT', declined: 'DECLINE' };\n  var isDecision = Object.prototype.hasOwnProperty.call(DECIDES, status);\n\n  // Contract artefact 4: `source` is the decision handle and `folder` is the\n  // brokerage, so a referral task groups per brokerage on the board AND stays\n  // resolvable to its decision. metadata.decision_id is the belt-and-braces\n  // copy; `folder` is read ONLY as the pre-migration fallback, and which one\n  // answered is recorded so a run log says so.\n  var handle = '', via = '';\n  if (typeof t.source === 'string' && t.source !== '') { handle = t.source; via = 'source'; }\n  else if (typeof meta.decision_id === 'string' && meta.decision_id !== '') { handle = meta.decision_id; via = 'metadata.decision_id'; }\n  else if (typeof t.folder === 'string' && t.folder !== '') { handle = t.folder; via = 'folder(legacy)'; }\n  else { via = 'none'; }\n\n  var ok = inSpace && isReferral && isDecision && handle !== '';\n  var reason;\n  if (!inSpace) reason = 'ignored:not-in-space:' + (t.space_id || '');\n  else if (!isReferral) reason = 'ignored:not-tagged-referral:' + tags.join('|');\n  else if (!isDecision) reason = 'ignored:task-status-is-not-a-decision:' + status;\n  else if (handle === '') reason = 'ignored:no-decision-handle-on-task';\n  else reason = 'proceed:' + status + ':decision=' + handle + ':via=' + via;\n\n  return {\n    proceed: ok,\n    task_id: t.id || '',\n    task_status: status,\n    decision_id: handle,\n    handle_via: via,\n    outcome: DECIDES[status] || '',\n    decision_status: status === 'approved' ? 'ISSUED' : (status === 'declined' ? 'DECLINED' : ''),\n    title: t.title || '',\n    reason: reason\n  };\n})()\n",
+            "params": {
+              "space": "$.static.space_id",
+              "task": "$.GET_TASK.data"
+            }
+          }
+        },
+        "id": "GATE_TASK",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.1610473599.GATE_TASK",
+        "modified": 1788353607
+      },
+      {
+        "data": {
+          "id": "BR_TASK",
+          "name": "Referral in ANTIPODEAN, or resolve quietly",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "input": [
+                  "$.GATE_TASK.proceed",
+                  true
+                ],
+                "operator": "="
+              },
+              "outcome": "GET_DECISION"
+            },
+            {
+              "outcome": "RESOLVE_SUCCESS"
+            }
+          ]
+        },
+        "id": "BR_TASK",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.1610473599.BR_TASK",
+        "modified": 1788353607
+      },
+      {
+        "data": {
+          "id": "GET_DECISION",
+          "name": "Read the decision record",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "method": "GET",
+            "url": "/records/decision_config/|$.GATE_TASK.decision_id"
+          }
+        },
+        "id": "GET_DECISION",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.1610473599.GET_DECISION",
+        "modified": 1788353607
+      },
+      {
+        "data": {
+          "id": "PREP",
+          "name": "Derive the submission id and the broker filter",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function () {\n  // The one place a filter STRING is built. It cannot be assembled by pipe\n  // concatenation inside an http node's query value: the flows MCP JSON.parses\n  // any value that looks like JSON, so a filter written as a literal\n  // {\"conditions\":[...]} would reach the wire as a Go map rendering, not JSON.\n  var r = (rec && typeof rec === 'object') ? rec : {};\n  var d = (r.data && typeof r.data === 'object') ? r.data : {};\n  var brokerKey = d.distributor_account_id || '';\n  return {\n    decision_id: r.id || '',\n    submission_id: d.submission_id || '',\n    broker_key: brokerKey,\n    // broker_config's only joinable indexed keyword is broker_id (artefact 2).\n    // A sentinel that matches nothing keeps the read bounded when the decision\n    // names no distributor, rather than widening to every broker.\n    broker_filter: JSON.stringify({\n      conditions: [{ field: 'broker_id', keyword: brokerKey || '__no_broker_key__' }]\n    })\n  };\n})()\n",
+            "params": {
+              "rec": "$.GET_DECISION.data"
+            }
+          }
+        },
+        "id": "PREP",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.1610473599.PREP",
+        "modified": 1788353607
+      },
+      {
+        "data": {
+          "id": "GET_SUBMISSION",
+          "name": "Read the submission (v1 IS the baseline)",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "method": "GET",
+            "url": "/records/submission_config/|$.PREP.submission_id"
+          }
+        },
+        "id": "GET_SUBMISSION",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.1610473599.GET_SUBMISSION",
+        "modified": 1788353607
+      },
+      {
+        "data": {
+          "id": "LOAD_BROKER",
+          "name": "Resolve the broker of record",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "method": "GET",
+            "query": {
+              "filter": "$.PREP.broker_filter",
+              "limit": "1",
+              "space_id": "$.static.space_id"
+            },
+            "url": "/records/broker_config"
+          }
+        },
+        "id": "LOAD_BROKER",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.1610473599.LOAD_BROKER",
+        "modified": 1788353607
+      },
+      {
+        "data": {
+          "id": "BUILD",
+          "name": "Assemble the decision patch, the document payload and the email",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function () {\n  var g = gate || {};\n  var d = (dec && typeof dec === 'object') ? dec : {};\n  var s = (sub && typeof sub === 'object') ? sub : {};\n  var brokerRows = (brokers && brokers.results) ? brokers.results : [];\n  var broker = (brokerRows.length && brokerRows[0].data) ? brokerRows[0].data : {};\n\n  var outcome = g.outcome;                 // ACCEPT | DECLINE\n  var newStatus = g.decision_status;       // ISSUED | DECLINED\n  var isAccept = outcome === 'ACCEPT';\n\n  // Idempotency and self-loop safety. The gate is the decision record's own\n  // decision_status, written FIRST (plan 5.3 rule 3) so a replay of the same\n  // move is a no-op. A genuine underwriter reversal (ISSUED -> DECLINED) is\n  // still allowed: only the identical terminal status is refused.\n  var already = (typeof d.decision_status === 'string') ? d.decision_status : '';\n  var replay = already === newStatus;\n\n  var ref = s.quote_reference || d.quote_id || g.decision_id;\n  var name = s.gen_policyholder_name || '';\n\n  // The quotation schedule's broker-facing narrative has to match the NEW\n  // outcome. Left alone it still reads \"referred for underwriter review\" on a\n  // quote that has just been issued. underwriter_reasons is never crossed over\n  // to the broker (artefact 3 assertion A16).\n  var brokerReasons;\n  if (isAccept) {\n    brokerReasons = ['Your quotation has been approved by an underwriter and is attached.'];\n  } else if (Array.isArray(d.decline_reasons) && d.decline_reasons.length) {\n    brokerReasons = d.decline_reasons.slice(0);\n  } else {\n    brokerReasons = ['Your application has been declined following underwriter review.'];\n  }\n\n  var docName = (isAccept ? 'quotation-schedule-' : 'decline-notice-') + ref;\n  var docFolder = 'antipodean.quotes';\n  var docBucket = 'microstrate-documents';\n  var docKey = docFolder + '.' + docName + '.pdf';\n\n  var to = broker.primary_contact_email || fallbackTo;\n  var toName = broker.primary_contact_name || broker.brokerage_name || 'Broker';\n\n  var subject = isAccept\n    ? ('Quote issued - ' + ref + ' - ' + name)\n    : ('Quote declined - ' + ref + ' - ' + name);\n\n  var reasonsHtml = '';\n  for (var i = 0; i < brokerReasons.length; i++) {\n    reasonsHtml += '<li>' + String(brokerReasons[i]) + '</li>';\n  }\n  var body =\n    '<p>Dear ' + toName + ',</p>' +\n    '<p>The referral on quote <strong>' + ref + '</strong> for <strong>' + name +\n    '</strong> has been reviewed by an underwriter and the outcome is <strong>' +\n    (isAccept ? 'ISSUED' : 'DECLINED') + '</strong>.</p>' +\n    '<ul>' + reasonsHtml + '</ul>' +\n    (isAccept\n      ? ('<p>Quotation valid until: ' + (d.quote_validity_expiry || 'see schedule') +\n         '.<br>Total payable: ' + (d.total_payable === undefined ? '' : d.total_payable) + '.</p>' +\n         '<p>The quotation schedule has been generated and filed as <code>' + docKey + '</code>.</p>')\n      : ('<p>A decline notice has been generated and filed as <code>' + docKey + '</code>.</p>')) +\n    '<p>Decision reference: ' + g.decision_id + ' (task ' + g.task_id + ').</p>' +\n    '<p>Antipodean Underwriting</p>';\n\n  return {\n    proceed: !replay,\n    replay: replay,\n    skip_reason: replay ? ('skip:decision-already-' + already) : '',\n    decision_id: g.decision_id,\n    task_id: g.task_id,\n    outcome: outcome,\n    decision_status: newStatus,\n    previous_decision_status: already,\n    decided_at: new Date().toISOString(),\n    // No underwriter identity is recoverable: the task delta carries no actor\n    // and model.Task has CreatedBy but no UpdatedBy. The task is named instead\n    // of inventing a person.\n    decided_by: 'underwriter-via-task:' + g.task_id,\n    broker_reasons: brokerReasons,\n    quote_reference: ref,\n    policyholder: name,\n    doc_name: docName,\n    doc_folder: docFolder,\n    doc_key: docKey,\n    // decision_config.issued_document_refs items are OBJECTS\n    // {document_type, object_key, template_id} \u2014 a bare string 400s the write.\n    doc_refs: [{\n      document_type: isAccept ? 'quotation_schedule' : 'decline_notice',\n      object_key: 'obj://' + docBucket + '/' + docKey,\n      template_id: docTemplate\n    }],\n    doc_payload: {\n      quote_reference: ref,\n      gen_policyholder_name: name,\n      gen_occupation: s.gen_occupation || '',\n      quote_validity_expiry: d.quote_validity_expiry || '',\n      outcome_status: outcome,\n      total_payable: d.total_payable === undefined ? 0 : d.total_payable,\n      broker_reasons: brokerReasons\n    },\n    email_to: to,\n    email_to_name: toName,\n    email_resolved_from: broker.primary_contact_email ? 'broker_config' : 'static.fallback_broker_email',\n    email_subject: subject,\n    email_body_html: body,\n    idempotency_key: 'referral-decide-' + g.decision_id + '-' + newStatus,\n    comment_body: 'flow 11 referral-decide: decision ' + g.decision_id + ' set to ' +\n      newStatus + ' (' + outcome + '). Document ' + docKey + '. Notified ' + to + '.'\n  };\n})()\n",
+            "params": {
+              "brokers": "$.LOAD_BROKER.data",
+              "dec": "$.GET_DECISION.data.data",
+              "docTemplate": "$.static.doc_template",
+              "fallbackTo": "$.static.fallback_broker_email",
+              "gate": "$.GATE_TASK",
+              "sub": "$.GET_SUBMISSION.data.data"
+            }
+          }
+        },
+        "id": "BUILD",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.1610473599.BUILD",
+        "modified": 1788353607
+      },
+      {
+        "data": {
+          "id": "BR_IDEM",
+          "name": "Not a replay of the same terminal status",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "input": [
+                  "$.BUILD.proceed",
+                  true
+                ],
+                "operator": "="
+              },
+              "outcome": "WRITE_DECISION"
+            },
+            {
+              "outcome": "RESOLVE_SUCCESS"
+            }
+          ]
+        },
+        "id": "BR_IDEM",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.1610473599.BR_IDEM",
+        "modified": 1788353607
+      },
+      {
+        "data": {
+          "id": "WRITE_DECISION",
+          "name": "Write the decision FIRST (plan 5.3 rule 3)",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "data": {
+              "data": {
+                "broker_reasons": "$.BUILD.broker_reasons",
+                "decided_at": "$.BUILD.decided_at",
+                "decided_by": "$.BUILD.decided_by",
+                "decision_status": "$.BUILD.decision_status",
+                "outcome": "$.BUILD.outcome"
+              }
+            },
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "method": "PUT",
+            "url": "/records/decision_config/|$.BUILD.decision_id"
+          }
+        },
+        "id": "WRITE_DECISION",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.1610473599.WRITE_DECISION",
+        "modified": 1788353607
+      },
+      {
+        "data": {
+          "id": "RENDER_DOC",
+          "name": "Render the quotation schedule / decline notice",
+          "subject": "microstrate.file-generator.post.template-trigger",
+          "node_type": "quiva-endpoint",
+          "payload": {
+            "list": [
+              {
+                "output": {
+                  "bucket": "$.static.doc_bucket",
+                  "content_type": "$.static.doc_content_type",
+                  "folder": "$.BUILD.doc_folder",
+                  "name": "$.BUILD.doc_name"
+                },
+                "template": "$.static.doc_template"
+              }
+            ],
+            "payload": "$.BUILD.doc_payload"
+          }
+        },
+        "id": "RENDER_DOC",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.1610473599.RENDER_DOC",
+        "modified": 1788353607
+      },
+      {
+        "data": {
+          "id": "SEND_EMAIL",
+          "name": "Send the section 9 email",
+          "subject": "ms.hub.config.workflow.3788449144.127773145",
+          "node_type": "flow",
+          "payload": {
+            "body_html": "$.BUILD.email_body_html",
+            "email_class": "transactional",
+            "idempotency_key": "$.BUILD.idempotency_key",
+            "subject": "$.BUILD.email_subject",
+            "to": "$.BUILD.email_to",
+            "to_name": "$.BUILD.email_to_name"
+          },
+          "await": true
+        },
+        "id": "SEND_EMAIL",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.1610473599.SEND_EMAIL",
+        "modified": 1788353607
+      },
+      {
+        "data": {
+          "id": "STAMP_REFS",
+          "name": "Stamp the issued document reference",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "data": {
+              "data": {
+                "issued_document_refs": "$.BUILD.doc_refs"
+              }
+            },
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "method": "PUT",
+            "url": "/records/decision_config/|$.BUILD.decision_id"
+          }
+        },
+        "id": "STAMP_REFS",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.1610473599.STAMP_REFS",
+        "modified": 1788353607
+      },
+      {
+        "data": {
+          "id": "COMMENT",
+          "name": "Record what flow 11 did on the task",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "data": {
+              "body": "|$.BUILD.comment_body| Email msg_id: |$.SEND_EMAIL.result.msg_id|",
+              "internal": true
+            },
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "method": "POST",
+            "url": "/workspaces/task/|$.BUILD.task_id|/comment"
+          }
+        },
+        "id": "COMMENT",
+        "subject": "ms.hub.config.workflow-node.draft.3788449144.1610473599.COMMENT",
+        "modified": 1788353607
+      }
+    ],
+    "static": {
+      "doc_bucket": "microstrate-documents",
+      "doc_content_type": "application/pdf",
+      "doc_template": "tpl_quotation_schedule",
+      "email_flow_name": "send-templated-email (collection antipodean); the node subject is the literal published subject because the server verifies a flow node subject exists at write time",
+      "fallback_broker_email": "brack.norris+antipodean-test@gmail.com",
+      "space_id": "ANTIPODEAN"
+    },
+    "result": "$.GATE_DELTA"
+  }
+}

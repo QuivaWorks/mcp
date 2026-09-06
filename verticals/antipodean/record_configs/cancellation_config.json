@@ -1,0 +1,280 @@
+{
+  "id": "cancellation_config",
+  "name": "Cancellation",
+  "description": "Publisher-side (Antipodean). Reason enum given verbatim in spec \u00a75.5; 4 bare CSV stubs \u2014 the canc_ questionnaire keys, which belong here and on cancellation_request_config, not on the quote form (01-key-list.json D-9).",
+  "label": "Cancellation",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "cancellation_reference": {
+        "type": "string",
+        "title": "Cancellation reference",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Cancellation reference"
+          }
+        }
+      },
+      "policy_number": {
+        "type": "string",
+        "title": "Policy number",
+        "description": "P-{PRODUCT_CODE}-{YYYY}-{000000} (01-key-list.json system_keys).",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Policy number"
+          }
+        }
+      },
+      "policy_id": {
+        "type": "string",
+        "title": "Policy id (record id)",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Policy id (record id)"
+          }
+        }
+      },
+      "broker_id": {
+        "type": "string",
+        "title": "Broker id (distributor account id)",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Broker id (distributor account id)"
+          }
+        }
+      },
+      "cancellation_status": {
+        "type": "string",
+        "title": "Cancellation status",
+        "enum": [
+          "REQUESTED",
+          "REFERRED",
+          "APPROVED",
+          "DECLINED",
+          "COMPLETED"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Cancellation status",
+            "options": [
+              {
+                "text": "Requested",
+                "value": "REQUESTED"
+              },
+              {
+                "text": "Referred",
+                "value": "REFERRED"
+              },
+              {
+                "text": "Approved",
+                "value": "APPROVED"
+              },
+              {
+                "text": "Declined",
+                "value": "DECLINED"
+              },
+              {
+                "text": "Completed",
+                "value": "COMPLETED"
+              }
+            ]
+          }
+        }
+      },
+      "effective_date": {
+        "type": "string",
+        "title": "Effective date",
+        "format": "date-time",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Effective date"
+          }
+        }
+      },
+      "refund_amount": {
+        "type": "number",
+        "title": "Refund amount",
+        "description": "Net written premium is bound premium plus MTA adjustments minus cancellation refunds (contract artefact 2).",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Refund amount"
+          }
+        }
+      },
+      "canc_referral_check": {
+        "type": "string",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "title": "Is there any notification or claim?",
+        "description": "Source name misspelled ('CancellationReferarralCheck') \u2014 corrected in the schema key; source_name preserves the typo (01-key-list.json D-8).",
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Is there any notification or claim?",
+            "options": [
+              {
+                "text": "Yes",
+                "value": "yes"
+              },
+              {
+                "text": "No",
+                "value": "no"
+              }
+            ]
+          }
+        }
+      },
+      "canc_reason": {
+        "type": "string",
+        "enum": [
+          "lost_to_competitor",
+          "non_payment",
+          "cover_no_longer_required",
+          "business_closure",
+          "other"
+        ],
+        "title": "Reason for cancellation",
+        "description": "COMMENTS number the options 1,3,4,5,6 \u2014 option 2 is missing from the source; the five listed match spec \u00a75.5 exactly, read as a numbering slip (01-key-list.json A-15). 'Non-Payment (refer)' encodes an outcome: the referral is a rule on the value, not part of the label.",
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Reason for cancellation",
+            "options": [
+              {
+                "text": "Lost to competitor",
+                "value": "lost_to_competitor"
+              },
+              {
+                "text": "Non-Payment",
+                "value": "non_payment"
+              },
+              {
+                "text": "Cover no longer required",
+                "value": "cover_no_longer_required"
+              },
+              {
+                "text": "Business Closure",
+                "value": "business_closure"
+              },
+              {
+                "text": "Other",
+                "value": "other"
+              }
+            ]
+          }
+        }
+      },
+      "canc_reason_other": {
+        "type": "string",
+        "title": "Reason (other)",
+        "description": "Visible when canc_reason == 'other'.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Reason (other)"
+          }
+        }
+      },
+      "canc_open_claims": {
+        "type": "string",
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "title": "Any open claims?",
+        "description": "Source name misspelled ('CancelleationOpenClaims') \u2014 corrected in the schema key (01-key-list.json D-8).",
+        "ui": {
+          "inputType": "multi-toggle",
+          "props": {
+            "label": "Any open claims?",
+            "options": [
+              {
+                "text": "Yes",
+                "value": "yes"
+              },
+              {
+                "text": "No",
+                "value": "no"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "views": {
+    "table": {
+      "type": "table",
+      "columns": [
+        {
+          "field": "cancellation_reference",
+          "order": 0
+        },
+        {
+          "field": "policy_number",
+          "order": 1
+        },
+        {
+          "field": "broker_id",
+          "order": 2
+        },
+        {
+          "field": "cancellation_status",
+          "order": 3
+        },
+        {
+          "field": "canc_reason",
+          "order": 4
+        },
+        {
+          "field": "effective_date",
+          "order": 5
+        },
+        {
+          "field": "refund_amount",
+          "order": 6
+        }
+      ]
+    }
+  },
+  "index_fields": [
+    {
+      "field": "cancellation_reference",
+      "type": "keyword"
+    },
+    {
+      "field": "policy_number",
+      "type": "keyword"
+    },
+    {
+      "field": "broker_id",
+      "type": "keyword"
+    },
+    {
+      "field": "cancellation_status",
+      "type": "keyword"
+    },
+    {
+      "field": "canc_reason",
+      "type": "keyword"
+    },
+    {
+      "field": "effective_date",
+      "type": "datetime"
+    },
+    {
+      "field": "refund_amount",
+      "type": "numeric"
+    }
+  ]
+}

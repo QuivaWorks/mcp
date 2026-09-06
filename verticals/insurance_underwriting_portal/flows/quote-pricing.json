@@ -1,0 +1,216 @@
+{
+  "name": "Quote Pricing",
+  "description": "When a UWQuote reaches status Submitted, run the Builders Risk rating ruleset, write the pricing back to the quote, set it to Priced and raise a review task. Rate tables live in config.static so they can be changed as data rather than as code. NOTE: this is a record-triggered flow, so it does NOT fire when a person saves the form — see the vertical spec.",
+  "config": {
+    "static": {
+      "base_rates": {
+        "New Construction": 0.35,
+        "Renovation": 0.45,
+        "Demolition": 0.55
+      },
+      "construction_modifiers": {
+        "Wood Frame": 1.0,
+        "Masonry/Concrete": 0.85,
+        "Steel Frame": 0.8
+      },
+      "location_modifiers": {
+        "Urban High Risk": 1.2,
+        "Urban Standard": 1.0,
+        "Suburban": 0.95,
+        "Rural": 0.9
+      },
+      "duration_bands": [
+        { "max_months": 6, "modifier": 1.0 },
+        { "max_months": 12, "modifier": 1.15 },
+        { "max_months": 24, "modifier": 1.35 },
+        { "max_months": 9999, "modifier": 1.5 }
+      ],
+      "experience_bands": [
+        { "max_years": 2, "modifier": 1.25 },
+        { "max_years": 5, "modifier": 1.1 },
+        { "max_years": 10, "modifier": 1.0 },
+        { "max_years": 9999, "modifier": 0.9 }
+      ],
+      "minimum_premium": 500
+    },
+    "nodes": [
+      {
+        "id": "record.UWQuote",
+        "data": {
+          "id": "record.UWQuote",
+          "name": "On quote written",
+          "node_type": "trigger",
+          "trigger_type": "record",
+          "payload": {
+            "record_config_id": "UWQuote",
+            "event_type": ["record-created", "record-updated"]
+          }
+        }
+      },
+      {
+        "id": "GATE_SUBMITTED",
+        "data": {
+          "id": "GATE_SUBMITTED",
+          "name": "Only price a Submitted quote",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": { "operator": "=", "input": ["$.trigger.data.status", "Submitted"] },
+              "outcome": "PRICE"
+            },
+            { "outcome": "RESOLVE_SUCCESS" }
+          ]
+        }
+      },
+      {
+        "id": "PRICE",
+        "data": {
+          "id": "PRICE",
+          "name": "Run the rating ruleset",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function(){function one(x){if(x===null||x===undefined)return '';if(Object.prototype.toString.call(x)==='[object Array]')return x.length?one(x[0]):'';return String(x);}function num(x){var n=Number(one(x));return isNaN(n)?0:n;}function band(bands,v,key){for(var i=0;i<bands.length;i++){if(v<=num(bands[i][key]))return num(bands[i].modifier);}return 1;}var iname=one(insuredName),pname=one(projectName),ptype=one(projectType),ctype=one(constructionType),zn=one(zone),uw=one(uwId),sd=one(startDate),ed=one(endDate);var missing=[];if(!iname)missing.push('insured_name');if(!pname)missing.push('project_name');if(!ptype)missing.push('project_type');if(num(tiv)<=0)missing.push('tiv');var who=uw?[uw]:[];if(missing.length){return{valid:false,missing:missing.join(', '),reference:'',base_rate:0,base_premium:0,duration_modifier:0,construction_modifier:0,experience_modifier:0,location_modifier:0,total_premium:0,duration_months:0,name:pname||'Untitled project',assignees:who,today:new Date().toISOString().slice(0,10)};}var months=0;if(sd&&ed){var s=Date.parse(sd),e=Date.parse(ed);if(!isNaN(s)&&!isNaN(e)&&e>s)months=(e-s)/2629800000;}var rate=num((baseRates||{})[ptype]);if(rate===0)rate=0.35;var basePremium=(num(tiv)/100)*rate;var dm=band(durationBands||[],months,'max_months');var cm=(ctype&&(constructionMods||{})[ctype]!==undefined)?num((constructionMods||{})[ctype]):1;var em=band(experienceBands||[],num(years),'max_years');var lm=(zn&&(locationMods||{})[zn]!==undefined)?num((locationMods||{})[zn]):1;var total=basePremium*dm*cm*em*lm;var minP=num(minimumPremium);if(total<minP)total=minP;function r2(x){return Math.round(x*100)/100;}return{valid:true,missing:'',reference:'Q-'+one(recordId),base_rate:rate,base_premium:r2(basePremium),duration_modifier:dm,construction_modifier:cm,experience_modifier:em,location_modifier:lm,total_premium:r2(total),duration_months:Math.round(months*10)/10,name:pname,assignees:who,today:new Date().toISOString().slice(0,10)};})();",
+            "params": {
+              "recordId": "$.trigger.id",
+              "insuredName": "$.trigger.data.insured_name",
+              "projectName": "$.trigger.data.project_name",
+              "projectType": "$.trigger.data.project_type",
+              "constructionType": "$.trigger.data.construction_type",
+              "zone": "$.trigger.data.location_zone",
+              "tiv": "$.trigger.data.tiv",
+              "years": "$.trigger.data.insured_years_in_business",
+              "startDate": "$.trigger.data.start_date",
+              "endDate": "$.trigger.data.completion_date",
+              "uwId": "$.trigger.data.underwriter_id",
+              "baseRates": "$.static.base_rates",
+              "constructionMods": "$.static.construction_modifiers",
+              "locationMods": "$.static.location_modifiers",
+              "durationBands": "$.static.duration_bands",
+              "experienceBands": "$.static.experience_bands",
+              "minimumPremium": "$.static.minimum_premium"
+            }
+          }
+        }
+      },
+      {
+        "id": "CHECK_VALID",
+        "data": {
+          "id": "CHECK_VALID",
+          "name": "Did validation pass?",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": { "operator": "=", "input": ["$.PRICE.valid", true] },
+              "outcome": ["STAMP_PRICED", "TASK_REVIEW"]
+            },
+            { "outcome": ["STAMP_DRAFT", "TASK_INCOMPLETE"] }
+          ]
+        }
+      },
+      {
+        "id": "STAMP_PRICED",
+        "data": {
+          "id": "STAMP_PRICED",
+          "name": "Write pricing back to the quote",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/records/UWQuote/|$.trigger.id",
+            "method": "PUT",
+            "headers": { "Authorization": "Bearer |$.env.auth_token" },
+            "data": {
+              "data": {
+                "status": "Priced",
+                "quote_reference": "$.PRICE.reference",
+                "quote_date": "$.PRICE.today",
+                "base_rate": "$.PRICE.base_rate",
+                "base_premium": "$.PRICE.base_premium",
+                "duration_modifier": "$.PRICE.duration_modifier",
+                "construction_modifier": "$.PRICE.construction_modifier",
+                "experience_modifier": "$.PRICE.experience_modifier",
+                "location_modifier": "$.PRICE.location_modifier",
+                "total_premium": "$.PRICE.total_premium"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "TASK_REVIEW",
+        "data": {
+          "id": "TASK_REVIEW",
+          "name": "Raise the review task",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/workspaces/task",
+            "method": "POST",
+            "headers": { "Authorization": "Bearer |$.env.auth_token" },
+            "data": {
+              "space_id": "UNDERWRITING",
+              "title": "Review priced quote: |$.PRICE.name",
+              "description": "Quote |$.PRICE.reference| priced at |$.PRICE.total_premium|. Check the rating before it goes out.",
+              "status": "open",
+              "priority": "medium",
+              "assignees": "$.PRICE.assignees",
+              "tags": ["underwriting", "quote-review"]
+            }
+          }
+        }
+      },
+      {
+        "id": "STAMP_DRAFT",
+        "data": {
+          "id": "STAMP_DRAFT",
+          "name": "Send an incomplete quote back to Draft",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/records/UWQuote/|$.trigger.id",
+            "method": "PUT",
+            "headers": { "Authorization": "Bearer |$.env.auth_token" },
+            "data": { "data": { "status": "Draft" } }
+          }
+        }
+      },
+      {
+        "id": "TASK_INCOMPLETE",
+        "data": {
+          "id": "TASK_INCOMPLETE",
+          "name": "Tell the underwriter what is missing",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/workspaces/task",
+            "method": "POST",
+            "headers": { "Authorization": "Bearer |$.env.auth_token" },
+            "data": {
+              "space_id": "UNDERWRITING",
+              "title": "Quote cannot be priced: |$.PRICE.name",
+              "description": "Returned to Draft. Missing required detail: |$.PRICE.missing",
+              "status": "open",
+              "priority": "high",
+              "assignees": "$.PRICE.assignees",
+              "tags": ["underwriting", "quote-incomplete"]
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      { "id": "e_trigger_GATE", "source": "record.UWQuote", "target": "GATE_SUBMITTED" },
+      { "id": "e_GATE_PRICE", "source": "GATE_SUBMITTED", "target": "PRICE" },
+      { "id": "e_PRICE_CHECK", "source": "PRICE", "target": "CHECK_VALID" },
+      { "id": "e_CHECK_STAMP_PRICED", "source": "CHECK_VALID", "target": "STAMP_PRICED" },
+      { "id": "e_CHECK_TASK_REVIEW", "source": "CHECK_VALID", "target": "TASK_REVIEW" },
+      { "id": "e_CHECK_STAMP_DRAFT", "source": "CHECK_VALID", "target": "STAMP_DRAFT" },
+      { "id": "e_CHECK_TASK_INCOMPLETE", "source": "CHECK_VALID", "target": "TASK_INCOMPLETE" }
+    ],
+    "result": {
+      "status": "success",
+      "priced": "$.PRICE.valid",
+      "reference": "$.PRICE.reference",
+      "total_premium": "$.PRICE.total_premium"
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+ "_comment": [
+  "The gateway mapping that gives D2 `outcome-materialise` a URL the PUBLISHER can POST a",
+  "decision to. This is the return path under the decided design (plan section 8.7): no",
+  "export, no import, no capture stream, no republish -- the publisher makes an ordinary",
+  "HTTPS call to the DISTRIBUTOR's own gateway, and cerberus stamps x-account-id from that",
+  "gateway's config (gateway_api.go:2111). Tenancy is therefore the distributor's with zero",
+  "platform work, which is the whole reason this path was chosen over the granted four hops.",
+  "",
+  "On the pilot account this mapping is on antipodean_build's own gateway (VWqPwSvI9DMS)",
+  "because no second staging account was available -- see the delivery report. In a real",
+  "distribution this file is installed on the DISTRIBUTOR's gateway and the gateway_id, url",
+  "and resource all change; the shape does not.",
+  "",
+  "Three calls, in order, then a fourth to force a route-table rebuild:",
+  "  1. POST   /gateway/{gateway_id}/mapping",
+  "  2. POST   /gateway/{gateway_id}/mapping/version?method=post&path=%2Fdecision",
+  "  3. PATCH  /gateway/{gateway_id}/mapping/details?method=post&path=%2Fdecision",
+  "  4. PATCH  /gateway/{gateway_id}  (any harmless field -- see traps)"
+ ],
+ "gateway_id": "VWqPwSvI9DMS",
+ "url": "https://vwqpwsvi9dms.microstrate.io/decision",
+ "mapping": {
+  "gateway": "ms.gateway.VWqPwSvI9DMS.gateway",
+  "method": "POST",
+  "path": "/decision",
+  "is_public": false,
+  "timeout": 30000,
+  "limit": { "request": 600, "time": 1000 }
+ },
+ "mapping_version": {
+  "resource_type": "flow",
+  "resource": "ms.hub.config.workflow.3788449144.1772448370",
+  "invocation_type": "RequestResponse",
+  "active": true,
+  "description": "D2 outcome-materialise: the publisher projects a decision here"
+ },
+ "mapping_traffic_patch": {
+  "traffic_distribution": { "1": 100 },
+  "timeout": 30000,
+  "limit": { "request": 600, "time": 1000 },
+  "is_public": false
+ },
+ "traps": [
+  "Step 3 is not optional. POST /mapping never sets traffic_distribution and cerberus skips every version whose weight is 0, so the route mounts with an empty version list and dies in the recoverer as a 500 with an EMPTY BODY.",
+  "The route table can be stale for minutes. `bcli publish ms.gateway.<id>.reload` cannot reach a sub-account; PATCH /gateway/<id> with a description writes ms.gateway.<id>.gateway, which cerberus turns into a per-gateway rebuild. Doing it in the same script as the three calls meant the route served on the first request.",
+  "An ERRORED flow run returns the whole node list to the HTTP caller -- node ids, urls, eval source and static references. Header VALUES are redacted ([redacted], P17), so no credential escapes, but on a distributor-facing endpoint the publisher's flow internals do. Nothing distributor-facing should be allowed to error; return a status field instead.",
+  "invocation_type must be RequestResponse or the gateway does not await the run and the caller gets nothing to read."
+ ]
+}

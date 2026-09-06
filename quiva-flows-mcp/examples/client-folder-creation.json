@@ -1,0 +1,387 @@
+{
+  "slug": "client-folder-creation",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "subject": "ms.hub.config.workflow.2163944795.4227511847",
+    "name": "Client Folder Creation",
+    "harvested_from": "published version"
+  },
+  "teaches": [
+    "condition node: the payload IS the { condition, outcome } branch array",
+    "gateway trigger node",
+    "integration nodes with base_url + security_schemes",
+    "pipe concatenation (\"$.trigger.firstName| |$.trigger.lastName\", \"Bearer |$.env.auth_token\")",
+    "flow-level config.result",
+    "flow-editor geometry (node position/type/measured, edge type/edgeType/handles)"
+  ],
+  "redactions": 1,
+  "description": "Deterministic process for managing client folder creation with deduplication checks and folder-to-client linking",
+  "config": {
+    "edges": [
+      {
+        "source": "QsY6OWA5xVhZn9aS3lF-Z",
+        "target": "DEDUPE_CHECK",
+        "id": "xy-edge__QsY6OWA5xVhZn9aS3lF-ZQsY6OWA5xVhZn9aS3lF-Z-DEDUPE_CHECKDEDUPE_CHECK",
+        "targetHandle": "DEDUPE_CHECK",
+        "sourceHandle": "QsY6OWA5xVhZn9aS3lF-Z",
+        "type": "custom",
+        "edgeType": "custom",
+        "subject": "ms.hub.config.workflow-edge.2163944795.4227511847.xy-edge__QsY6OWA5xVhZn9aS3lF-ZQsY6OWA5xVhZn9aS3lF-Z-DEDUPE_CHECKDEDUPE_CHECK",
+        "modified": 1783669740
+      },
+      {
+        "source": "DEDUPE_CHECK",
+        "target": "CHECK_FOR_DUPLICATES",
+        "id": "xy-edge__DEDUPE_CHECKDEDUPE_CHECK-CHECK_FOR_DUPLICATESCHECK_FOR_DUPLICATES",
+        "targetHandle": "CHECK_FOR_DUPLICATES",
+        "sourceHandle": "DEDUPE_CHECK",
+        "type": "custom",
+        "edgeType": "custom",
+        "subject": "ms.hub.config.workflow-edge.2163944795.4227511847.xy-edge__DEDUPE_CHECKDEDUPE_CHECK-CHECK_FOR_DUPLICATESCHECK_FOR_DUPLICATES",
+        "modified": 1783669740
+      },
+      {
+        "source": "CHECK_FOR_DUPLICATES",
+        "target": "zl6q42Zr0X3QXjpv0Wv4K",
+        "id": "zl6q42Zr0X3QXjpv0Wv4K_CHECK_FOR_DUPLICATES",
+        "targetHandle": "zl6q42Zr0X3QXjpv0Wv4K",
+        "sourceHandle": "CHECK_FOR_DUPLICATES",
+        "type": "custom",
+        "edgeType": "custom",
+        "subject": "ms.hub.config.workflow-edge.2163944795.4227511847.zl6q42Zr0X3QXjpv0Wv4K_CHECK_FOR_DUPLICATES",
+        "modified": 1783669740
+      },
+      {
+        "source": "zl6q42Zr0X3QXjpv0Wv4K",
+        "target": "CONFLICT_RESPONSE",
+        "id": "xy-edge__zl6q42Zr0X3QXjpv0Wv4Kzl6q42Zr0X3QXjpv0Wv4K-CONFLICT_RESPONSECONFLICT_RESPONSE",
+        "targetHandle": "CONFLICT_RESPONSE",
+        "sourceHandle": "zl6q42Zr0X3QXjpv0Wv4K",
+        "type": "custom",
+        "edgeType": "custom",
+        "subject": "ms.hub.config.workflow-edge.2163944795.4227511847.xy-edge__zl6q42Zr0X3QXjpv0Wv4Kzl6q42Zr0X3QXjpv0Wv4K-CONFLICT_RESPONSECONFLICT_RESPONSE",
+        "modified": 1783669740
+      },
+      {
+        "source": "zl6q42Zr0X3QXjpv0Wv4K",
+        "target": "CREATE_FOLDER",
+        "id": "xy-edge__zl6q42Zr0X3QXjpv0Wv4Kzl6q42Zr0X3QXjpv0Wv4K-CREATE_FOLDERCREATE_FOLDER",
+        "targetHandle": "CREATE_FOLDER",
+        "sourceHandle": "zl6q42Zr0X3QXjpv0Wv4K",
+        "type": "custom",
+        "edgeType": "custom",
+        "subject": "ms.hub.config.workflow-edge.2163944795.4227511847.xy-edge__zl6q42Zr0X3QXjpv0Wv4Kzl6q42Zr0X3QXjpv0Wv4K-CREATE_FOLDERCREATE_FOLDER",
+        "modified": 1783669740
+      },
+      {
+        "source": "CREATE_FOLDER",
+        "target": "CREATE_CLIENT_RECORD",
+        "id": "xy-edge__CREATE_FOLDERCREATE_FOLDER-CREATE_CLIENT_RECORDCREATE_CLIENT_RECORD",
+        "targetHandle": "CREATE_CLIENT_RECORD",
+        "sourceHandle": "CREATE_FOLDER",
+        "type": "custom",
+        "edgeType": "custom",
+        "subject": "ms.hub.config.workflow-edge.2163944795.4227511847.xy-edge__CREATE_FOLDERCREATE_FOLDER-CREATE_CLIENT_RECORDCREATE_CLIENT_RECORD",
+        "modified": 1783669740
+      }
+    ],
+    "nodes": [
+      {
+        "data": {
+          "id": "QsY6OWA5xVhZn9aS3lF-Z",
+          "name": "https://Nrlz-Pmv8qiH.microstrate.io/client/create",
+          "subject": "ms.gateway.Nrlz-Pmv8qiH.mapping.post.client-create",
+          "node_type": "trigger",
+          "trigger_type": "gateway",
+          "payload": {
+            "api_key": {
+              "created_on": "2026-07-08T13:08:51Z",
+              "expires_on": "2027-07-08T13:08:51Z",
+              "key": "<<REDACTED — provide your own credential>>",
+              "name": "http_trigger_Nrlz-Pmv8qiH.microstrate.io/client/create"
+            }
+          }
+        },
+        "id": "QsY6OWA5xVhZn9aS3lF-Z",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "type": "custom",
+        "measured": {
+          "height": 96,
+          "width": 96
+        },
+        "subject": "ms.hub.config.workflow-node.2163944795.4227511847.QsY6OWA5xVhZn9aS3lF-Z",
+        "modified": 1783669740
+      },
+      {
+        "data": {
+          "id": "DEDUPE_CHECK",
+          "name": "Dedupe check",
+          "node_type": "integration",
+          "payload": {
+            "auth": {
+              "private_auth": false,
+              "scheme_name": "apiKey",
+              "scheme_type": "apiKey"
+            },
+            "base_url": "https://api.microstrate.io",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "method": "GET",
+            "query": {
+              "space_id": "FAHUB"
+            },
+            "security_schemes": {
+              "apiKey": {
+                "in": "header",
+                "name": "x-api-key",
+                "type": "apiKey"
+              },
+              "bearerAuth": {
+                "bearerFormat": "JWT",
+                "scheme": "bearer",
+                "type": "http"
+              }
+            },
+            "url": "/workspaces/files"
+          },
+          "integration_id": "quiva-workspace-files",
+          "request_type_id": "quiva-workspace-files__listfiles"
+        },
+        "id": "DEDUPE_CHECK",
+        "position": {
+          "x": 296,
+          "y": 0
+        },
+        "type": "custom",
+        "measured": {
+          "height": 96,
+          "width": 96
+        },
+        "subject": "ms.hub.config.workflow-node.2163944795.4227511847.DEDUPE_CHECK",
+        "modified": 1783669740
+      },
+      {
+        "data": {
+          "id": "CHECK_FOR_DUPLICATES",
+          "name": "Check for duplicates",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function() {\n  // foldersList is already the results array from DEDUPE_CHECK\n  var duplicateFolder = null;\n  \n  for (var i = 0; i < foldersList.length; i++) {\n    // Parse folder name from: spaces.FAHUB.{folderName}.metadata.json\n    var nameParts = foldersList[i].name.split('.');\n    var folderName = nameParts[2];\n    \n    if (folderName === uniqueName) {\n      duplicateFolder = {\n        \"name\": foldersList[i].name,\n        \"folderName\": folderName,\n        \"subject\": foldersList[i].subject,\n        \"modified\": foldersList[i].modified\n      };\n      break;\n    }\n  }\n  \n  return {\n    \"duplicate_exists\": duplicateFolder ? true : false,\n    \"matching_folder\": duplicateFolder || null\n  };\n})();",
+            "params": {
+              "foldersList": "$.DEDUPE_CHECK.data.results",
+              "uniqueName": "$.trigger.firstName| |$.trigger.lastName"
+            }
+          }
+        },
+        "id": "CHECK_FOR_DUPLICATES",
+        "position": {
+          "x": 555.4687744027196,
+          "y": -1.2864675948760862
+        },
+        "type": "custom",
+        "measured": {
+          "height": 96,
+          "width": 96
+        },
+        "subject": "ms.hub.config.workflow-node.2163944795.4227511847.CHECK_FOR_DUPLICATES",
+        "modified": 1783669740
+      },
+      {
+        "data": {
+          "id": "zl6q42Zr0X3QXjpv0Wv4K",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "input": [
+                  "$.CHECK_FOR_DUPLICATES.duplicate_exists",
+                  false
+                ],
+                "operator": "="
+              },
+              "outcome": "CREATE_FOLDER"
+            },
+            {
+              "condition": {
+                "input": [
+                  "$.CHECK_FOR_DUPLICATES.duplicate_exists",
+                  true
+                ],
+                "operator": "="
+              },
+              "outcome": "CONFLICT_RESPONSE"
+            }
+          ],
+          "options": {
+            "flat_map": false,
+            "backoff_ms": 1000,
+            "timeout": 20000,
+            "attempts": 3,
+            "ignore_response_codes": []
+          }
+        },
+        "id": "zl6q42Zr0X3QXjpv0Wv4K",
+        "position": {
+          "x": 805.8813218211558,
+          "y": 0.016031050311454464
+        },
+        "type": "custom",
+        "measured": {
+          "height": 96,
+          "width": 96
+        },
+        "subject": "ms.hub.config.workflow-node.2163944795.4227511847.zl6q42Zr0X3QXjpv0Wv4K",
+        "modified": 1783669740
+      },
+      {
+        "data": {
+          "id": "CONFLICT_RESPONSE",
+          "name": "Conflict response",
+          "node_type": "error",
+          "payload": {
+            "message": "Client folder already exists for this client name",
+            "status_code": 409
+          }
+        },
+        "id": "CONFLICT_RESPONSE",
+        "position": {
+          "x": 1090.099840629092,
+          "y": 149.01711671464486
+        },
+        "type": "custom",
+        "measured": {
+          "height": 96,
+          "width": 96
+        },
+        "subject": "ms.hub.config.workflow-node.2163944795.4227511847.CONFLICT_RESPONSE",
+        "modified": 1783669740
+      },
+      {
+        "data": {
+          "id": "CREATE_FOLDER",
+          "name": "Create folder",
+          "node_type": "integration",
+          "payload": {
+            "auth": {
+              "private_auth": false,
+              "scheme_name": "apiKey",
+              "scheme_type": "apiKey"
+            },
+            "base_url": "https://api.microstrate.io",
+            "data": {
+              "folder": "$.trigger.firstName| |$.trigger.lastName|",
+              "full_path": "",
+              "metadata": {
+                "email": "$.trigger.email",
+                "type": "client"
+              },
+              "space_id": "FAHUB"
+            },
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "method": "POST",
+            "query": {},
+            "security_schemes": {
+              "apiKey": {
+                "in": "header",
+                "name": "x-api-key",
+                "type": "apiKey"
+              },
+              "bearerAuth": {
+                "bearerFormat": "JWT",
+                "scheme": "bearer",
+                "type": "http"
+              }
+            },
+            "url": "/workspaces/files/folder"
+          },
+          "integration_id": "quiva-workspace-files",
+          "request_type_id": "quiva-workspace-files__createfolder"
+        },
+        "id": "CREATE_FOLDER",
+        "position": {
+          "x": 1087.32772740743,
+          "y": -147.59899800319093
+        },
+        "type": "custom",
+        "measured": {
+          "height": 96,
+          "width": 96
+        },
+        "subject": "ms.hub.config.workflow-node.2163944795.4227511847.CREATE_FOLDER",
+        "modified": 1783669740
+      },
+      {
+        "data": {
+          "id": "CREATE_CLIENT_RECORD",
+          "name": "Create Client Record",
+          "node_type": "integration",
+          "payload": {
+            "auth": {
+              "private_auth": false,
+              "scheme_name": "apiKeyAuth",
+              "scheme_type": "apiKey"
+            },
+            "base_url": "https://api.microstrate.io",
+            "data": {
+              "data": {
+                "address": "$.trigger.address",
+                "dob": "$.trigger.dateOfBirth",
+                "email": "$.trigger.email",
+                "firstName": "$.trigger.firstName",
+                "lastName": "$.trigger.lastName",
+                "name": "$.trigger.firstName| |$.trigger.lastName",
+                "phone": "$.trigger.phone"
+              },
+              "folder": "$.trigger.firstName| |$.trigger.lastName",
+              "space_id": "FAHUB"
+            },
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "method": "POST",
+            "query": {},
+            "security_schemes": {
+              "apiKeyAuth": {
+                "in": "header",
+                "name": "X-Api-Key",
+                "type": "apiKey"
+              },
+              "bearerAuth": {
+                "bearerFormat": "JWT",
+                "description": "JWT Authorization header using the Bearer scheme",
+                "scheme": "bearer",
+                "type": "http"
+              }
+            },
+            "url": "/records/Client"
+          },
+          "integration_id": "quiva-records",
+          "request_type_id": "quiva-records__createrecord"
+        },
+        "id": "CREATE_CLIENT_RECORD",
+        "position": {
+          "x": 1383.32772740743,
+          "y": -147.59899800319093
+        },
+        "type": "custom",
+        "measured": {
+          "height": 96,
+          "width": 96
+        },
+        "subject": "ms.hub.config.workflow-node.2163944795.4227511847.CREATE_CLIENT_RECORD",
+        "modified": 1783669740
+      }
+    ],
+    "result": {
+      "folder": "/folder/|$.trigger.firstName| |$.trigger.lastName",
+      "message": "Client and folder created successfully",
+      "status": "success"
+    }
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "name": "Deal Rollup",
+  "description": "When a Deal changes, recount the open deals for its company and write the totals back onto the Company record.",
+  "config": {
+    "nodes": [
+      {
+        "id": "record.Deal",
+        "data": {
+          "id": "record.Deal",
+          "node_type": "trigger",
+          "payload": {
+            "record_config_id": "Deal",
+            "event_type": [
+              "record-created",
+              "record-updated"
+            ]
+          },
+          "name": "On Deal record-created/record-updated",
+          "trigger_type": "record"
+        }
+      },
+      {
+        "id": "LIST_DEALS",
+        "data": {
+          "id": "LIST_DEALS",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/records/Deal",
+            "method": "GET",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "query": {
+              "limit": 500
+            }
+          }
+        }
+      },
+      {
+        "id": "AGGREGATE",
+        "data": {
+          "id": "AGGREGATE",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function(){var rows=(list&&list.results)||list||[];var open=0,count=0;for(var i=0;i<rows.length;i++){var d=rows[i].data||{};if(String(d.company_id||'')!==String(companyId||''))continue;var s=String(d.deal_stage||'');if(s==='Closed Won'||s==='Closed Lost')continue;open+=Number(d.deal_value)||0;count++;}return{company:String(companyId||''),open_deal_value:open,deal_count:count};})();",
+            "params": {
+              "list": "$.LIST_DEALS.data",
+              "companyId": "$.trigger.data.company_id"
+            }
+          }
+        }
+      },
+      {
+        "id": "UPDATE_COMPANY",
+        "data": {
+          "id": "UPDATE_COMPANY",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/records/Company/|$.AGGREGATE.company",
+            "method": "PUT",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "data": {
+                "open_deal_value": "$.AGGREGATE.open_deal_value",
+                "deal_count": "$.AGGREGATE.deal_count"
+              }
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_record_Deal_LIST_DEALS",
+        "source": "record.Deal",
+        "target": "LIST_DEALS"
+      },
+      {
+        "id": "e_LIST_DEALS_AGGREGATE",
+        "source": "LIST_DEALS",
+        "target": "AGGREGATE"
+      },
+      {
+        "id": "e_AGGREGATE_UPDATE_COMPANY",
+        "source": "AGGREGATE",
+        "target": "UPDATE_COMPANY"
+      }
+    ],
+    "result": {
+      "status": "success",
+      "open_deal_value": "$.AGGREGATE.open_deal_value"
+    }
+  }
+}

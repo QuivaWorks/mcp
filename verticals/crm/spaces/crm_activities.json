@@ -1,0 +1,21 @@
+{
+  "id": "CRM_ACTIVITIES",
+  "name": "CRM Activities",
+  "description": "Follow-ups, proposal tasks and renewal reminders raised against deals, companies and contacts. Most tasks here are created by the CRM flows.",
+  "default_status": "to_do",
+  "record_config_ids": ["Client", "Company", "Deal", "Product", "Activity"],
+  "record_configs": [
+    { "id": "Client" },
+    { "id": "Company" },
+    { "id": "Deal" },
+    { "id": "Product" },
+    { "id": "Activity" }
+  ],
+  "statuses": [
+    { "id": "to_do", "name": "To Do", "color": "#6B7280", "order": 1, "is_visible": true, "complete": false },
+    { "id": "in_progress", "name": "In Progress", "color": "#3B82F6", "order": 2, "is_visible": true, "complete": false },
+    { "id": "waiting", "name": "Waiting", "color": "#F59E0B", "order": 3, "is_visible": true, "complete": false },
+    { "id": "done", "name": "Done", "color": "#10B981", "order": 4, "is_visible": true, "complete": true },
+    { "id": "cancelled", "name": "Cancelled", "color": "#EF4444", "order": 5, "is_visible": true, "complete": true }
+  ]
+}

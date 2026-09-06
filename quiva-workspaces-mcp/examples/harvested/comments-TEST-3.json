@@ -1,0 +1,33 @@
+{
+  "slug": "comments-TEST-3",
+  "kind": "comments",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "task_id": "TEST-3",
+    "space_id": "TEST",
+    "url": "https://app.microstrate.io/en/hub/spaces/TEST/tasks?task=TEST-3",
+    "harvested_from": "GET /workspaces/task/TEST-3/comments"
+  },
+  "teaches": [
+    "1 real comment(s) with server-generated ids (c_<nanoid>)",
+    "reactions is a map, `{}` when empty (react_to_comment writes { \"<emoji>\": true|false })",
+    "subject: ms.workspaces.task-comment.{TASK-ID}.{COMMENT-ID}",
+    "url anchors the comment: ...?task={TASK-ID}#comment-{COMMENT-ID}",
+    "read-only fields a create/update body must NOT echo back: author, created_at, updated_at, url, reactions"
+  ],
+  "comments": [
+    {
+      "author": "<<REDACTED:user-id>>",
+      "body": "@Alex",
+      "created_at": "2026-06-12T07:22:41.430445409Z",
+      "id": "c_jJ8MebPYer",
+      "modified": 1781248961,
+      "reactions": {},
+      "sequence": 1339,
+      "subject": "ms.workspaces.task-comment.TEST-3.c_jJ8MebPYer",
+      "type": "created",
+      "updated_at": "2026-06-12T07:22:41.430445409Z",
+      "url": "https://app.microstrate.io/en/hub/spaces/TEST/tasks?task=TEST-3#comment-c_jJ8MebPYer"
+    }
+  ]
+}

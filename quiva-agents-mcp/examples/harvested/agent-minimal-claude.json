@@ -1,0 +1,34 @@
+{
+  "slug": "agent-minimal-claude",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "subject": "ms.hub.config.agent.078a51f0-daa2-34c1-8788-72b8eb939709",
+    "path_id": "078a51f0-daa2-34c1-8788-72b8eb939709",
+    "name": "Email Template Writer",
+    "harvested_from": "GET /hub/agent"
+  },
+  "teaches": [
+    "the smallest shape that actually runs: name + llm_provider + model + behaviour"
+  ],
+  "facts": [
+    "llm_provider \"claude\" / model \"claude-3-5-haiku-20241022\"",
+    "shared: \"\""
+  ],
+  "config": {
+    "name": "Email Template Writer",
+    "description": "This agent takes information in the form of json and converts it into an html for an email template.",
+    "behaviour": "You are an agent that takes structured input in JSON format and transforms it into a responsive HTML email template.\n\nThe JSON will describe the content and structure of the email (e.g., headers, body text, images, buttons, links, footers).\n\nYour task is to generate production-ready HTML that is:\n\nClean and valid\n\nCompatible with major email clients (Gmail, Outlook, Apple Mail, etc.)\n\nResponsive across desktop and mobile\n\nUses inline styles where appropriate\n\nThe final output must be the complete HTML email template, ready to be sent.",
+    "llm_provider": "claude",
+    "model": "claude-3-5-haiku-20241022",
+    "has_tools": true,
+    "timeout": 30,
+    "context_limit": 50000,
+    "message_history_limit": 200,
+    "prompt": "$.CLAUDE_AGENT.result",
+    "ai_prompt": false,
+    "api_key": "CLAUDE_API_KEY",
+    "await": true,
+    "shared": "",
+    "owner": ""
+  }
+}

@@ -1,0 +1,579 @@
+{
+  "name": "lookup-resolve",
+  "description": "One resolver behind the quote form's `lookup` inputs, branched on `kind`,\nserving all five kinds in contract artefact 7 §3 over one gateway path\n(POST /antipodean/lookup, non-public).\n\n| kind | hop | resolves against |\n|---|---|---|\n| address | search | Google Places Autocomplete |\n| address_details | details | Google Place Details, fields=address_components,formatted_address |\n| abn | search | ABR MatchingNames.aspx (JSONP) |\n| abn_details | details | ABR AbnDetails.aspx (JSONP) |\n| occupation | search | occupation_config records - NOT an external API |\n\nAdding a kind is an edit to contract 7's table and to PREPARE/ROUTE/RESPOND\nhere, not a new flow and not a new mapping.\n\nSpend is bounded in PREPARE, never by the gateway: cerberus's Limit.Time is\nms x time.Second and its key is global. PREPARE reads a fixed allowlist of eight\ntrigger keys, rejects an unknown kind, holds a search under 3 characters back\nfrom calling out at all, caps limit at 50, and requires a details hop to carry a\nvalue.\n\nconfig.result is \"$.RESPOND\" - the gateway projects the terminal node's return\nvalue, not the run result, so a payload a secret reference was substituted\ninto never reaches the browser.\n\nResponse is contract 7 §2: {options:[{value,text,note,...}], total, count,\nhas_more, next_offset} for a search, {option:{...}} for a details hop, {error}\nfor a failure. Prefill keys sit FLAT on each row because\nlookup.utils.readRowKey looks a key up flat before it looks it up as a path.",
+  "config": {
+    "nodes": [
+      {
+        "id": "PREPARE",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "type": "custom",
+        "measured": {
+          "height": 96,
+          "width": 96
+        },
+        "data": {
+          "id": "PREPARE",
+          "name": "Validate and bound the request",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function () {\n  var MIN = 3, MAXLIM = 50, DEFLIM = 25;\n  // An unrouted JSONPath arrives as the literal \"$.x\" string, and the engine\n  // also hands back the strings \"undefined\"/\"null\" for an absent key. Both are\n  // emptiness, not data. (Same guard the occupation-lookup flow ships.)\n  function cl(v) {\n    if (v === undefined || v === null) return '';\n    var s = String(v);\n    if (s.indexOf('$.') === 0) return '';\n    if (s === 'undefined' || s === 'null' || s === '[]' || s === '{}') return '';\n    return s;\n  }\n  function num(v, d, max) {\n    var n = parseInt(cl(v), 10);\n    if (!(n > 0)) n = d;\n    if (max && n > max) n = max;\n    return n;\n  }\n  var k = cl(kind).toLowerCase().replace(/[^a-z_]/g, '');\n  var raw = cl(q).trim();\n  var val = cl(val_in).trim();\n  var lim = num(limit, DEFLIM, MAXLIM);\n  var off = num(offset, 0, 10000); if (!(off > 0)) off = 0;\n  var sess = cl(session).replace(/[^A-Za-z0-9._-]/g, '').substring(0, 64);\n\n  var KINDS = ['address', 'address_details', 'abn', 'abn_details', 'occupation'];\n  var known = false;\n  for (var i = 0; i < KINDS.length; i++) { if (KINDS[i] === k) known = true; }\n  if (!known) {\n    return { route: 'REJECT', kind: k, error: 'unsupported lookup kind', reason: 'unknown_kind',\n             limit: lim, offset: off, session: sess };\n  }\n\n  var isSearch = (k === 'address' || k === 'abn' || k === 'occupation');\n  // Below the minimum this returns an EMPTY PAGE, not an error: \"keep typing\" is\n  // not a failure and must not paint a banner over the field. No upstream call\n  // is made either way, which is the half that bounds spend.\n  if (isSearch && raw.length < MIN) {\n    return { route: 'REJECT', kind: k, reason: 'below_min_chars', min_chars: MIN,\n             limit: lim, offset: off, session: sess };\n  }\n  if (!isSearch && val === '') {\n    return { route: 'REJECT', kind: k, error: 'nothing selected to resolve', reason: 'no_value',\n             limit: lim, offset: off, session: sess };\n  }\n\n  var out = { kind: k, reason: 'query', limit: lim, offset: off, session: sess,\n              min_chars: MIN, query: raw, value: val, error: '' };\n\n  if (k === 'occupation') {\n    // Prefix per whitespace token against occupation_label, lowercased — the\n    // index stores lowercase prefixes, so \"PHYS\" matches nothing. Tokens AND.\n    var toks = raw.toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/^ +| +$/g, '').split(' ');\n    var conditions = [{ field: 'occupation_active', keyword: 'true' }];\n    for (var t = 0; t < toks.length; t++) {\n      if (toks[t].length > 0) conditions.push({ field: 'occupation_label', prefix: toks[t] });\n    }\n    var FIELDS = { itpi: 'itpi_eligibility', itl: 'itpi_eligibility', itcl: 'itpi_eligibility',\n                   ah: 'ah_eligibility', allied_health: 'ah_eligibility', ahcl: 'ah_eligibility',\n                   gp: 'gp_eligibility', general_property: 'gp_eligibility' };\n    var pkey = cl(product).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');\n    var pfield = FIELDS[pkey] || '';\n    if (pfield !== '') {\n      var wantRaw = cl(eligibility); if (wantRaw === '') wantRaw = 'yes,refer';\n      var parts = wantRaw.toLowerCase().split(','), want = [];\n      for (var w = 0; w < parts.length; w++) {\n        var p = parts[w].replace(/^ +| +$/g, '');\n        if (p === 'yes' || p === 'no' || p === 'refer') want.push(p);\n      }\n      if (want.length === 0) want = ['yes', 'refer'];\n      var group = [];\n      for (var g = 0; g < want.length; g++) group.push({ field: pfield, keyword: want[g] });\n      conditions.push({ operator: 'or', conditions: group });\n    }\n    out.route = 'OCC_FETCH';\n    out.occ_filter = JSON.stringify({ conditions: conditions });\n    out.occ_limit = String(lim);\n    out.occ_offset = String(off);\n    return out;\n  }\n\n  if (k === 'address') { out.route = 'ADDR_FETCH'; out.g_input = raw; return out; }\n  if (k === 'address_details') { out.route = 'ADDR_DET_FETCH'; out.g_place_id = val; return out; }\n\n  if (k === 'abn') {\n    // ABR's MatchingNames is a NAME search. A caller who typed digits meant the\n    // details hop, so route it there rather than name-searching for \"51824753556\".\n    var digits = raw.replace(/[^0-9]/g, '');\n    if (digits.length === 11 && raw.replace(/[0-9 ]/g, '') === '') {\n      out.route = 'ABN_DET_FETCH'; out.abr_abn = digits; out.kind = 'abn_details'; return out;\n    }\n    out.route = 'ABN_FETCH'; out.abr_name = raw; out.abr_max = String(lim); return out;\n  }\n\n  // abn_details. Always a STRING on the wire: a bare JSON number becomes a Go\n  // float64 and serialises into the query string as 3.3051775556e+10, which ABR\n  // answers 200 with \"Search text is not a valid ABN or ACN\" — a wrong answer\n  // that looks like a right one (§9).\n  var d = val.replace(/[^0-9]/g, '');\n  if (d.length !== 11) {\n    return { route: 'REJECT', kind: k, error: 'an ABN is 11 digits', reason: 'bad_abn',\n             limit: lim, offset: off, session: sess };\n  }\n  out.route = 'ABN_DET_FETCH'; out.abr_abn = d; return out;\n})()",
+            "params": {
+              "kind": "$.trigger.kind",
+              "q": "$.trigger.query",
+              "val_in": "$.trigger.value",
+              "limit": "$.trigger.limit",
+              "offset": "$.trigger.offset",
+              "session": "$.trigger.session",
+              "product": "$.trigger.product",
+              "eligibility": "$.trigger.eligibility"
+            }
+          }
+        }
+      },
+      {
+        "id": "ROUTE",
+        "position": {
+          "x": 200,
+          "y": 0
+        },
+        "type": "custom",
+        "measured": {
+          "height": 96,
+          "width": 96
+        },
+        "data": {
+          "id": "ROUTE",
+          "name": "Branch on kind",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.PREPARE.route",
+                  "OCC_FETCH"
+                ]
+              },
+              "outcome": "OCC_FETCH"
+            },
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.PREPARE.route",
+                  "ADDR_FETCH"
+                ]
+              },
+              "outcome": "ADDR_FETCH"
+            },
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.PREPARE.route",
+                  "ADDR_DET_FETCH"
+                ]
+              },
+              "outcome": "ADDR_DET_FETCH"
+            },
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.PREPARE.route",
+                  "ABN_FETCH"
+                ]
+              },
+              "outcome": "ABN_FETCH"
+            },
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.PREPARE.route",
+                  "ABN_DET_FETCH"
+                ]
+              },
+              "outcome": "ABN_DET_FETCH"
+            },
+            {
+              "outcome": "GO_REJECT"
+            }
+          ]
+        }
+      },
+      {
+        "id": "OCC_FETCH",
+        "position": {
+          "x": 400,
+          "y": -200
+        },
+        "type": "custom",
+        "measured": {
+          "height": 96,
+          "width": 96
+        },
+        "data": {
+          "id": "OCC_FETCH",
+          "name": "Query occupation_config",
+          "node_type": "http",
+          "payload": {
+            "method": "get",
+            "url": "https://api.microstrate.io/records",
+            "headers": {
+              "accept": "application/json",
+              "authorization": "Bearer |$.env.auth_token"
+            },
+            "query": {
+              "space_id": "ANTIPODEAN",
+              "config_id": "occupation_config",
+              "filter": "$.PREPARE.occ_filter",
+              "limit": "$.PREPARE.occ_limit",
+              "offset": "$.PREPARE.occ_offset",
+              "sort_by": "occupation_label"
+            },
+            "timeout": 20000
+          }
+        }
+      },
+      {
+        "id": "ADDR_FETCH",
+        "position": {
+          "x": 400,
+          "y": -100
+        },
+        "type": "custom",
+        "measured": {
+          "height": 96,
+          "width": 96
+        },
+        "data": {
+          "id": "ADDR_FETCH",
+          "name": "Google Places Autocomplete",
+          "node_type": "http",
+          "payload": {
+            "method": "get",
+            "url": "https://maps.googleapis.com/maps/api/place/autocomplete/json",
+            "query": {
+              "input": "$.PREPARE.g_input",
+              "components": "country:au",
+              "types": "address",
+              "sessiontoken": "$.PREPARE.session",
+              "key": "SECRET::GOOGLE_PLACES_KEY::"
+            },
+            "timeout": 15000
+          }
+        }
+      },
+      {
+        "id": "ADDR_DET_FETCH",
+        "position": {
+          "x": 400,
+          "y": 0
+        },
+        "type": "custom",
+        "measured": {
+          "height": 96,
+          "width": 96
+        },
+        "data": {
+          "id": "ADDR_DET_FETCH",
+          "name": "Google Place Details",
+          "node_type": "http",
+          "payload": {
+            "method": "get",
+            "url": "https://maps.googleapis.com/maps/api/place/details/json",
+            "query": {
+              "place_id": "$.PREPARE.g_place_id",
+              "fields": "address_components,formatted_address",
+              "sessiontoken": "$.PREPARE.session",
+              "key": "SECRET::GOOGLE_PLACES_KEY::"
+            },
+            "timeout": 15000
+          }
+        }
+      },
+      {
+        "id": "ABN_FETCH",
+        "position": {
+          "x": 400,
+          "y": 100
+        },
+        "type": "custom",
+        "measured": {
+          "height": 96,
+          "width": 96
+        },
+        "data": {
+          "id": "ABN_FETCH",
+          "name": "ABR MatchingNames",
+          "node_type": "http",
+          "payload": {
+            "method": "get",
+            "url": "https://abr.business.gov.au/json/MatchingNames.aspx",
+            "query": {
+              "name": "$.PREPARE.abr_name",
+              "maxResults": "$.PREPARE.abr_max",
+              "guid": "SECRET-NOT-PROVISIONED-ABR_GUID"
+            },
+            "timeout": 15000
+          }
+        }
+      },
+      {
+        "id": "ABN_DET_FETCH",
+        "position": {
+          "x": 400,
+          "y": 200
+        },
+        "type": "custom",
+        "measured": {
+          "height": 96,
+          "width": 96
+        },
+        "data": {
+          "id": "ABN_DET_FETCH",
+          "name": "ABR AbnDetails",
+          "node_type": "http",
+          "payload": {
+            "method": "get",
+            "url": "https://abr.business.gov.au/json/AbnDetails.aspx",
+            "query": {
+              "abn": "$.PREPARE.abr_abn",
+              "guid": "SECRET-NOT-PROVISIONED-ABR_GUID"
+            },
+            "timeout": 15000
+          }
+        }
+      },
+      {
+        "id": "GO_REJECT",
+        "position": {
+          "x": 620,
+          "y": 300
+        },
+        "type": "custom",
+        "measured": {
+          "height": 96,
+          "width": 96
+        },
+        "data": {
+          "id": "GO_REJECT",
+          "name": "Rejected before any upstream call",
+          "node_type": "condition",
+          "payload": [
+            {
+              "outcome": "RESPOND"
+            }
+          ]
+        }
+      },
+      {
+        "id": "GO_OCC",
+        "position": {
+          "x": 620,
+          "y": -200
+        },
+        "type": "custom",
+        "measured": {
+          "height": 96,
+          "width": 96
+        },
+        "data": {
+          "id": "GO_OCC",
+          "name": "Occupation rows ready",
+          "node_type": "condition",
+          "payload": [
+            {
+              "outcome": "RESPOND"
+            }
+          ]
+        }
+      },
+      {
+        "id": "GO_ADDR",
+        "position": {
+          "x": 620,
+          "y": -100
+        },
+        "type": "custom",
+        "measured": {
+          "height": 96,
+          "width": 96
+        },
+        "data": {
+          "id": "GO_ADDR",
+          "name": "Predictions ready",
+          "node_type": "condition",
+          "payload": [
+            {
+              "outcome": "RESPOND"
+            }
+          ]
+        }
+      },
+      {
+        "id": "GO_ADDR_DET",
+        "position": {
+          "x": 620,
+          "y": 0
+        },
+        "type": "custom",
+        "measured": {
+          "height": 96,
+          "width": 96
+        },
+        "data": {
+          "id": "GO_ADDR_DET",
+          "name": "Place details ready",
+          "node_type": "condition",
+          "payload": [
+            {
+              "outcome": "RESPOND"
+            }
+          ]
+        }
+      },
+      {
+        "id": "GO_ABN",
+        "position": {
+          "x": 620,
+          "y": 100
+        },
+        "type": "custom",
+        "measured": {
+          "height": 96,
+          "width": 96
+        },
+        "data": {
+          "id": "GO_ABN",
+          "name": "ABR name matches ready",
+          "node_type": "condition",
+          "payload": [
+            {
+              "outcome": "RESPOND"
+            }
+          ]
+        }
+      },
+      {
+        "id": "GO_ABN_DET",
+        "position": {
+          "x": 620,
+          "y": 200
+        },
+        "type": "custom",
+        "measured": {
+          "height": 96,
+          "width": 96
+        },
+        "data": {
+          "id": "GO_ABN_DET",
+          "name": "ABR entity ready",
+          "node_type": "condition",
+          "payload": [
+            {
+              "outcome": "RESPOND"
+            }
+          ]
+        }
+      },
+      {
+        "id": "RESPOND",
+        "position": {
+          "x": 700,
+          "y": 0
+        },
+        "type": "custom",
+        "measured": {
+          "height": 96,
+          "width": 96
+        },
+        "data": {
+          "id": "RESPOND",
+          "name": "Shape the contract 7 response",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function () {\n  function obj(v) { return (v && typeof v === 'object' && Object.prototype.toString.call(v) !== '[object Array]') ? v : null; }\n  function arr(v) { return Object.prototype.toString.call(v) === '[object Array]' ? v : []; }\n  function str(v) { return (v === undefined || v === null) ? '' : String(v); }\n  // An http node that never ran resolves to the literal \"$.NODE\" string.\n  function node(v) { if (typeof v === 'string') return null; return obj(v); }\n  // ABR is JSONP: a hard-coded callback( ... ) wrapper that &callback= does not\n  // change, so http.go's json.Unmarshal fails and hands back the raw string.\n  function jsonp(v) {\n    var s = (v === undefined || v === null) ? '' : String(v);\n    var a = s.indexOf('{'), b = s.lastIndexOf('}');\n    if (a < 0 || b <= a) return null;\n    try { return JSON.parse(s.substring(a, b + 1)); } catch (e) { return null; }\n  }\n  function page(options, total, off, extra) {\n    var out = { options: options, total: total, count: options.length,\n                has_more: (off + options.length) < total,\n                next_offset: ((off + options.length) < total) ? (off + options.length) : null };\n    if (extra) { for (var k in extra) { if (extra[k] !== undefined) out[k] = extra[k]; } }\n    return out;\n  }\n\n  var p = obj(prep) || {};\n  var off = parseInt(p.offset, 10); if (!(off > 0)) off = 0;\n  var kind = str(p.kind);\n\n  // ---- rejected before any upstream call ---------------------------------\n  // PREPARE puts min_chars on its below_min_chars return. Rebuilding the\n  // envelope here drops anything PREPARE added, so it is carried across\n  // explicitly: without it the input can say \"keep typing\" but not how many,\n  // which is the whole content of the hint.\n  if (str(p.route) === 'REJECT') {\n    var r = { options: [], total: 0, count: 0, has_more: false, next_offset: null,\n              reason: str(p.reason) };\n    var mc = parseInt(p.min_chars, 10);\n    if (mc > 0) r.min_chars = mc;\n    if (str(p.error) !== '') r.error = str(p.error);\n    return r;\n  }\n\n  // ---- occupation: occupation_config records, no external API ------------\n  var f = node(occ);\n  if (f) {\n    var src = obj(f.data) || {};\n    var rows = arr(src.results);\n    var total = typeof src.total_hits === 'number' ? src.total_hits : rows.length;\n    var options = [];\n    for (var i = 0; i < rows.length; i++) {\n      var d = obj(rows[i] && rows[i].data) || {};\n      var flags = [];\n      if (d.itpi_eligibility) flags.push('ITPI ' + d.itpi_eligibility);\n      if (d.ah_eligibility) flags.push('Allied Health ' + d.ah_eligibility);\n      if (d.gp_eligibility) flags.push('General Property ' + d.gp_eligibility);\n      // Prefill keys sit FLAT on the row: lookup.utils.readRowKey looks the key\n      // up flat first and only then as a dotted path.\n      options.push({\n        value: str(d.occupation_code), text: str(d.occupation_label),\n        note: (d.occupation_category ? 'ANZSIC ' + d.occupation_category + ' - ' : '') + flags.join(', '),\n        occupation_code: d.occupation_code, occupation_label: d.occupation_label,\n        occupation_category: d.occupation_category,\n        itpi_eligibility: d.itpi_eligibility, ah_eligibility: d.ah_eligibility,\n        gp_eligibility: d.gp_eligibility,\n        itpi_hazard_class: d.itpi_hazard_class, ah_hazard_class: d.ah_hazard_class,\n        itpi_question_set: d.itpi_question_set, ah_question_set: d.ah_question_set,\n        gp_question_set: d.gp_question_set\n      });\n    }\n    return page(options, total, off, { reason: 'query' });\n  }\n\n  // ---- address search: Google Places Autocomplete -------------------------\n  var a = node(addr);\n  if (a) {\n    var ad = obj(a.data) || {};\n    var st = str(ad.status);\n    if (st !== 'OK' && st !== 'ZERO_RESULTS') {\n      return { options: [], total: 0, count: 0, has_more: false, next_offset: null,\n               error: 'address lookup is unavailable' };\n    }\n    var preds = arr(ad.predictions), opts = [];\n    for (var j = 0; j < preds.length; j++) {\n      var pr = obj(preds[j]) || {};\n      // A prediction carries NO address components; the four leaves only exist\n      // after the address_details hop (contract 7 §0).\n      opts.push({ value: str(pr.place_id), text: str(pr.description) });\n    }\n    return page(opts, opts.length, 0, { reason: 'query' });\n  }\n\n  // ---- address details: Google Place Details -----------------------------\n  var adt = node(addr_det);\n  if (adt) {\n    var dd = obj(adt.data) || {};\n    if (str(dd.status) !== 'OK') {\n      return { error: 'address lookup is unavailable' };\n    }\n    var res = obj(dd.result) || {};\n    var comps = arr(res.address_components);\n    var by = {};\n    for (var c = 0; c < comps.length; c++) {\n      var cc = obj(comps[c]) || {}, types = arr(cc.types);\n      for (var t = 0; t < types.length; t++) {\n        if (!by[types[t]]) by[types[t]] = { long: str(cc.long_name), short: str(cc.short_name) };\n      }\n    }\n    function pick(k, which) { return by[k] ? by[k][which || 'long'] : ''; }\n    // route SHORT: Google's own formatted_address abbreviates it (\"Macquarie St\",\n    // not \"Macquarie Street\"), and so does every Australian address line.\n    var street = (pick('street_number') + ' ' + pick('route', 'short')).replace(/^ +| +$/g, '');\n    if (street === '') street = pick('subpremise') || pick('premise') || pick('establishment');\n    var suburb = pick('locality') || pick('postal_town') || pick('sublocality_level_1') || pick('sublocality');\n    return { option: {\n      value: str(p.value), text: str(res.formatted_address),\n      street: street, suburb: suburb,\n      state: pick('administrative_area_level_1', 'short'), postcode: pick('postal_code')\n    } };\n  }\n\n  // ---- ABN name search: ABR MatchingNames --------------------------------\n  var an = node(abn);\n  if (an) {\n    var aj = jsonp(an.data);\n    if (!aj) return { options: [], total: 0, count: 0, has_more: false, next_offset: null,\n                      error: 'ABN lookup is unavailable' };\n    var names = arr(aj.Names);\n    if (names.length === 0 && str(aj.Message) !== '') {\n      return { options: [], total: 0, count: 0, has_more: false, next_offset: null,\n               error: str(aj.Message) };\n    }\n    var nopts = [];\n    for (var n = 0; n < names.length; n++) {\n      var nn = obj(names[n]) || {};\n      nopts.push({\n        value: str(nn.Abn), text: str(nn.Name),\n        note: [str(nn.NameType), str(nn.State), str(nn.Postcode)].join(' ').replace(/ +/g, ' ').replace(/^ +| +$/g, ''),\n        abn: str(nn.Abn), policyholder_name: str(nn.Name),\n        state: str(nn.State), postcode: str(nn.Postcode)\n      });\n    }\n    return page(nopts, nopts.length, 0, { reason: 'query' });\n  }\n\n  // ---- ABN details: ABR AbnDetails ---------------------------------------\n  var adn = node(abn_det);\n  if (adn) {\n    var bj = jsonp(adn.data);\n    if (!bj) return { error: 'ABN lookup is unavailable' };\n    if (str(bj.Abn) === '' && str(bj.Message) !== '') return { error: str(bj.Message) };\n    var trading = arr(bj.BusinessName);\n    var row = {\n      value: str(bj.Abn), text: str(bj.EntityName) + ' (' + str(bj.Abn) + ')',\n      note: [str(bj.EntityTypeName), str(bj.AbnStatus)].join(' - '),\n      abn: str(bj.Abn), policyholder_name: str(bj.EntityName),\n      entity_type: str(bj.EntityTypeName), abn_status: str(bj.AbnStatus),\n      state: str(bj.AddressState), postcode: str(bj.AddressPostcode),\n      trading_name: trading.length > 0 ? str(trading[0]) : ''\n    };\n    // A name-search caller reaches this node too (PREPARE reroutes 11 digits),\n    // and that caller is reading an option LIST.\n    if (kind === 'abn') return page([row], 1, 0, { reason: 'query' });\n    return { option: row };\n  }\n\n  return { options: [], total: 0, count: 0, has_more: false, next_offset: null,\n           error: 'lookup produced no result' };\n})()",
+            "params": {
+              "prep": "$.PREPARE",
+              "occ": "$.OCC_FETCH",
+              "addr": "$.ADDR_FETCH",
+              "addr_det": "$.ADDR_DET_FETCH",
+              "abn": "$.ABN_FETCH",
+              "abn_det": "$.ABN_DET_FETCH"
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "xy-edge__PREPAREPREPARE-ROUTEROUTE",
+        "source": "PREPARE",
+        "target": "ROUTE",
+        "sourceHandle": "PREPARE",
+        "targetHandle": "ROUTE",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "xy-edge__ROUTEROUTE-OCC_FETCHOCC_FETCH",
+        "source": "ROUTE",
+        "target": "OCC_FETCH",
+        "sourceHandle": "ROUTE",
+        "targetHandle": "OCC_FETCH",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "xy-edge__ROUTEROUTE-ADDR_FETCHADDR_FETCH",
+        "source": "ROUTE",
+        "target": "ADDR_FETCH",
+        "sourceHandle": "ROUTE",
+        "targetHandle": "ADDR_FETCH",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "xy-edge__ROUTEROUTE-ADDR_DET_FETCHADDR_DET_FETCH",
+        "source": "ROUTE",
+        "target": "ADDR_DET_FETCH",
+        "sourceHandle": "ROUTE",
+        "targetHandle": "ADDR_DET_FETCH",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "xy-edge__ROUTEROUTE-ABN_FETCHABN_FETCH",
+        "source": "ROUTE",
+        "target": "ABN_FETCH",
+        "sourceHandle": "ROUTE",
+        "targetHandle": "ABN_FETCH",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "xy-edge__ROUTEROUTE-ABN_DET_FETCHABN_DET_FETCH",
+        "source": "ROUTE",
+        "target": "ABN_DET_FETCH",
+        "sourceHandle": "ROUTE",
+        "targetHandle": "ABN_DET_FETCH",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "xy-edge__ROUTEROUTE-GO_REJECTGO_REJECT",
+        "source": "ROUTE",
+        "target": "GO_REJECT",
+        "sourceHandle": "ROUTE",
+        "targetHandle": "GO_REJECT",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "xy-edge__OCC_FETCHOCC_FETCH-GO_OCCGO_OCC",
+        "source": "OCC_FETCH",
+        "target": "GO_OCC",
+        "sourceHandle": "OCC_FETCH",
+        "targetHandle": "GO_OCC",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "xy-edge__ADDR_FETCHADDR_FETCH-GO_ADDRGO_ADDR",
+        "source": "ADDR_FETCH",
+        "target": "GO_ADDR",
+        "sourceHandle": "ADDR_FETCH",
+        "targetHandle": "GO_ADDR",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "xy-edge__ADDR_DET_FETCHADDR_DET_FETCH-GO_ADDR_DETGO_ADDR_DET",
+        "source": "ADDR_DET_FETCH",
+        "target": "GO_ADDR_DET",
+        "sourceHandle": "ADDR_DET_FETCH",
+        "targetHandle": "GO_ADDR_DET",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "xy-edge__ABN_FETCHABN_FETCH-GO_ABNGO_ABN",
+        "source": "ABN_FETCH",
+        "target": "GO_ABN",
+        "sourceHandle": "ABN_FETCH",
+        "targetHandle": "GO_ABN",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "xy-edge__ABN_DET_FETCHABN_DET_FETCH-GO_ABN_DETGO_ABN_DET",
+        "source": "ABN_DET_FETCH",
+        "target": "GO_ABN_DET",
+        "sourceHandle": "ABN_DET_FETCH",
+        "targetHandle": "GO_ABN_DET",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "xy-edge__GO_REJECTGO_REJECT-RESPONDRESPOND",
+        "source": "GO_REJECT",
+        "target": "RESPOND",
+        "sourceHandle": "GO_REJECT",
+        "targetHandle": "RESPOND",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "xy-edge__GO_OCCGO_OCC-RESPONDRESPOND",
+        "source": "GO_OCC",
+        "target": "RESPOND",
+        "sourceHandle": "GO_OCC",
+        "targetHandle": "RESPOND",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "xy-edge__GO_ADDRGO_ADDR-RESPONDRESPOND",
+        "source": "GO_ADDR",
+        "target": "RESPOND",
+        "sourceHandle": "GO_ADDR",
+        "targetHandle": "RESPOND",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "xy-edge__GO_ADDR_DETGO_ADDR_DET-RESPONDRESPOND",
+        "source": "GO_ADDR_DET",
+        "target": "RESPOND",
+        "sourceHandle": "GO_ADDR_DET",
+        "targetHandle": "RESPOND",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "xy-edge__GO_ABNGO_ABN-RESPONDRESPOND",
+        "source": "GO_ABN",
+        "target": "RESPOND",
+        "sourceHandle": "GO_ABN",
+        "targetHandle": "RESPOND",
+        "type": "custom",
+        "edgeType": "custom"
+      },
+      {
+        "id": "xy-edge__GO_ABN_DETGO_ABN_DET-RESPONDRESPOND",
+        "source": "GO_ABN_DET",
+        "target": "RESPOND",
+        "sourceHandle": "GO_ABN_DET",
+        "targetHandle": "RESPOND",
+        "type": "custom",
+        "edgeType": "custom"
+      }
+    ],
+    "result": "$.RESPOND"
+  }
+}

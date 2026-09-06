@@ -1,0 +1,40 @@
+{
+  "slug": "comments-MCP_VERIFICATION_RENEWALS-1",
+  "kind": "comments",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "task_id": "MCP_VERIFICATION_RENEWALS-1",
+    "space_id": "MCP_VERIFICATION_RENEWALS",
+    "url": "https://app.microstrate.io/en/hub/spaces/MCP_VERIFICATION_RENEWALS/tasks?task=MCP_VERIFICATION_RENEWALS-1",
+    "harvested_from": "GET /workspaces/task/MCP_VERIFICATION_RENEWALS-1/comments"
+  },
+  "teaches": [
+    "1 real comment(s) with server-generated ids (c_<nanoid>)",
+    "reactions is a map, `{}` when empty (react_to_comment writes { \"<emoji>\": true|false })",
+    "subject: ms.workspaces.task-comment.{TASK-ID}.{COMMENT-ID}",
+    "url anchors the comment: ...?task={TASK-ID}#comment-{COMMENT-ID}",
+    "read-only fields a create/update body must NOT echo back: author, created_at, updated_at, url, reactions"
+  ],
+  "comments": [
+    {
+      "author": "<<REDACTED:user-id>>",
+      "body": "Broker confirmed the sum insured moves to 2.5M. Referring for underwriter sign-off.",
+      "created_at": "2026-07-29T10:31:35.13369Z",
+      "id": "c_EjFPH9ZyI5",
+      "modified": 1785321095,
+      "reactions": {
+        "👀": {
+          "count": 1,
+          "users": [
+            "<<REDACTED:user-id>>"
+          ]
+        }
+      },
+      "sequence": 1606,
+      "subject": "ms.workspaces.task-comment.MCP_VERIFICATION_RENEWALS-1.c_EjFPH9ZyI5",
+      "type": "created",
+      "updated_at": "2026-07-29T10:31:35.13369Z",
+      "url": "https://app.microstrate.io/en/hub/spaces/MCP_VERIFICATION_RENEWALS/tasks?task=MCP_VERIFICATION_RENEWALS-1#comment-c_EjFPH9ZyI5"
+    }
+  ]
+}

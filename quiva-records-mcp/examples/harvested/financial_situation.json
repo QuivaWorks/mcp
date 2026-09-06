@@ -1,0 +1,660 @@
+{
+  "slug": "financial_situation",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "config_id": "financial_situation",
+    "harvested": "live record config (configs only — no record data)"
+  },
+  "featured": false,
+  "teaches": [
+    "required fields",
+    "enums",
+    "format: date",
+    "schema types: array, number, object, string"
+  ],
+  "form_node_count": 0,
+  "config": {
+    "id": "financial_situation",
+    "name": "Financial Situation",
+    "description": "Records for tracking client financial position, assets, liabilities, investment profile, and compliance status (KYC/AML)",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "aml_status": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "AML Status",
+              "options": [
+                {
+                  "text": "Pending",
+                  "value": "pending"
+                },
+                {
+                  "text": "In Progress",
+                  "value": "in_progress"
+                },
+                {
+                  "text": "Verified",
+                  "value": "verified"
+                },
+                {
+                  "text": "Failed",
+                  "value": "failed"
+                }
+              ]
+            }
+          },
+          "type": "string",
+          "enum": [
+            "pending",
+            "in_progress",
+            "verified",
+            "failed"
+          ]
+        },
+        "client_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Client ID"
+            }
+          },
+          "type": "string"
+        },
+        "created_by": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Created By"
+            }
+          },
+          "type": "string"
+        },
+        "created_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Created Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "dependents": {
+          "ui": {
+            "inputType": "array",
+            "props": {
+              "helpText": {
+                "markdown": "Client dependents"
+              },
+              "label": "Dependents"
+            }
+          },
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "date_of_birth": {
+                "ui": {
+                  "inputType": "date",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Date of birth"
+                    },
+                    "label": "Date of Birth"
+                  }
+                },
+                "type": "string",
+                "format": "date"
+              },
+              "name": {
+                "ui": {
+                  "inputType": "text",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Name of dependent"
+                    },
+                    "label": "Name"
+                  }
+                },
+                "type": "string"
+              },
+              "relationship": {
+                "ui": {
+                  "inputType": "text",
+                  "props": {
+                    "helpText": {
+                      "markdown": "Relationship to client (e.g., child, parent)"
+                    },
+                    "label": "Relationship"
+                  }
+                },
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "date_of_birth",
+              "relationship"
+            ]
+          }
+        },
+        "employment_status": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Employment Status",
+              "options": [
+                {
+                  "text": "Employed",
+                  "value": "employed"
+                },
+                {
+                  "text": "Self Employed",
+                  "value": "self_employed"
+                },
+                {
+                  "text": "Retired",
+                  "value": "retired"
+                },
+                {
+                  "text": "Unemployed",
+                  "value": "unemployed"
+                },
+                {
+                  "text": "Other",
+                  "value": "other"
+                }
+              ]
+            }
+          },
+          "type": "string",
+          "enum": [
+            "employed",
+            "self_employed",
+            "retired",
+            "unemployed",
+            "other"
+          ]
+        },
+        "financial_situation_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Financial Situation ID"
+            }
+          },
+          "type": "string"
+        },
+        "investment_experience": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Investment Experience",
+              "options": [
+                {
+                  "text": "None",
+                  "value": "none"
+                },
+                {
+                  "text": "Limited",
+                  "value": "limited"
+                },
+                {
+                  "text": "Moderate",
+                  "value": "moderate"
+                },
+                {
+                  "text": "Extensive",
+                  "value": "extensive"
+                }
+              ]
+            }
+          },
+          "type": "string",
+          "enum": [
+            "none",
+            "limited",
+            "moderate",
+            "extensive"
+          ]
+        },
+        "jurisdiction": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "helpText": {
+                "markdown": "Primary jurisdiction for regulatory compliance"
+              },
+              "label": "Jurisdiction",
+              "options": [
+                {
+                  "text": "Australia",
+                  "value": "australia"
+                },
+                {
+                  "text": "UK",
+                  "value": "uk"
+                }
+              ]
+            }
+          },
+          "type": "string",
+          "enum": [
+            "australia",
+            "uk"
+          ]
+        },
+        "kyc_provider": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "KYC Provider"
+            }
+          },
+          "type": "string"
+        },
+        "kyc_status": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "KYC Status",
+              "options": [
+                {
+                  "text": "Pending",
+                  "value": "pending"
+                },
+                {
+                  "text": "In Progress",
+                  "value": "in_progress"
+                },
+                {
+                  "text": "Verified",
+                  "value": "verified"
+                },
+                {
+                  "text": "Failed",
+                  "value": "failed"
+                }
+              ]
+            }
+          },
+          "type": "string",
+          "enum": [
+            "pending",
+            "in_progress",
+            "verified",
+            "failed"
+          ]
+        },
+        "kyc_verification_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "KYC Verification Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "last_modified_by": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Last Modified By"
+            }
+          },
+          "type": "string"
+        },
+        "last_modified_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Last Modified Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "liquid_assets": {
+          "ui": {
+            "inputType": "currency",
+            "props": {
+              "helpText": {
+                "markdown": "Cash and easily convertible assets"
+              },
+              "label": "Liquid Assets"
+            }
+          },
+          "type": "number"
+        },
+        "net_worth": {
+          "ui": {
+            "inputType": "currency",
+            "props": {
+              "helpText": {
+                "markdown": "Total assets minus total liabilities"
+              },
+              "label": "Net Worth"
+            }
+          },
+          "type": "number"
+        },
+        "relationship_status": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Relationship Status",
+              "options": [
+                {
+                  "text": "Single",
+                  "value": "single"
+                },
+                {
+                  "text": "Married",
+                  "value": "married"
+                },
+                {
+                  "text": "De Facto",
+                  "value": "de_facto"
+                },
+                {
+                  "text": "Civil Partnership",
+                  "value": "civil_partnership"
+                },
+                {
+                  "text": "Divorced",
+                  "value": "divorced"
+                },
+                {
+                  "text": "Widowed",
+                  "value": "widowed"
+                }
+              ]
+            }
+          },
+          "type": "string",
+          "enum": [
+            "single",
+            "married",
+            "de_facto",
+            "civil_partnership",
+            "divorced",
+            "widowed"
+          ]
+        },
+        "risk_profile": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Risk Profile",
+              "options": [
+                {
+                  "text": "Conservative",
+                  "value": "conservative"
+                },
+                {
+                  "text": "Moderate",
+                  "value": "moderate"
+                },
+                {
+                  "text": "Balanced",
+                  "value": "balanced"
+                },
+                {
+                  "text": "Growth",
+                  "value": "growth"
+                },
+                {
+                  "text": "Aggressive",
+                  "value": "aggressive"
+                }
+              ]
+            }
+          },
+          "type": "string",
+          "enum": [
+            "conservative",
+            "moderate",
+            "balanced",
+            "growth",
+            "aggressive"
+          ]
+        },
+        "status": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Status",
+              "options": [
+                {
+                  "text": "Active",
+                  "value": "active"
+                },
+                {
+                  "text": "Inactive",
+                  "value": "inactive"
+                },
+                {
+                  "text": "Archived",
+                  "value": "archived"
+                }
+              ]
+            }
+          },
+          "default": "active",
+          "type": "string",
+          "enum": [
+            "active",
+            "inactive",
+            "archived"
+          ]
+        },
+        "total_assets": {
+          "ui": {
+            "inputType": "currency",
+            "props": {
+              "helpText": {
+                "markdown": "Total value of all assets"
+              },
+              "label": "Total Assets"
+            }
+          },
+          "type": "number"
+        },
+        "total_liabilities": {
+          "ui": {
+            "inputType": "currency",
+            "props": {
+              "helpText": {
+                "markdown": "Total outstanding debts"
+              },
+              "label": "Total Liabilities"
+            }
+          },
+          "type": "number"
+        }
+      },
+      "required": [
+        "financial_situation_id",
+        "client_id",
+        "kyc_status",
+        "aml_status",
+        "status",
+        "created_date",
+        "created_by",
+        "last_modified_date",
+        "last_modified_by",
+        "jurisdiction"
+      ]
+    },
+    "views": {
+      "form": {
+        "type": "grid",
+        "props": {
+          "gridTemplateColumns": "1fr 1fr",
+          "gap": 16
+        },
+        "children": [
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr 1fr",
+              "gap": 16
+            },
+            "children": [
+              {
+                "type": "",
+                "field": "financial_situation_id"
+              },
+              {
+                "type": "",
+                "field": "client_id"
+              },
+              {
+                "type": "",
+                "field": "relationship_status"
+              },
+              {
+                "type": "",
+                "field": "status"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr 1fr",
+              "gap": 16
+            },
+            "children": [
+              {
+                "type": "",
+                "field": "kyc_status"
+              },
+              {
+                "type": "",
+                "field": "aml_status"
+              },
+              {
+                "type": "",
+                "field": "kyc_verification_date"
+              },
+              {
+                "type": "",
+                "field": "kyc_provider"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr 1fr",
+              "gap": 16
+            },
+            "children": [
+              {
+                "type": "",
+                "field": "total_assets"
+              },
+              {
+                "type": "",
+                "field": "total_liabilities"
+              },
+              {
+                "type": "",
+                "field": "net_worth"
+              },
+              {
+                "type": "",
+                "field": "liquid_assets"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr 1fr",
+              "gap": 16
+            },
+            "children": [
+              {
+                "type": "",
+                "field": "investment_experience"
+              },
+              {
+                "type": "",
+                "field": "employment_status"
+              },
+              {
+                "type": "",
+                "field": "risk_profile"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr 1fr",
+              "gap": 16
+            },
+            "children": [
+              {
+                "type": "",
+                "field": "created_date"
+              },
+              {
+                "type": "",
+                "field": "created_by"
+              },
+              {
+                "type": "",
+                "field": "last_modified_date"
+              },
+              {
+                "type": "",
+                "field": "last_modified_by"
+              }
+            ]
+          }
+        ]
+      },
+      "table": {
+        "type": "table",
+        "columns": [
+          {
+            "field": "financial_situation_id",
+            "order": 1
+          },
+          {
+            "field": "client_id",
+            "order": 2
+          },
+          {
+            "field": "net_worth",
+            "order": 3
+          },
+          {
+            "field": "risk_profile",
+            "order": 4
+          },
+          {
+            "field": "kyc_status",
+            "order": 5
+          },
+          {
+            "field": "aml_status",
+            "order": 6
+          },
+          {
+            "field": "status",
+            "order": 7
+          }
+        ]
+      }
+    },
+    "created_at": "2026-07-10T14:46:58Z",
+    "updated_at": "2026-07-10T15:25:07Z"
+  }
+}

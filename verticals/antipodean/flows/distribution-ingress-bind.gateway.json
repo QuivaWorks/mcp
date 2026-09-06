@@ -1,0 +1,48 @@
+{
+ "_comment": [
+  "The gateway mapping for the bind ingress. Same shape as the rate ingress: one",
+  "mapping with a route parameter, per-distributor isolation carried by the msr- key.",
+  "",
+  "A distributor's key must allow BOTH /d/<id>/rate and /d/<id>/bind; a key scoped to",
+  "one is 401'd on the other, which is the behaviour to want and the one to remember",
+  "when a broker reports that quoting works and binding does not."
+ ],
+ "gateway_id": "VWqPwSvI9DMS",
+ "url": "https://vwqpwsvi9dms.microstrate.io/d/{distribution_id}/bind",
+ "mapping": {
+  "gateway": "ms.gateway.VWqPwSvI9DMS.gateway",
+  "method": "POST",
+  "path": "/d/{distribution_id}/bind",
+  "is_public": false,
+  "timeout": 30000,
+  "limit": { "request": 600, "time": 1000 }
+ },
+ "mapping_version": {
+  "resource_type": "flow",
+  "resource": "ms.hub.config.workflow.3788449144.1127781875",
+  "invocation_type": "RequestResponse",
+  "active": true,
+  "description": "Distribution ingress: broker bind for one distributor"
+ },
+ "mapping_traffic_patch": {
+  "traffic_distribution": { "1": 100 },
+  "timeout": 30000,
+  "limit": { "request": 600, "time": 1000 },
+  "is_public": false
+ },
+ "msr_key": {
+  "key_name": "dist-<distribution_id>-submit",
+  "scope": "account",
+  "expiry_days": 90,
+  "allow_endpoints": [
+   { "method": "post", "path": "/d/<distribution_id>/rate", "gateway_id": "VWqPwSvI9DMS" },
+   { "method": "post", "path": "/d/<distribution_id>/bind", "gateway_id": "VWqPwSvI9DMS" }
+  ]
+ },
+ "traps": [
+  "A gateway mapping can be created and patched over HTTP but NEVER removed or disabled: DELETE /gateway/<id>/mapping, PATCH /gateway/<id>/mapping/version and DELETE /gateway/<id>/mapping/version all return 405 on a tenant gateway. Ending a distribution therefore cannot remove its route. Revoking the msr- key is the only de-provisioning lever that works, and it works immediately (measured: 200 before the delete, 401 on the very next request).",
+  "quote-bind's BOUND decision carries NO distributor_account_id and NO submission_version, so a projection that trusts the decision is undeliverable for every bind and unorderable if delivered. decision-project resolves both from the submission instead, fetched by id so it cannot race the index.",
+  "quote_outcome_config.outcome enumerates ACCEPT/REFER/DECLINE while decision_config.outcome also enumerates BOUND and SANCTION_REFERRAL. Copying the decision's value across 400s the outcome write on every bind; the lifecycle value belongs in outcome_status.",
+  "Picking `the newest decision` after a bind is a race: the index flushes on a 1s ticker, so a read taken seconds after quote-bind returns can still hand back the ACCEPT that preceded the BOUND, which then projects REFERRED onto a policy that has just been bound. This flow requires an actual BOUND decision and defers the projection rather than sending the wrong one."
+ ]
+}

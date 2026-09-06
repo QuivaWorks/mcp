@@ -1,0 +1,59 @@
+{
+  "slug": "comments-ALEX-4",
+  "kind": "comments",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "task_id": "ALEX-4",
+    "space_id": "ALEX",
+    "url": "https://app.microstrate.io/en/hub/spaces/ALEX/tasks?task=ALEX-4",
+    "harvested_from": "GET /workspaces/task/ALEX-4/comments"
+  },
+  "teaches": [
+    "3 real comment(s) with server-generated ids (c_<nanoid>)",
+    "reactions is a map, `{}` when empty (react_to_comment writes { \"<emoji>\": true|false })",
+    "subject: ms.workspaces.task-comment.{TASK-ID}.{COMMENT-ID}",
+    "url anchors the comment: ...?task={TASK-ID}#comment-{COMMENT-ID}",
+    "read-only fields a create/update body must NOT echo back: author, created_at, updated_at, url, reactions"
+  ],
+  "comments": [
+    {
+      "author": "<<REDACTED:user-id>>",
+      "body": "l",
+      "created_at": "2026-07-14T19:04:38.919791202Z",
+      "id": "c_vjzL1WEExW",
+      "modified": 1784055878,
+      "reactions": {},
+      "sequence": 1484,
+      "subject": "ms.workspaces.task-comment.ALEX-4.c_vjzL1WEExW",
+      "type": "created",
+      "updated_at": "2026-07-14T19:04:38.919791202Z",
+      "url": "https://app.microstrate.io/en/hub/spaces/ALEX/tasks?task=ALEX-4#comment-c_vjzL1WEExW"
+    },
+    {
+      "author": "<<REDACTED:user-id>>",
+      "body": "test",
+      "created_at": "2026-07-14T19:27:52.218910343Z",
+      "id": "c_eU7CVCgmAU",
+      "modified": 1784057272,
+      "reactions": {},
+      "sequence": 1487,
+      "subject": "ms.workspaces.task-comment.ALEX-4.c_eU7CVCgmAU",
+      "type": "created",
+      "updated_at": "2026-07-14T19:27:52.218910343Z",
+      "url": "https://app.microstrate.io/en/hub/spaces/ALEX/tasks?task=ALEX-4#comment-c_eU7CVCgmAU"
+    },
+    {
+      "author": "<<REDACTED:user-id>>",
+      "body": "comment 1!!!!",
+      "created_at": "2026-07-14T19:03:16.501641275Z",
+      "id": "c_x4h0WxpVkY",
+      "modified": 1784057330,
+      "reactions": {},
+      "sequence": 1488,
+      "subject": "ms.workspaces.task-comment.ALEX-4.c_x4h0WxpVkY",
+      "type": "created",
+      "updated_at": "2026-07-14T19:28:50.365068629Z",
+      "url": "https://app.microstrate.io/en/hub/spaces/ALEX/tasks?task=ALEX-4#comment-c_x4h0WxpVkY"
+    }
+  ]
+}
