@@ -1,0 +1,250 @@
+{
+ "name": "ais-referral-decide",
+ "description": "Writes an underwriter's referral decision back into evari-mordor AIS. Started by a RECORD trigger on cip_referral_decision (node id record:cip_referral_decision \u2014 colon, so the id stays one subject token; see hub commit bfb3da01c). Sets the SAME answers a human underwriter would set, so mordor's own collations (CHANGE_UW_DECISION, UNDERWRITER_APPROVED/DECLINED/INFO_REQUESTED) send the existing SendGrid emails, de-index BR_REFERRALS and apply the quote unlock. No email is authored here. Then moves the task to the matching column.",
+ "config": {
+  "static": {
+   "mordorApiRoot": "https://api.cip-test.evari.tech",
+   "spaceId": "CIP_REFERRALS",
+   "quivaApiRoot": "https://api.microstrate.io"
+  },
+  "nodes": [
+   {
+    "id": "record:cip_referral_decision",
+    "data": {
+     "id": "record:cip_referral_decision",
+     "name": "On referral decision record",
+     "node_type": "trigger",
+     "trigger_type": "record",
+     "payload": {
+      "record_config_id": "cip_referral_decision",
+      "event_type": [
+       "record-created",
+       "record-updated"
+      ]
+     }
+    }
+   },
+   {
+    "id": "GATE",
+    "data": {
+     "id": "GATE",
+     "name": "Only a confirmed, unsent decision",
+     "node_type": "condition",
+     "payload": [
+      {
+       "condition": {
+        "operator": "and",
+        "input": [
+         {
+          "operator": "=",
+          "input": [
+           "$.trigger.data.confirmed",
+           true
+          ]
+         },
+         {
+          "operator": "notEmpty",
+          "input": [
+           "$.trigger.data.decision"
+          ]
+         },
+         {
+          "operator": "notEmpty",
+          "input": [
+           "$.trigger.data.topic_prefix"
+          ]
+         },
+         {
+          "operator": "notIn",
+          "input": [
+           "$.trigger.data.write_back_status",
+           [
+            "sent",
+            "acknowledged"
+           ]
+          ]
+         }
+        ]
+       },
+       "outcome": "BUILD"
+      },
+      {
+       "outcome": "RESOLVE_SUCCESS"
+      }
+     ]
+    }
+   },
+   {
+    "id": "BUILD",
+    "data": {
+     "id": "BUILD",
+     "name": "Build the mordor answer writes",
+     "node_type": "eval",
+     "payload": {
+      "params": {
+       "decision": "$.trigger.data.decision",
+       "topicPrefix": "$.trigger.data.topic_prefix",
+       "notes": "$.trigger.data.underwriter_notes",
+       "info": "$.trigger.data.information_requested",
+       "declineReason": "$.trigger.data.declination_reason",
+       "quoteNumber": "$.trigger.data.quote_number",
+       "taskId": "$.trigger.data.task_id"
+      },
+      "code": "(() => { const tp = String(topicPrefix); const ans = (t, v) => ({ topic: tp + '/' + t, body: { value: v, isTouched: true } }); const env = (answers) => ({ command: 'multi-upsert-answer', subject: '$QUESTION/ANSWER', topic: tp, body: { answers } }); let fields = [], button = [], taskStatus = '', comment = ''; if (decision === 'accept') { fields = [ans('CIP_BR_Underwriting_Decision_Trigger', 'ACCEPTED')]; button = [ans('CIP_BR_Update_Underwriting_Reason', true)]; taskStatus = 'approved'; comment = '**Referral accepted** and written back to AIS. The quote is unlocked and the acceptance email has been sent by AIS.'; } else if (decision === 'decline') { fields = [ans('CIP_BR_declination_reason', String(declineReason || '')), ans('CIP_BR_Underwriting_Decision_Trigger', 'DECLINED')]; button = [ans('CIP_BR_Update_Underwriting_Reason', true)]; taskStatus = 'declined'; comment = '**Referral declined** and written back to AIS. AIS has sent the decline email.\\n\\n> ' + String(declineReason || ''); } else if (decision === 'request_info') { fields = [ans('CIP_BR_information_requested', String(info || ''))]; button = [ans('CIP_BR_send_information_request_button', true)]; taskStatus = 'awaiting_broker'; comment = '**More information requested** from the broker. AIS has sent the request-for-information email.\\n\\n> ' + String(info || ''); } else { throw new Error('unknown decision: ' + decision); } if (notes) { comment += '\\n\\n_Underwriter notes:_ ' + String(notes); } return { fieldsBody: env(fields), buttonBody: env(button), taskStatus, comment, quoteNumber: String(quoteNumber || ''), taskId: String(taskId || ''), stampedAt: new Date().toISOString() }; })()"
+     }
+    }
+   },
+   {
+    "id": "SWAP",
+    "data": {
+     "id": "SWAP",
+     "name": "Log in to mordor as the AIS integration user",
+     "node_type": "http",
+     "payload": {
+      "url": "$.static.mordorApiRoot|/apiv2/authenticate/authorise/basic",
+      "method": "post",
+      "headers": {
+       "Content-Type": "application/json"
+      },
+      "data": {
+       "command": "authorise-basic",
+       "subject": "$AUTHENTICATE/CREDENTIAL",
+       "topic": "SECRET::CIP_TEST_USER::",
+       "body": {
+        "password": "SECRET::CIP_TEST_PASSWORD::"
+       }
+      }
+     }
+    }
+   },
+   {
+    "id": "WRITE_FIELDS",
+    "data": {
+     "id": "WRITE_FIELDS",
+     "name": "Write the decision fields",
+     "node_type": "http",
+     "payload": {
+      "url": "$.static.mordorApiRoot|/apiv2/question/upsert-multi/answer",
+      "method": "post",
+      "headers": {
+       "Content-Type": "application/json",
+       "Authorization": "Bearer |$.SWAP.data.accessToken"
+      },
+      "data": "$.BUILD.fieldsBody"
+     }
+    }
+   },
+   {
+    "id": "PRESS_BUTTON",
+    "data": {
+     "id": "PRESS_BUTTON",
+     "name": "Press the mordor button that fires the collation",
+     "node_type": "http",
+     "payload": {
+      "url": "$.static.mordorApiRoot|/apiv2/question/upsert-multi/answer",
+      "method": "post",
+      "headers": {
+       "Content-Type": "application/json",
+       "Authorization": "Bearer |$.SWAP.data.accessToken"
+      },
+      "data": "$.BUILD.buttonBody"
+     }
+    }
+   },
+   {
+    "id": "SET_STATUS",
+    "data": {
+     "id": "SET_STATUS",
+     "name": "Move the task to the decided column",
+     "node_type": "task",
+     "operation": "set_task_status",
+     "payload": {
+      "space_id": "$.static.spaceId",
+      "task_id": "$.BUILD.taskId",
+      "status": "$.BUILD.taskStatus"
+     }
+    }
+   },
+   {
+    "id": "COMMENT",
+    "data": {
+     "id": "COMMENT",
+     "name": "Record what was sent to AIS",
+     "node_type": "task",
+     "operation": "comment_task",
+     "payload": {
+      "space_id": "$.static.spaceId",
+      "task_id": "$.BUILD.taskId",
+      "body": "$.BUILD.comment"
+     }
+    }
+   },
+   {
+    "id": "STAMP",
+    "data": {
+     "id": "STAMP",
+     "name": "Stamp the decision record as written back",
+     "node_type": "http",
+     "payload": {
+      "url": "$.static.quivaApiRoot|/records/cip_referral_decision/|$.trigger.id",
+      "method": "put",
+      "headers": {
+       "Content-Type": "application/json",
+       "Authorization": "Bearer |$.env.auth_token"
+      },
+      "data": {
+       "data": {
+        "write_back_status": "acknowledged",
+        "write_back_at": "$.BUILD.stampedAt",
+        "decided_at": "$.BUILD.stampedAt"
+       }
+      }
+     }
+    }
+   }
+  ],
+  "edges": [
+   {
+    "id": "e1",
+    "source": "record:cip_referral_decision",
+    "target": "GATE"
+   },
+   {
+    "id": "e2",
+    "source": "GATE",
+    "target": "BUILD"
+   },
+   {
+    "id": "e3",
+    "source": "BUILD",
+    "target": "SWAP"
+   },
+   {
+    "id": "e4",
+    "source": "SWAP",
+    "target": "WRITE_FIELDS"
+   },
+   {
+    "id": "e5",
+    "source": "WRITE_FIELDS",
+    "target": "PRESS_BUTTON"
+   },
+   {
+    "id": "e6",
+    "source": "PRESS_BUTTON",
+    "target": "SET_STATUS"
+   },
+   {
+    "id": "e7",
+    "source": "SET_STATUS",
+    "target": "COMMENT"
+   },
+   {
+    "id": "e8",
+    "source": "COMMENT",
+    "target": "STAMP"
+   }
+  ],
+  "result": "$.STAMP"
+ }
+}

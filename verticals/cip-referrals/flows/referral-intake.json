@@ -1,0 +1,492 @@
+{
+  "name": "ais-referral-intake",
+  "description": "Receives a referred AIS quote from evari-mordor (gateway trigger, called by the QUIVA_CREATE_REFERRAL_TASK collation) and materialises it in CIP_REFERRALS: decision record, task, decision form action, then the immutable submission snapshot LAST with completed:true \u2014 that write is what fires ais-referral-research. IDEMPOTENT: FIND_TASK looks for a task whose `source` is this topic_prefix and the run stops if one exists, so a replay (or the collation's non-atomic partitionKey letting two cold containers through) updates nothing rather than raising a duplicate. TWO ORDERING RULES: (1) seed the task action BEFORE setting status, because writing an action recomputes the status (workspaces-service/handler/task_actions.go:50-98); (2) create the submission LAST with completed:true \u2014 that write is what fires ais-referral-research, and it carries task_id/decision_id so research needs no lookup. EVERY ARTEFACT IS FILED UNDER ITS BUILDER: FIND_BUILDER/PICK_BUILDER/CREATE_BUILDER find or open the ais_builder record for this builder name and BUILDER_FOLDER carries its folder onto the task and onto the decision, submission and (through builder_folder on the snapshot) research records. The folder is read back from records-service, never re-derived: it is sha256(field:normalised value) and the flow sandbox has no crypto. The task's `contact` is NOT used \u2014 on the live build a create carrying identity comes back with neither a folder nor the base_record_skipped reason the handler promises, so the folder is set explicitly. Records store the relative folder, tasks the full spaces.<SPACE>.<folder> path. Record config ids stay cip_* on purpose: an id is immutable and live records hang off it.",
+  "config": {
+    "static": {
+      "spaceId": "CIP_REFERRALS",
+      "quivaApiRoot": "https://api.microstrate.io",
+      "defaultAssignees": [
+        "71e6ac00-1205-40b6-b334-8e4267943bd4"
+      ]
+    },
+    "nodes": [
+      {
+        "id": "TRIGGER",
+        "data": {
+          "id": "TRIGGER",
+          "name": "Referral received from AIS (webhook)",
+          "node_type": "trigger",
+          "trigger_type": "webhook",
+          "payload": {},
+          "subject": "ms.gateway.Nrlz-Pmv8qiH.mapping.post.webhook-4273291493-638137998"
+        }
+      },
+      {
+        "id": "GATE",
+        "data": {
+          "id": "GATE",
+          "name": "Require a join key",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": "notEmpty",
+                "input": [
+                  "$.trigger.topic_prefix"
+                ]
+              },
+              "outcome": "BUILD"
+            },
+            {
+              "outcome": "RESOLVE_ERROR"
+            }
+          ]
+        }
+      },
+      {
+        "id": "BUILD",
+        "data": {
+          "id": "BUILD",
+          "name": "Normalise the AIS payload",
+          "node_type": "eval",
+          "payload": {
+            "params": {
+              "t": "$.trigger"
+            },
+            "code": "(() => { const s = v => v === undefined || v === null ? '' : String(v); const n = v => { const x = Number(v); return isFinite(x) ? x : 0; }; const nowIso = () => new Date().toISOString(); const iso = v => { const raw = s(v).trim(); if (!raw) return nowIso(); const d = new Date(/^\\d{4}-\\d{2}-\\d{2}$/.test(raw) ? raw + 'T00:00:00Z' : raw); return isNaN(d.getTime()) ? nowIso() : d.toISOString(); }; const fct = s(t.form_config_topic).toUpperCase(); const line = fct.indexOf('TOOLBOX') > -1 ? 'toolbox' : 'builders_risk'; const txn = fct.indexOf('ENDORSEMENT') > -1 ? 'endorsement' : (fct.indexOf('CANCELLATION') > -1 ? 'cancellation' : 'new_business'); const tags = ['referral', line, txn]; const builderName = s(t.builder_name).trim().split(/\\s+/).join(' '); const builderKey = builderName.toLowerCase().split(/\\s+/).join(' '); const builderQuery = encodeURIComponent(JSON.stringify([{ field: 'organisation', term: builderName }])); const reasons = Array.isArray(t.referral_reasons) ? t.referral_reasons.map(s) : (t.referral_reasons ? [s(t.referral_reasons)] : []); const title = s(t.quote_number) + ' \u2014 ' + s(t.insured_name); const desc = ['| | |','|---|---|','| Quote | ' + s(t.quote_number) + ' |','| Insured | ' + s(t.insured_name) + ' |','| Builder | ' + s(t.builder_name) + ' |','| Project | ' + s(t.project_type) + ' |','| Risk address | ' + s(t.risk_address) + ' |','| Effective | ' + s(t.effective_date) + ' |','| Premium | ' + s(t.total_policy_premium) + ' |','| Agency | ' + s(t.agency_name) + ' |','','**Why this referred**','',s(t.referral_reasons_text),'','[Open the quote in AIS](' + s(t.quote_link) + ')'].join('\\n'); return { topicPrefix: s(t.topic_prefix), builderKey, builderQuery, referredAt: iso(t.submitted_at), title, description: desc, reasons, reasonsText: s(t.referral_reasons_text), quoteNumber: s(t.quote_number), insuredName: s(t.insured_name), builderName, premium: n(t.total_policy_premium), isEndorsement: fct.indexOf('ENDORSEMENT') > -1, tags, submission: { topic_prefix: s(t.topic_prefix), submission_version: n(t.submission_version) || 1, submitted_at: iso(t.submitted_at), quote_id: s(t.quote_id), quote_number: s(t.quote_number), policy_id: s(t.policy_id), form_config_topic: s(t.form_config_topic), quote_link: s(t.quote_link), insured_name: s(t.insured_name), builder_name: s(t.builder_name), project_type: s(t.project_type), risk_address: s(t.risk_address), effective_date: s(t.effective_date), expiration_date: s(t.expiration_date), total_policy_premium: n(t.total_policy_premium), agency_name: s(t.agency_name), agent_first_name: s(t.agent_first_name), agent_last_name: s(t.agent_last_name), agent_email: s(t.agent_email), uw_assignee: s(t.uw_assignee), quote_status: s(t.quote_status), underwriting_decision: s(t.underwriting_decision), referral_reasons: reasons, referral_reasons_text: s(t.referral_reasons_text), carrier_selection: s(t.carrier_selection) } }; })()"
+          }
+        }
+      },
+      {
+        "id": "FIND_BUILDER",
+        "data": {
+          "id": "FIND_BUILDER",
+          "name": "Have we seen this builder before?",
+          "node_type": "http",
+          "payload": {
+            "url": "$.static.quivaApiRoot|/records?space_id=|$.static.spaceId|&config_id=ais_builder&limit=50&filter=|$.BUILD.builderQuery",
+            "method": "get",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            }
+          }
+        }
+      },
+      {
+        "id": "PICK_BUILDER",
+        "data": {
+          "id": "PICK_BUILDER",
+          "name": "Exact match, or none",
+          "node_type": "eval",
+          "payload": {
+            "params": {
+              "r": "$.FIND_BUILDER",
+              "key": "$.BUILD.builderKey"
+            },
+            "code": "(() => { const cands = [r, r && r.body, r && r.data, r && r.result, r && r.body && r.body.data]; let rows = null; for (const c of cands) { if (!c) continue; if (Array.isArray(c)) { rows = c; break; } if (Array.isArray(c.results)) { rows = c.results; break; } } rows = rows || []; const k = String(key || ''); if (!k) return { action: 'none', folder: '', id: '' }; const norm = v => String(v || '').trim().toLowerCase().split(/\\s+/).join(' '); const hit = rows.filter(x => x && x.data && norm(x.data.organisation) === k)[0]; if (hit && hit.folder) return { action: 'use', folder: String(hit.folder), id: String(hit.id || '') }; return { action: 'create', folder: '', id: '' }; })()"
+          }
+        }
+      },
+      {
+        "id": "GATE_BUILDER",
+        "data": {
+          "id": "GATE_BUILDER",
+          "name": "Create the builder only once",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.PICK_BUILDER.action",
+                  "create"
+                ]
+              },
+              "outcome": "CREATE_BUILDER"
+            },
+            {
+              "outcome": "BUILDER_FOLDER"
+            }
+          ]
+        }
+      },
+      {
+        "id": "CREATE_BUILDER",
+        "data": {
+          "id": "CREATE_BUILDER",
+          "name": "Open a builder record",
+          "node_type": "http",
+          "payload": {
+            "url": "$.static.quivaApiRoot|/records/ais_builder",
+            "method": "post",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "space_id": "$.static.spaceId",
+              "data": {
+                "organisation": "$.BUILD.builderName",
+                "appetite": "unassessed",
+                "first_referred_at": "$.BUILD.referredAt"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "BUILDER_FOLDER_MARKER",
+        "data": {
+          "id": "BUILDER_FOLDER_MARKER",
+          "name": "Write the folder object the pickers read",
+          "node_type": "http",
+          "payload": {
+            "url": "$.static.quivaApiRoot|/workspaces/files/folder",
+            "method": "post",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "space_id": "$.static.spaceId",
+              "folder": "$.CREATE_BUILDER.data.folder",
+              "metadata": {
+                "type": "client",
+                "client_name": "$.BUILD.builderName",
+                "config_id": "ais_builder"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "BUILDER_FOLDER",
+        "data": {
+          "id": "BUILDER_FOLDER",
+          "name": "The folder everything for this builder is filed under",
+          "node_type": "eval",
+          "payload": {
+            "params": {
+              "found": "$.PICK_BUILDER.folder",
+              "made": "$.CREATE_BUILDER.data.folder",
+              "sp": "$.static.spaceId"
+            },
+            "code": "(() => { const s = v => Array.isArray(v) ? (v.length ? String(v[0]) : '') : (v === undefined || v === null ? '' : String(v)); const folder = s(found) || s(made); return { folder, taskFolder: folder ? 'spaces.' + s(sp) + '.' + folder : '', linked: folder !== '' }; })()"
+          }
+        }
+      },
+      {
+        "id": "FIND_TASK",
+        "data": {
+          "id": "FIND_TASK",
+          "name": "Has this quote already got a task?",
+          "node_type": "task",
+          "operation": "list_tasks",
+          "payload": {
+            "space_id": "$.static.spaceId",
+            "source": "$.BUILD.topicPrefix",
+            "limit": 50
+          }
+        }
+      },
+      {
+        "id": "CHECK_EXISTING",
+        "data": {
+          "id": "CHECK_EXISTING",
+          "name": "Normalise the lookup reply",
+          "node_type": "eval",
+          "payload": {
+            "params": {
+              "r": "$.FIND_TASK",
+              "src": "$.BUILD.topicPrefix"
+            },
+            "code": "(() => { const cands = [r, r && r.body, r && r.data, r && r.result, r && r.body && r.body.data]; let rows = null; for (const c of cands) { if (!c) continue; if (Array.isArray(c)) { rows = c; break; } if (Array.isArray(c.results)) { rows = c.results; break; } if (Array.isArray(c.tasks)) { rows = c.tasks; break; } } if (rows === null) return { recognised: false, count: 0, existingId: '', note: 'unrecognised list_tasks reply shape: ' + JSON.stringify(r).slice(0, 200) }; const mine = rows.filter(t => t && String(t.source || '') === String(src || '')); return { recognised: true, count: mine.length, existingId: mine.length ? String(mine[0].id || '') : '', note: '' }; })()"
+          }
+        }
+      },
+      {
+        "id": "GATE_EXISTS",
+        "data": {
+          "id": "GATE_EXISTS",
+          "name": "Create only if none exists",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": "=",
+                "input": [
+                  "$.CHECK_EXISTING.count",
+                  0
+                ]
+              },
+              "outcome": "CREATE_DECISION"
+            },
+            {
+              "outcome": "RESOLVE_SUCCESS"
+            }
+          ]
+        }
+      },
+      {
+        "id": "CREATE_DECISION",
+        "data": {
+          "id": "CREATE_DECISION",
+          "name": "Seed the decision record the underwriter will fill",
+          "node_type": "http",
+          "payload": {
+            "url": "$.static.quivaApiRoot|/records/cip_referral_decision",
+            "method": "post",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "space_id": "$.static.spaceId",
+              "data": {
+                "topic_prefix": "$.BUILD.topicPrefix",
+                "quote_number": "$.BUILD.quoteNumber",
+                "insured_name": "$.BUILD.insuredName",
+                "builder_name": "$.BUILD.builderName",
+                "total_policy_premium": "$.BUILD.premium",
+                "referral_reasons_text": "$.BUILD.reasonsText",
+                "research_summary": "_Research pending._",
+                "write_back_status": "pending",
+                "decision_seq": 1
+              },
+              "folder": "$.BUILDER_FOLDER.folder"
+            }
+          }
+        }
+      },
+      {
+        "id": "CREATE_TASK",
+        "data": {
+          "id": "CREATE_TASK",
+          "name": "Raise the referral task",
+          "node_type": "task",
+          "operation": "create_task",
+          "payload": {
+            "space_id": "$.static.spaceId",
+            "title": "$.BUILD.title",
+            "description": "$.BUILD.description",
+            "priority": "high",
+            "tags": "$.BUILD.tags",
+            "source": "$.BUILD.topicPrefix",
+            "source_detail": "ais-referral-intake",
+            "assignees": "$.static.defaultAssignees",
+            "folder": "$.BUILDER_FOLDER.taskFolder"
+          }
+        }
+      },
+      {
+        "id": "LINK_DECISION",
+        "data": {
+          "id": "LINK_DECISION",
+          "name": "Put the task id on the decision record",
+          "node_type": "http",
+          "payload": {
+            "url": "$.static.quivaApiRoot|/records/cip_referral_decision/|$.CREATE_DECISION.data.id",
+            "method": "put",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "data": {
+                "task_id": "$.CREATE_TASK.id"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "SEED_ACTION",
+        "data": {
+          "id": "SEED_ACTION",
+          "name": "Attach the decision form to the task",
+          "node_type": "http",
+          "payload": {
+            "url": "$.static.quivaApiRoot|/workspaces/task/|$.CREATE_TASK.id|/action",
+            "method": "put",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "description": "Record the referral decision \u2014 outcome, notes and the broker-facing reason",
+              "done": false,
+              "resources": [
+                {
+                  "resource_id": "cip_referral_decision.|$.CREATE_DECISION.data.id",
+                  "resource_type": "record",
+                  "metadata": {
+                    "form": "underwriter",
+                    "recordId": "$.CREATE_DECISION.data.id",
+                    "recordConfigId": "cip_referral_decision"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": "SET_STATUS",
+        "data": {
+          "id": "SET_STATUS",
+          "name": "Set the column AFTER seeding the action",
+          "node_type": "task",
+          "operation": "set_task_status",
+          "payload": {
+            "space_id": "$.static.spaceId",
+            "task_id": "$.CREATE_TASK.id",
+            "status": "researching"
+          }
+        }
+      },
+      {
+        "id": "SUBMISSION_BODY",
+        "data": {
+          "id": "SUBMISSION_BODY",
+          "name": "Add the task and decision ids to the snapshot",
+          "node_type": "eval",
+          "payload": {
+            "params": {
+              "base": "$.BUILD.submission",
+              "taskId": "$.CREATE_TASK.id",
+              "decisionId": "$.CREATE_DECISION.data.id",
+              "builderFolder": "$.BUILDER_FOLDER.folder"
+            },
+            "code": "(() => { return { submission: Object.assign({}, base, { task_id: String(taskId||''), decision_id: String(decisionId||''), builder_folder: String(builderFolder||'') }) }; })()"
+          }
+        }
+      },
+      {
+        "id": "CREATE_SUBMISSION",
+        "data": {
+          "id": "CREATE_SUBMISSION",
+          "name": "Store the submission snapshot (this fires the research flow)",
+          "node_type": "http",
+          "payload": {
+            "url": "$.static.quivaApiRoot|/records/cip_referral_submission",
+            "method": "post",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "space_id": "$.static.spaceId",
+              "completed": true,
+              "data": "$.SUBMISSION_BODY.submission",
+              "folder": "$.BUILDER_FOLDER.folder"
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "source": "TRIGGER",
+        "target": "GATE"
+      },
+      {
+        "id": "e2",
+        "source": "GATE",
+        "target": "BUILD"
+      },
+      {
+        "id": "e4",
+        "source": "FIND_TASK",
+        "target": "CHECK_EXISTING"
+      },
+      {
+        "id": "e5",
+        "source": "CHECK_EXISTING",
+        "target": "GATE_EXISTS"
+      },
+      {
+        "id": "e6",
+        "source": "GATE_EXISTS",
+        "target": "CREATE_DECISION"
+      },
+      {
+        "id": "e7",
+        "source": "CREATE_DECISION",
+        "target": "CREATE_TASK"
+      },
+      {
+        "id": "e8",
+        "source": "CREATE_TASK",
+        "target": "LINK_DECISION"
+      },
+      {
+        "id": "e9",
+        "source": "LINK_DECISION",
+        "target": "SEED_ACTION"
+      },
+      {
+        "id": "e10",
+        "source": "SEED_ACTION",
+        "target": "SET_STATUS"
+      },
+      {
+        "id": "e11",
+        "source": "SET_STATUS",
+        "target": "SUBMISSION_BODY"
+      },
+      {
+        "id": "e12",
+        "source": "SUBMISSION_BODY",
+        "target": "CREATE_SUBMISSION"
+      },
+      {
+        "id": "b1",
+        "source": "BUILD",
+        "target": "FIND_BUILDER"
+      },
+      {
+        "id": "b2",
+        "source": "FIND_BUILDER",
+        "target": "PICK_BUILDER"
+      },
+      {
+        "id": "b3",
+        "source": "PICK_BUILDER",
+        "target": "GATE_BUILDER"
+      },
+      {
+        "id": "b4",
+        "source": "GATE_BUILDER",
+        "target": "CREATE_BUILDER"
+      },
+      {
+        "id": "b5",
+        "source": "GATE_BUILDER",
+        "target": "BUILDER_FOLDER"
+      },
+      {
+        "id": "b7",
+        "source": "BUILDER_FOLDER",
+        "target": "FIND_TASK"
+      },
+      {
+        "id": "b6",
+        "source": "CREATE_BUILDER",
+        "target": "BUILDER_FOLDER_MARKER"
+      },
+      {
+        "id": "b8",
+        "source": "BUILDER_FOLDER_MARKER",
+        "target": "BUILDER_FOLDER"
+      }
+    ],
+    "result": {
+      "task_id": "$.CREATE_TASK.id",
+      "submission_id": "$.CREATE_SUBMISSION.data.id",
+      "decision_id": "$.CREATE_DECISION.data.id",
+      "existing_task_id": "$.CHECK_EXISTING.existingId",
+      "builder_folder": "$.BUILDER_FOLDER.folder"
+    }
+  }
+}
