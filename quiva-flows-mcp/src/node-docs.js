@@ -399,6 +399,34 @@ export const NODE_TYPES = {
       'Returns { <ruleName>: <outcome> } — verified live. Read a single outcome as $.<ID>.<ruleName>, but ONLY if the rule name has no dots: a dotted key like "AvatarUrl.visible" cannot be read with $.<ID>.AvatarUrl.visible (the resolver walks AvatarUrl -> visible instead of matching the literal key, and you get []). Either keep rule names dot-free when a downstream node needs them, or read the whole map with $.<ID> and pick the key in an eval node. NOTE the "rules" NODE unwraps to bare outcomes, whereas the shared rules COMPUTE FUNCTION (a "function" node with an ms.compute.* subject, as used by the production Builders Risk flow) returns the raw engine output — which is why that flow reads $.NODE..outcome. Same payload, different return shape. Full DSL: get_flows_reference("rules-syntax"); real example: get_example("builders-risk-product-selection").',
   },
 
+  jsonlogic: {
+    summary:
+      'Evaluate a MAP of named json-logic rules against data — the same rule language the form builder writes, so one rule set can drive both the browser gate and the server decision. Non-short-circuiting: every rule runs. (Not in the OpenAPI spec.)',
+    required: ['id', 'node_type', 'payload'],
+    payload: {
+      required: {
+        rules: 'map of rule id -> json-logic rule expression, evaluated against "data"',
+      },
+      optional: {
+        data: 'object the rules are evaluated against; JSONPath supported',
+        timeout: 'milliseconds; 0 (or omitted) uses the engine default deadline',
+      },
+    },
+    example: {
+      id: 'GATE_CHECK',
+      data: {
+        id: 'GATE_CHECK',
+        node_type: 'jsonlogic',
+        payload: {
+          rules: { over18: { '>=': [{ var: 'age' }, 18] } },
+          data: { age: '$.trigger.age' },
+        },
+      },
+    },
+    notes:
+      'Result is FLAT: $.<ID>.<ruleId>, NOT $.<ID>.result.<ruleId> like an agent node. Every rule is evaluated regardless of earlier results, so a run can assert which rules did NOT fire as well as which did.',
+  },
+
   map: {
     summary: 'Transform/reshape data: the payload itself is JSONPath-resolved and becomes the node output.',
     required: ['id', 'node_type', 'payload'],

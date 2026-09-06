@@ -335,6 +335,13 @@ function validateNodePayload(type, data, label, errors, warnings) {
       }
       break;
 
+    case 'jsonlogic':
+      requireKeys(['rules']);
+      if (isObj && payload.rules !== undefined && (typeof payload.rules !== 'object' || Array.isArray(payload.rules) || payload.rules === null)) {
+        errors.push(`node ${label}: jsonlogic payload "rules" must be an object of rule id -> json-logic expression`);
+      }
+      break;
+
     case 'static':
       if (containsJsonPath(payload)) {
         warnings.push(
