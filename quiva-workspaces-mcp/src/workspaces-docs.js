@@ -191,6 +191,8 @@ const REFERENCE = {
       'Tasks carry `time_tracking` ({ estimate?, logs[] }). See get_workspaces_reference("time-tracking") — logs[] REPLACES rather than appends, so adding an entry is read-modify-write.',
     task_actions_note:
       'Checklist items are stored on a separate subject but ARE returned by get_task in a top-level `task_actions[]` array (since #1299). See get_workspaces_reference("task-actions") — and note that writing one silently resets the task status.',
+    flows_note:
+      'Task writes can start a Quiva flow. A "task" TRIGGER (quiva-flows-mcp node_type: "trigger", trigger_type: "task") starts a flow on a task event — created/updated/status-changed/moved/deleted, action added/completed/deleted, comment created/updated/deleted — bound to one space (node id `task:<space_id>`). This is DIFFERENT from the per-task cron timer described in the "Automation" UI section (`action_type: "flow"`, PUT task-event-schedule route above): the trigger reacts to an event with no timer, the schedule fires at a time with no event. See quiva-flows-mcp get_flows_reference("triggers") for the full picture, including a third thing that shares the word "task": the flows "task" NODE TYPE, which is a flow performing a task operation (the egress direction of this same feature).',
     example_create: CREATE_TASK_EXAMPLE,
     example_update: UPDATE_TASK_EXAMPLE,
     multi_update_note:
@@ -243,6 +245,8 @@ const REFERENCE = {
     frontend_support: 'None yet — no component in microstrate/src reads or writes task actions, so an action you create is invisible in the UI even though the API now returns it.',
     validation_quirk:
       '`description` is required on EVERY write, not just creates: the handler checks it before touching the store, so a call that only means to flip `done` still has to resend the description.',
+    flows_note:
+      'Adding or completing an action fires `task-action-added` / `task-action-completed` on the same task-event trigger described in get_workspaces_reference("tasks").flows_note. WATCH FOR LOOPS: completing an action can itself move the task\'s status (status_reset above), which can re-fire the trigger on the resulting task-status-changed write — a flow that ticks its own action needs the trigger\'s self-trigger suppression (default on) rather than assuming one write means one run. See quiva-flows-mcp get_flows_reference("triggers").',
     example: TASK_ACTION_EXAMPLE,
   },
   'comments': {
