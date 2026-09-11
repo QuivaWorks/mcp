@@ -68,7 +68,115 @@ Notes
   simply never run. validate_flow_config does check.
 `.trim();
 
+const TRIGGERS = `
+TRIGGER TYPES — what actually starts a flow
+============================================
+
+A trigger node (node_type: "trigger") is editor/config metadata: it is never
+executed as a run step. Whether it does anything depends entirely on
+trigger_type, and that field spans THREE unrelated dispatch mechanisms plus a
+purely presentational group. Get this wrong and a flow looks configured but
+never fires — silently, with no error anywhere.
+
+1. PURELY PRESENTATIONAL — no dispatch behind them at all
+   manual, webhook, embed
+   These exist for the editor's UI (a "Run manually" button, embed widget
+   config) and never cause hub-service or anything else to start a run on
+   their own.
+
+2. INSTALLED AT PUBLISH TIME — schedule-service, not hub.trigger.*
+   schedule
+   publish-workflow.go:58-99 unschedules the previously published trigger and
+   installs the draft's on every publish. Real, but the mechanism is a cron
+   registration, not an event subscription.
+
+3. LIVE IN HUB-SERVICE'S hub.trigger.* SUBSCRIBER — the "platform event" family
+   record, object-store, email, task
+   A publisher (records-service, workspaces-service, ...) sends to
+   hub.trigger.<kind>.<scope>.<id>. hub-service globs
+   ms.hub.config.workflow-node.*.*.<node-id> for matching trigger nodes and
+   runs each match (hub-service/service/service.go dispatchTrigger,
+   hub-service/data/const.go TriggerTypeRecord / TriggerTypeObjectStore /
+   TriggerTypeEmail / TriggerTypeTask). These four are the ones that behave
+   like "a real-world event started this flow."
+
+   record  — get_node_type_reference("trigger").record_trigger. Node id MUST
+     be "record:<record_config_id>" (COLON — a legacy dotted form still
+     dispatches for a handful of pre-existing nodes, but create/update now
+     reject a dot). records-service only republishes when the write sets
+     completed:true (or test_flow). event_type omitted defaults to
+     ["record-created","record-updated"], not every record event —
+     "record-patched" must be named explicitly.
+   task — get_node_type_reference("trigger").task_trigger. Node id MUST be
+     "task:<space_id>" (COLON, same reasoning as record — a dotted id splits
+     into two subject tokens and breaks workflow-history's node lookup).
+     Implemented and live: hub-service/data/const.go defines TriggerTypeTask,
+     dispatched in hub-service/service/service.go. Fires on task
+     created/updated/status-changed/moved/deleted, action added/completed/
+     deleted, and comment created/updated/deleted; a move is delivered to the
+     destination space with every kind and to the space it left with only
+     task-moved. Sourced from evari-olympus docs/task-event-trigger-plan.md §0.
+   object-store, email — less commonly used; same dispatch shape as record.
+
+   TASK LOOP CONTROLS — a flow that writes back to the task that started it can
+   re-trigger itself. Guard with: self-trigger suppression (default ON; a run
+   skips a write its own run produced — allow_self_trigger: true opts out),
+   the write's own suppress_events: true (create/update task, add/update task
+   action, create/update comment accept it in the body; deletes take it as
+   ?suppress_events=true; a flow's task node can add it to create_task,
+   update_task, set_task_status, assign_task, comment_task payloads — the
+   editor form does not show it — but NOT to complete_task_action or any
+   delete), a no-op write publishing nothing, and a 60/minute per-task burst
+   limit as the backstop. Full detail: get_node_type_reference("trigger").task_trigger.loop_controls.
+
+4. LIVE, BUT VIA A COMPLETELY DIFFERENT SERVICE — trigger-service
+   gateway
+   trigger-service (built for EXTERNAL ingress — a webhook door into the
+   mesh) creates a gateway mapping and mapping version with
+   Resource: <this flow's subject>, ResourceType: "flow"
+   (trigger-service/handler/post-trigger-gateway.go), so an inbound HTTP call
+   invokes the flow directly. This NEVER goes through hub.trigger.* or
+   dispatchTrigger — it is dispatch #3's sibling system, not a member of it.
+   Real and harvested in production: examples/client-folder-creation.json.
+
+   trigger-service also registers "stream" and "obj" trigger types (a
+   Bellerophon stream subject, an object-store event) with their own POST
+   handlers — these are trigger-service concepts, not flow trigger_type
+   values documented here, though a gateway/stream/obj trigger's endpoint is
+   still what ultimately calls into a flow.
+
+   "subject" is a trigger-service TriggerType constant (TRIGGER_TYPE_SUBJECT)
+   with NO POST handler (only post-trigger-{email,gateway,obj,stream}.go
+   exist) — it is dead. The frontend silently rewrites a chosen trigger_type
+   of "subject" to "stream" before submitting
+   (microstrate trigger.services.svelte.ts createTrigger). Never author
+   trigger_type "subject".
+
+THREE THINGS NAMED "TASK" — pick the right one
+------------------------------------------------
+- task TRIGGER (trigger_type: "task") — STARTS a flow on a workspaces task
+  event (created, updated, status changed, ...). Ingress. Documented above
+  and in get_node_type_reference("trigger").task_trigger.
+- task NODE (node_type: "task") — PERFORMS a task operation (create/update/
+  comment/complete-action) as a step inside an already-running flow. Egress.
+  get_node_type_reference("task").
+- task_schedule_create / schedule_task_event (quiva-workspaces-mcp; the
+  space/task "Automation" UI section) — a per-task CRON TIMER with
+  action_type: "flow". Fires at a scheduled time regardless of any task
+  write; never watches events. This is what a model reaches for by habit when
+  it actually wants the task trigger above.
+
+Check node_type vs trigger_type, not the English word, to tell the first two
+apart in a config you are reading — they are different JSON fields that
+happen to share a name.
+`.trim();
+
 const TOPICS = {
+  triggers: {
+    summary:
+      'What actually starts a flow: the four dispatch mechanisms behind trigger_type (presentational-only, schedule-service, hub-service\'s hub.trigger.* family, and trigger-service\'s gateway binding), plus how to tell the task TRIGGER apart from the task NODE and from task scheduling. Read this before wiring any trigger node.',
+    body: () => TRIGGERS,
+  },
   'rules-syntax': {
     summary:
       'The rule-engine v2 DSL used by condition / rules nodes: { condition, outcome } branches (NOT if/then/else), expressions, @fact refs, and the operator list. Read before building any branching flow.',

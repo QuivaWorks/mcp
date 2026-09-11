@@ -11,16 +11,15 @@ import { checkRule, isBranch } from './rules-docs.js';
 const ID_REGEX = /^[a-zA-Z_][a-zA-Z0-9_:]*$/;
 const RESERVED_IDS = new Set(['trigger', 'static', 'RESOLVE_ERROR', 'RESOLVE_SUCCESS']);
 
-// `record.<record_config_id>` — the one node id that legitimately contains a dot.
-// A record config id is the same shape as any other platform id.
-const RECORD_TRIGGER_ID_REGEX = /^record\.[a-zA-Z0-9_-]+$/;
+// Record and task trigger ids address their config or space with a colon —
+// `record:<record_config_id>`, `task:<space_id>` — because hub dispatches by
+// globbing the node id (hub-service/handler/create-workflow.go check*TriggerID).
+const TASK_TRIGGER_ID_REGEX = /^task:\w+$/;
+// The dotted record form hub still reads for legacy nodes but refuses on write.
+const LEGACY_RECORD_TRIGGER_ID_REGEX = /^record\.[a-zA-Z0-9_-]+$/;
 
-function isRecordTriggerId(id, data) {
-  return (
-    RECORD_TRIGGER_ID_REGEX.test(id) &&
-    data?.node_type === 'trigger' &&
-    data?.trigger_type === 'record'
-  );
+function isRecordTrigger(data) {
+  return data?.node_type === 'trigger' && data?.trigger_type === 'record';
 }
 const RESERVED_CONDITION_TARGETS = new Set(['RESOLVE_ERROR', 'RESOLVE_SUCCESS']);
 const BUILTIN_LOOKUPS = new Set(['trigger', 'static', 'env', 'context']);
@@ -63,23 +62,26 @@ export function validateFlowConfig(config) {
       warnings.push(`node ${label}: top-level id ("${node.id}") differs from data.id ("${data.id}") — they should match`);
     }
     if (!ID_REGEX.test(id)) {
-      if (isRecordTriggerId(id, data)) {
-        // A record trigger is the ONE node whose id must contain a dot, so
-        // ID_REGEX cannot apply to it. hub-service dispatches record events by
-        // GLOB on the node subject `ms.hub.config.workflow-node.*.*.record.<configID>`
-        // (service/service.go recordTriggerNodeSubject), and the node subject is
-        // the flow subject with ".workflow." swapped for ".workflow-node." plus
-        // "." + node.id. So the id has to be literally `record.<configID>` or the
-        // trigger never fires — which is exactly what the editor writes
-        // (trigger-record.component.svelte:113 sets the id to `record.${config}`).
-        warnings.push(
-          `node ${label}: the id contains a dot, which ID_REGEX and hub-service validate.ValidateID both reject — but a record trigger REQUIRES the id to be exactly "record.<record_config_id>", because hub-service matches record events by glob on the node subject. Send this flow with server_validate=false, or the create/update is rejected.`
+      if (isRecordTrigger(data) && LEGACY_RECORD_TRIGGER_ID_REGEX.test(id)) {
+        errors.push(
+          `node ${label}: record trigger id "${id}" uses the legacy dot — hub-service refuses it on create and update (checkRecordTriggerID). Use "record:<record_config_id>".`
         );
       } else {
         errors.push(
-          `node ${label}: invalid id — must start with a letter or underscore and contain only alphanumerics, underscores or colons (hub-service validate.ValidateID). NOTE: the flow editor does NOT run this check (the server only validates when validate=true), so UI-authored flows can contain ids like "QsY6OWA5xVhZn9aS3lF-Z" that you cannot re-send with validation on. To update such a flow, pass server_validate=false. EXCEPTION: a record trigger node's id must be "record.<record_config_id>" — set data.trigger_type to "record" and this becomes a warning instead of an error.`
+          `node ${label}: invalid id — must start with a letter or underscore and contain only alphanumerics, underscores or colons (hub-service validate.ValidateID). NOTE: the flow editor does NOT run this check (the server only validates when validate=true), so UI-authored flows can contain ids like "QsY6OWA5xVhZn9aS3lF-Z" that you cannot re-send with validation on. To update such a flow, pass server_validate=false.`
         );
       }
+    }
+    const recordConfigId = isRecordTrigger(data) ? data.payload?.record_config_id : undefined;
+    if (
+      typeof recordConfigId === 'string' &&
+      recordConfigId &&
+      id !== `record:${recordConfigId}` &&
+      !LEGACY_RECORD_TRIGGER_ID_REGEX.test(id)
+    ) {
+      errors.push(
+        `node ${label}: a record trigger's id must be exactly "record:${recordConfigId}" — hub dispatches record events by globbing the node id and refuses a mismatch on create and update.`
+      );
     }
     if (RESERVED_IDS.has(id)) {
       errors.push(`node ${label}: "${id}" is a reserved word and cannot be used as a node id`);
@@ -350,8 +352,28 @@ function validateNodePayload(type, data, label, errors, warnings) {
       }
       break;
 
-    case 'map':
     case 'trigger':
+      if (data.trigger_type === 'task') {
+        if (!isObj || !payload.space_id) {
+          errors.push(`node ${label}: task trigger payload requires "space_id"`);
+          break;
+        }
+        const expectedId = `task:${payload.space_id}`;
+        if (data.id !== expectedId) {
+          errors.push(
+            `node ${label}: task trigger node id must be exactly "${expectedId}" (task:<space_id>, colon not dot) — hub-service dispatches task events by glob on the node subject, so any other id means the trigger silently never fires (task-event-trigger-plan.md §0/§3).`
+          );
+        } else if (!TASK_TRIGGER_ID_REGEX.test(data.id)) {
+          // Catches a space_id with characters ^\w+$ does not allow, which
+          // would otherwise pass the expectedId string-equality check above.
+          errors.push(`node ${label}: task trigger id "${data.id}" — space_id must match ^\\w+$ (letters, digits, underscore only)`);
+        }
+        if (payload.event_type !== undefined && !Array.isArray(payload.event_type)) {
+          errors.push(`node ${label}: task trigger payload "event_type" must be an array of event-kind strings, e.g. ["task-created","task-updated"]`);
+        }
+      }
+      break;
+    case 'map':
       break;
   }
 }
