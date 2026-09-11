@@ -534,22 +534,20 @@ check('golden: the condition example really uses the v2 branch shape', () => {
   }
 });
 
-// --- record triggers (hub-service #1287) -------------------------------------
-// The one node id that must contain a dot. hub-service dispatches record events by
-// glob on `ms.hub.config.workflow-node.*.*.record.<configID>`, and the node subject
-// is the flow subject + "." + node.id — so the id has to be `record.<configID>` or
-// the trigger silently never fires. ValidateID rejects that id, which is why this
-// is a warning (send with server_validate=false) and not an error.
+// --- record triggers ----------------------------------------------------------
+// hub-service dispatches record events by glob on the node subject, so the id must be
+// exactly `record:<configID>`; it refuses the legacy dotted form and a mismatch on
+// create and update (create-workflow.go checkRecordTriggerID).
 
-const recordTriggerFlow = (overrides = {}) => ({
+const recordTriggerFlow = (overrides = {}, id = 'record:risk_programme') => ({
   name: 'record trigger flow',
   nodes: [
     {
-      id: 'record.risk_programme',
+      id,
       position: { x: 0, y: 0 },
       type: 'custom',
       data: {
-        id: 'record.risk_programme',
+        id,
         name: 'On risk programme record',
         node_type: 'trigger',
         trigger_type: 'record',
@@ -561,17 +559,22 @@ const recordTriggerFlow = (overrides = {}) => ({
   edges: [],
 });
 
-check('a record trigger node id containing a dot is accepted', () => {
+check('a record trigger id of record:<record_config_id> is valid', () => {
   const r = validate(recordTriggerFlow());
   assert.equal(r.valid, true, JSON.stringify(r.errors));
+  assert.ok(!r.warnings.some((w) => w.includes('server_validate=false')), 'a colon id needs no workaround');
 });
 
-check('a record trigger id warns that server-side validation will still reject it', () => {
-  const r = validate(recordTriggerFlow());
-  assert.ok(
-    r.warnings.some((w) => w.includes('server_validate=false')),
-    'the caller must be told the create/update needs server_validate=false'
-  );
+check('a legacy dotted record trigger id is refused', () => {
+  const r = validate(recordTriggerFlow({}, 'record.risk_programme'));
+  assert.equal(r.valid, false, 'hub refuses the dotted form on create and update');
+  assert.ok(r.errors.some((e) => e.includes('legacy dot')), JSON.stringify(r.errors));
+});
+
+check('a record trigger id that does not address its record_config_id is refused', () => {
+  const r = validate(recordTriggerFlow({}, 'record:other_config'));
+  assert.equal(r.valid, false, 'a mismatched id is a trigger that never fires');
+  assert.ok(r.errors.some((e) => e.includes('record:risk_programme')), JSON.stringify(r.errors));
 });
 
 check('a dotted id on a NON-record node is still an error', () => {
@@ -591,22 +594,22 @@ check('a dotted id on a NON-record node is still an error', () => {
   assert.ok(r.errors.some((e) => e.includes('invalid id')), JSON.stringify(r.errors));
 });
 
-check('a dotted id on a trigger that is not trigger_type record is still an error', () => {
-  const r = validate(recordTriggerFlow({ trigger_type: 'manual' }));
-  assert.equal(r.valid, false, 'only a record trigger legitimises the dot');
+check('a dotted id on a trigger that is not trigger_type record is an invalid id', () => {
+  const r = validate(recordTriggerFlow({ trigger_type: 'manual' }, 'record.risk_programme'));
+  assert.equal(r.valid, false);
   assert.ok(r.errors.some((e) => e.includes('invalid id')));
 });
 
-check('the trigger reference documents all three live trigger types and the id rule', () => {
+check('the trigger reference documents the live hub trigger types and the id rule', () => {
   const trigger = NODE_TYPES.trigger;
-  for (const type of ['record', 'object-store', 'email']) {
+  for (const type of ['record', 'object-store', 'email', 'task']) {
     assert.ok(
       trigger.nodeLevelProps.trigger_type.includes(type),
       `trigger_type must list "${type}" — hub-service dispatches on it (data.TriggerType*)`
     );
   }
   assert.ok(
-    trigger.record_trigger?.the_id_rule?.includes('record.<record_config_id>'),
+    trigger.record_trigger?.the_id_rule?.includes('record:<record_config_id>'),
     'the id rule is the whole reason a record trigger fails silently — it must be documented'
   );
   assert.ok(
@@ -616,12 +619,11 @@ check('the trigger reference documents all three live trigger types and the id r
   assert.equal(
     NODE_TYPES.trigger.record_trigger_example.id,
     NODE_TYPES.trigger.record_trigger_example.data.payload.record_config_id
-      ? `record.${NODE_TYPES.trigger.record_trigger_example.data.payload.record_config_id}`
+      ? `record:${NODE_TYPES.trigger.record_trigger_example.data.payload.record_config_id}`
       : null,
-    'the example id must be record.<record_config_id> or it teaches the wrong thing'
+    'the example id must be record:<record_config_id> or it teaches the wrong thing'
   );
 });
-
 
 // --- every src module parses -------------------------------------------------
 // A syntax error in src/index.js used to be INVISIBLE to this suite: nothing here
