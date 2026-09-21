@@ -104,11 +104,18 @@ function collectCitations() {
   // cites the deployVerticals routing keys. Omitting them here hid those citations
   // independently of the CITATION regex, so widening one without the other fixes
   // only half the hole.
+  //
+  // specs/openapi is walked for the same reason: the specs carry engine claims
+  // of their own (x-resource subjects, the x-gateway-routes-not-in-this-spec
+  // extension), and a citation placed in one was invisible here — the exact
+  // "tree not listed" failure described at the top of this file, one directory
+  // over.
   const roots = [
     ...SERVERS.map((s) => join(ROOT, s)),
     join(ROOT, 'docs'),
     join(ROOT, 'tools'),
     join(ROOT, 'verticals'),
+    SPEC_DIR,
   ];
   for (const root of roots) {
     let files;
