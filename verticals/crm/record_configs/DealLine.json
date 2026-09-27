@@ -1,0 +1,124 @@
+{
+  "id": "DealLine",
+  "name": "Deal Line",
+  "description": "One product or service on a deal: quantity, price and discount. Joins Deal to Product so a deal can carry several catalogue entries.",
+  "schema": {
+    "type": "object",
+    "required": ["deal_id", "product_id", "quantity", "unit_price"],
+    "properties": {
+      "deal_id": { "type": "string", "title": "Deal" },
+      "product_id": { "type": "string", "title": "Product" },
+      "line_description": { "type": "string", "title": "Description" },
+      "quantity": { "type": "number", "title": "Quantity", "minimum": 0 },
+      "unit_price": { "type": "number", "title": "Unit price", "minimum": 0 },
+      "discount_percent": { "type": "number", "title": "Discount %", "minimum": 0, "maximum": 100 },
+      "line_total": { "type": "number", "title": "Line total", "minimum": 0 }
+    }
+  },
+  "views": {
+    "forms": [
+      {
+        "id": "default",
+        "title": "Deal Line",
+        "description": "A single product or service line on a deal.",
+        "layout": {
+          "type": "grid",
+          "props": { "gridTemplateColumns": "1fr", "gap": 16 },
+          "children": [
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr 1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "deal_id",
+                  "inputType": "text",
+                  "props": { "label": "Deal", "helpText": { "markdown": "Record id of the parent Deal." } }
+                },
+                {
+                  "type": "field",
+                  "field": "product_id",
+                  "inputType": "text",
+                  "props": { "label": "Product", "helpText": { "markdown": "Record id of the catalogue entry." } }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "line_description",
+                  "inputType": "text",
+                  "props": { "label": "Description", "placeholder": "Defaults to the product name if left blank." }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr 1fr 1fr 1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "quantity",
+                  "inputType": "number",
+                  "props": { "label": "Quantity", "min": 0, "step": 1, "showControls": true, "defaultValue": 1 }
+                },
+                {
+                  "type": "field",
+                  "field": "unit_price",
+                  "inputType": "currency",
+                  "props": { "label": "Unit price", "min": 0, "decimalPlace": 2 }
+                },
+                {
+                  "type": "field",
+                  "field": "discount_percent",
+                  "inputType": "slider",
+                  "props": { "label": "Discount %", "min": 0, "max": 100, "showIndicatorMin": true, "showIndicatorMax": true }
+                },
+                {
+                  "type": "field",
+                  "field": "line_total",
+                  "inputType": "currency",
+                  "props": { "label": "Line total", "min": 0, "decimalPlace": 2 },
+                  "rules": [
+                    {
+                      "id": "line_total.value",
+                      "property": "value",
+                      "logic": {
+                        "*": [
+                          { "*": [{ "var": "quantity" }, { "var": "unit_price" }] },
+                          { "-": [1, { "/": [{ "var": "discount_percent" }, 100] }] }
+                        ]
+                      },
+                      "description": "Line total is quantity multiplied by unit price, less the discount percentage."
+                    },
+                    {
+                      "id": "line_total.readonly",
+                      "property": "readonly",
+                      "logic": true,
+                      "description": "Line total is always computed, never typed."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "table": {
+      "type": "table",
+      "columns": [
+        { "field": "deal_id", "order": 1 },
+        { "field": "product_id", "order": 2 },
+        { "field": "line_description", "order": 3 },
+        { "field": "quantity", "order": 4 },
+        { "field": "unit_price", "order": 5 },
+        { "field": "discount_percent", "order": 6 },
+        { "field": "line_total", "order": 7 }
+      ]
+    }
+  }
+}

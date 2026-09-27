@@ -1,0 +1,380 @@
+{
+  "topic": "form-builder",
+  "summary": "Complete instructions for turning a record config's JSON Schema (plus an optional NL request) into a form layout. A form layout is a tree of view nodes (grid / field / array-field) whose ROOT is a single grid node. That root grid is exactly what goes in `views.forms[].layout` (equivalently, the `{ \"form\": <root grid> }` a form-creator agent emits). Input config lives on the nodes, not the schema.",
+  "output_contract": "A form is one named entry in `views.forms`: `{ \"id\": \"<unique>\", \"title\": \"...\", \"description\"?: \"...\", \"layout\": <ROOT_GRID_NODE> }`. The layout root is ALWAYS a single grid node. A config may hold several forms; `id` is unique within the config and appears in the URL. (The deprecated singular `views.form` is just a bare root grid; prefer `views.forms`.)",
+  "node_kinds": {
+    "grid": {
+      "shape": "{ \"type\": \"grid\", \"props\": { \"gridTemplateColumns\": \"<css>\", \"gap\"?: 16 }, \"children\": [...], \"rules\"?: [...] }",
+      "notes": "`gridTemplateColumns` is raw CSS; the number of space-separated tokens = number of columns, children fill left-to-right (\"1fr\", \"1fr 1fr\", \"2fr 1fr\", \"1fr 1fr 1fr\"). `gap` is an optional pixel number. A grid is a container: its only supported rule property is `visible`."
+    },
+    "field": {
+      "shape": "{ \"type\": \"field\", \"field\": \"<dotted path>\", \"inputType\"?: \"<input type>\", \"props\"?: {...}, \"rules\"?: [...] }",
+      "notes": "`field` is required and must resolve in the schema. `inputType`, `props`, and `rules` live HERE on the node (not on the schema) — one schema can back several forms with different input config. Omit `inputType` to accept the type default (see defaults_by_type). Always give `props.label`. If you omit `type` on a child that has a `field`, the renderer treats it as a field anyway — but emit `\"type\": \"field\"` explicitly."
+    },
+    "array-field": {
+      "shape": "{ \"type\": \"array-field\", \"field\": \"<array-of-object path>\", \"props\"?: {...}, \"children\": [...] }",
+      "notes": "A repeater: a list of item instances the user can add/remove/reorder, each edited with real sub-inputs. Use it when the bound array's `items` is an object with its own properties. Children describe ONE item's layout and their `field` refs are ELEMENT-RELATIVE — resolved against the array's `items.properties`, e.g. child `field: \"title\"` for array \"products\" means products[].title, NOT \"products.title\". `{ \"var\": \"...\" }` in a child rule reads sibling fields within the same item. Container `props`: label, itemLabel, required, minItems, maxItems, collapsible, defaultCollapsed. Give a repeater its own full-width row. (For arrays of scalars, prefer a plain field with `tags` — or `array` for a List; use `multi-select` only when the items have an enum.)"
+    }
+  },
+  "input_selection": {
+    "defaults_by_type": {
+      "string": "text",
+      "number": "number",
+      "integer": "number",
+      "boolean": "toggle",
+      "array": "tags",
+      "object": "key-value"
+    },
+    "allowed_by_type": {
+      "string": [
+        "text",
+        "textarea",
+        "dropdown",
+        "multi-select",
+        "multi-toggle",
+        "tags",
+        "array",
+        "date",
+        "date-range",
+        "phone",
+        "country",
+        "multi-country"
+      ],
+      "number": [
+        "number",
+        "currency",
+        "slider"
+      ],
+      "integer": [
+        "number",
+        "currency",
+        "slider"
+      ],
+      "boolean": [
+        "toggle",
+        "checkbox"
+      ],
+      "array": [
+        "tags",
+        "array",
+        "multi-select (only if items have an enum)"
+      ],
+      "object": [
+        "key-value"
+      ]
+    },
+    "hints": [
+      "string with enum → dropdown; array items with enum → multi-select.",
+      "format date → date; a start/end pair → date-range.",
+      "long text (description/notes, large maxLength) → textarea.",
+      "phone → phone; country → country (multi-country for arrays of countries).",
+      "money/price/amount → currency; a bounded rating/percentage → slider.",
+      "array of scalars → tags (or array for a List); array of objects → an array-field repeater.",
+      "object with defined properties → expand into individual leaf field nodes (one node per leaf) rather than binding the whole object; use key-value only for a free-form object.",
+      "Omit inputType when the type default already fits; set it otherwise."
+    ],
+    "extended_union": "The full InputType union also includes password, secret, markdown, statuses, search, code, code-editor, color-picker, icon, display, question, toggleable, yesNo, custom — valid on a node but NOT offered by the visual builder and mostly without prop editors. Prefer the allowed_by_type set."
+  },
+  "props": {
+    "common_all": [
+      "label",
+      "placeholder",
+      "helpText",
+      "spacing",
+      "strictMultiline",
+      "defaultValue"
+    ],
+    "by_input_type": {
+      "text|textarea|markdown|secret|password|search|tags|phone": [
+        "label",
+        "placeholder",
+        "helpText",
+        "spacing",
+        "strictMultiline",
+        "defaultValue"
+      ],
+      "dropdown|statuses": [
+        "label",
+        "placeholder",
+        "helpText",
+        "spacing",
+        "strictMultiline",
+        "sort",
+        "options",
+        "defaultValue"
+      ],
+      "multi-select": [
+        "label",
+        "placeholder",
+        "helpText",
+        "spacing",
+        "strictMultiline",
+        "sort",
+        "options",
+        "maxItems",
+        "defaultValue"
+      ],
+      "multi-toggle": [
+        "label",
+        "helpText",
+        "spacing",
+        "strictMultiline",
+        "sort",
+        "options",
+        "defaultValue"
+      ],
+      "date|date-range": [
+        "label",
+        "placeholder",
+        "helpText",
+        "spacing",
+        "strictMultiline",
+        "minDate",
+        "maxDate",
+        "defaultValue"
+      ],
+      "country|multi-country": [
+        "label",
+        "placeholder",
+        "helpText",
+        "spacing",
+        "strictMultiline",
+        "includedCountries",
+        "showNativeName",
+        "defaultValue"
+      ],
+      "number": [
+        "label",
+        "placeholder",
+        "helpText",
+        "spacing",
+        "strictMultiline",
+        "showControls",
+        "decimalPlace",
+        "min",
+        "max",
+        "defaultValue"
+      ],
+      "currency": [
+        "label",
+        "placeholder",
+        "helpText",
+        "spacing",
+        "strictMultiline",
+        "decimalPlace",
+        "min",
+        "max",
+        "defaultValue"
+      ],
+      "slider": [
+        "label",
+        "helpText",
+        "spacing",
+        "strictMultiline",
+        "min",
+        "max",
+        "defaultValue"
+      ],
+      "toggle|checkbox": [
+        "label",
+        "helpText",
+        "strictMultiline",
+        "spacing",
+        "defaultValue"
+      ],
+      "key-value|array": [
+        "label",
+        "helpText",
+        "spacing",
+        "strictMultiline",
+        "defaultValue"
+      ]
+    },
+    "prop_shapes": {
+      "options": "[ { \"value\": \"...\", \"text\": \"...\" }, ... ] — seed from the schema field's enum.",
+      "sort": "boolean — sort the options alphabetically.",
+      "min": "number — seed from schema `minimum`.",
+      "max": "number — seed from schema `maximum`.",
+      "decimalPlace": "number of decimal places.",
+      "showControls": "boolean — show number spinner controls.",
+      "minDate": "ISO date string — seed from schema date bounds if present.",
+      "maxDate": "ISO date string.",
+      "maxItems": "number — seed from schema `maxItems`.",
+      "includedCountries": "string[] of ISO codes, e.g. [\"uk\",\"ua\"].",
+      "showNativeName": "boolean.",
+      "helpText": "{ \"markdown\": \"...\" } — extra guidance, use sparingly.",
+      "strictMultiline": "boolean — force the label above the input.",
+      "defaultValue": "a literal default for the input."
+    },
+    "array_field_container_props": [
+      "label",
+      "itemLabel",
+      "required",
+      "minItems",
+      "maxItems",
+      "collapsible",
+      "defaultCollapsed"
+    ]
+  },
+  "paths": "Reference nested properties with dots: Address.Country, Address.Phone. Resolution steps into `properties` for objects and `items.properties` for arrays of objects. Bind only leaf fields (primitives, enums, date/array leaves). Prefer expanding a nested object into individual leaf field nodes over binding the whole object. For an array of objects, use an array-field node with element-relative child refs.",
+  "layout_principles": [
+    "Root = a single grid with `gridTemplateColumns: \"1fr\"` whose children are row grids.",
+    "Each row = a child grid whose children are field nodes (or nested grids / array-fields).",
+    "Keep rows to 1–3 columns. Put related fields in the same row.",
+    "Wide/complex inputs (textarea, repeaters/array-fields, address groups) get their own full-width single-column row.",
+    "Preserve a sensible reading order: identity/name first, then contact, address, then secondary details.",
+    "Every field node binds a real leaf path and has a `props.label`. Every array-field binds a real array path and has a label (and preferably itemLabel).",
+    "Reflect schema constraints: enum → options; minimum/maximum → min/max; date bounds → minDate/maxDate; maxItems; array minItems/maxItems onto the array-field container.",
+    "If a user request names/implies specific fields, include only those; if it describes layout, honour it; with no request, include every leaf property.",
+    "Never invent fields — only reference paths that exist in the schema."
+  ],
+  "rules_pointer": "Conditional behaviour (visible/required/disabled/readonly/value) goes in a node's `rules` array. See get_records_reference(\"form-rules\").",
+  "legacy_fallback": "The renderer reads node `inputType`/`props` first, falling back to the schema field's `ui.inputType`/`ui.props` only for nested object-group members and array-item leaves that are not their own view node. When saving, the frontend STRIPS `schema.*.ui` for any field placed on a form node. Build forms with node-level config; do not rely on schema `ui`.",
+  "example": {
+    "id": "default",
+    "title": "Default",
+    "layout": {
+      "type": "grid",
+      "props": {
+        "gridTemplateColumns": "1fr"
+      },
+      "children": [
+        {
+          "type": "grid",
+          "props": {
+            "gridTemplateColumns": "1fr 1fr"
+          },
+          "children": [
+            {
+              "type": "field",
+              "field": "rating",
+              "inputType": "slider",
+              "props": {
+                "label": "Rating",
+                "min": 1,
+                "max": 5
+              }
+            },
+            {
+              "type": "field",
+              "field": "category",
+              "inputType": "dropdown",
+              "props": {
+                "label": "Category",
+                "options": [
+                  {
+                    "value": "bug",
+                    "text": "Bug"
+                  },
+                  {
+                    "value": "feature",
+                    "text": "Feature"
+                  },
+                  {
+                    "value": "general",
+                    "text": "General"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "type": "grid",
+          "props": {
+            "gridTemplateColumns": "1fr"
+          },
+          "children": [
+            {
+              "type": "field",
+              "field": "comment",
+              "inputType": "textarea",
+              "props": {
+                "label": "Comment"
+              }
+            }
+          ]
+        },
+        {
+          "type": "grid",
+          "props": {
+            "gridTemplateColumns": "1fr 1fr"
+          },
+          "children": [
+            {
+              "type": "field",
+              "field": "follow_up",
+              "inputType": "toggle",
+              "props": {
+                "label": "Requested follow-up"
+              }
+            },
+            {
+              "type": "field",
+              "field": "email",
+              "inputType": "text",
+              "props": {
+                "label": "Email",
+                "placeholder": "name@example.com"
+              },
+              "rules": [
+                {
+                  "id": "email.required",
+                  "property": "required",
+                  "logic": {
+                    "==": [
+                      {
+                        "var": "follow_up"
+                      },
+                      true
+                    ]
+                  },
+                  "description": "Email is required when a follow-up is requested."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "array_field_example": {
+    "type": "array-field",
+    "field": "products",
+    "props": {
+      "label": "Products",
+      "itemLabel": "Product",
+      "required": true,
+      "minItems": 1,
+      "maxItems": 10
+    },
+    "children": [
+      {
+        "type": "grid",
+        "props": {
+          "gridTemplateColumns": "2fr 1fr"
+        },
+        "children": [
+          {
+            "type": "field",
+            "field": "title",
+            "inputType": "text",
+            "props": {
+              "label": "Title"
+            }
+          },
+          {
+            "type": "field",
+            "field": "price",
+            "inputType": "currency",
+            "props": {
+              "label": "Price",
+              "min": 0,
+              "decimalPlace": 2
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

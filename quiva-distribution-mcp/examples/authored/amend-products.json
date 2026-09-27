@@ -1,0 +1,14 @@
+{
+  "slug": "amend-products",
+  "of": "amend",
+  "teaches": "Granting and withdrawing products without a status change. A withdrawn product is deactivated, not removed. Every withdraw id must already be on the grant or the whole request is refused. An empty version tracks the latest.",
+  "payload": {
+    "distributor_account_id": "<<ACCOUNT_2>>",
+    "grant_products": [
+      { "product_id": "support-plan" },
+      { "product_id": "onboarding", "version": "2" }
+    ],
+    "withdraw_products": ["legacy-plan"]
+  },
+  "tool_arguments": { "confirm": true }
+}

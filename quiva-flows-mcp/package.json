@@ -1,0 +1,24 @@
+{
+  "name": "quiva-flows-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for building, publishing and running Quiva workflows",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "quiva-flows-mcp": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node test/validate.test.js",
+    "test:e2e": "node test/e2e-staging.mjs",
+    "test:e2e:rules": "node test/e2e-rules-node.mjs",
+    "harvest": "node tools/harvest-examples.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.24.0"
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "slug": "refusals",
+  "kind": "harvested",
+  "source": {
+    "harvested_at": "2026-09-27"
+  },
+  "teaches": "The three failure shapes: a named refusal (404 product_not_found), a plain 400 { error }, and a validation 400.",
+  "responses": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/accounts/distribution-product",
+        "query": {
+          "code": "<<PRODUCT_6>>"
+        }
+      },
+      "status": 404,
+      "refused": true,
+      "body": {
+        "data": {
+          "code": "<<PRODUCT_6>>",
+          "detail": "nothing is published under <<PRODUCT_6>>",
+          "refusal_code": "product_not_found",
+          "status": "refused"
+        },
+        "message": "Refused"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/accounts/distribution",
+        "query": {
+          "distributor_account_id": "<<ACCOUNT_5>>"
+        }
+      },
+      "status": 400,
+      "refused": false,
+      "body": {
+        "error": "No distribution found for that publisher and distributor"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/accounts/distribution-invites",
+        "query": {
+          "state": "unknown"
+        }
+      },
+      "status": 400,
+      "refused": false,
+      "body": {
+        "error": "State must be one of outstanding, redeemed, withdrawn or expired"
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/accounts/distribution-granted-products",
+        "query": {
+          "publisher_account_id": "<<ACCOUNT_5>>"
+        }
+      },
+      "status": 403,
+      "refused": true,
+      "body": {
+        "data": {
+          "detail": "account <<ACCOUNT_6>> holds no distribution from <<ACCOUNT_5>>, so it has no products to work",
+          "refusal_code": "not_a_party",
+          "status": "refused"
+        },
+        "message": "Refused"
+      }
+    }
+  ]
+}

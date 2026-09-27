@@ -1,0 +1,81 @@
+{
+  "slug": "publisher-invites",
+  "kind": "harvested",
+  "source": {
+    "harvested_at": "2026-09-27"
+  },
+  "teaches": "list_distribution_invites: one invitation per state, newest first. Items carry no token. The list is trimmed, so results_total is the platform count.",
+  "response": {
+    "request": {
+      "method": "GET",
+      "path": "/accounts/distribution-invites",
+      "query": {}
+    },
+    "status": 200,
+    "refused": false,
+    "body": {
+      "data": {
+        "results": [
+          {
+            "invite_id": "<<INVITE_4>>",
+            "products": [
+              {
+                "product_id": "<<PRODUCT_1>>",
+                "product_name": "<<PRODUCT_NAME_1>>"
+              }
+            ],
+            "distribution_id": "<<DISTRIBUTION_4>>",
+            "brokerage_name": "<<NAME_5>>",
+            "created_at": "2026-09-18T16:05:28+01:00",
+            "expires_at": 1790953528,
+            "granted_by": "<<REDACTED:granted_by>>",
+            "state": "redeemed"
+          },
+          {
+            "invite_id": "<<INVITE_5>>",
+            "products": [
+              {
+                "product_id": "<<PRODUCT_3>>"
+              }
+            ],
+            "distribution_id": "<<DISTRIBUTION_5>>",
+            "brokerage_name": "<<NAME_6>>",
+            "created_at": "2026-09-18T10:49:22+01:00",
+            "expires_at": 1790934562,
+            "granted_by": "<<REDACTED:granted_by>>",
+            "state": "outstanding"
+          },
+          {
+            "invite_id": "<<INVITE_6>>",
+            "products": [
+              {
+                "product_id": "<<PRODUCT_4>>"
+              }
+            ],
+            "distribution_id": "<<DISTRIBUTION_6>>",
+            "brokerage_name": "<<NAME_7>>",
+            "created_at": "2026-09-09T10:16:23Z",
+            "expires_at": 1789035383,
+            "granted_by": "<<REDACTED:granted_by>>",
+            "state": "withdrawn"
+          },
+          {
+            "invite_id": "<<INVITE_7>>",
+            "products": [
+              {
+                "product_id": "<<PRODUCT_5>>"
+              }
+            ],
+            "distribution_id": "<<DISTRIBUTION_7>>",
+            "brokerage_name": "<<NAME_8>>",
+            "created_at": "2026-09-08T09:34:11Z",
+            "expires_at": 1790069651,
+            "granted_by": "<<REDACTED:granted_by>>",
+            "state": "expired"
+          }
+        ],
+        "results_total": 75
+      }
+    }
+  }
+}
