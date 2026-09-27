@@ -148,7 +148,8 @@
                 "research_summary": "$.PARSE.summary",
                 "research_confidence": "$.PARSE.confidence",
                 "research_red_flags": "$.PARSE.redFlags"
-              }
+              },
+              "suppress_events": true
             }
           }
         }

@@ -4,9 +4,9 @@
   "config": {
     "nodes": [
       {
-        "id": "record.UWQuote",
+        "id": "record:UWQuote",
         "data": {
-          "id": "record.UWQuote",
+          "id": "record:UWQuote",
           "name": "On quote written",
           "node_type": "trigger",
           "trigger_type": "record",
@@ -130,7 +130,7 @@
     "edges": [
       {
         "id": "e_trigger_GATE",
-        "source": "record.UWQuote",
+        "source": "record:UWQuote",
         "target": "GATE_ACCEPTED"
       },
       {

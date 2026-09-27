@@ -4,9 +4,9 @@
   "config": {
     "nodes": [
       {
-        "id": "record.Deal",
+        "id": "record:Deal",
         "data": {
-          "id": "record.Deal",
+          "id": "record:Deal",
           "name": "On Deal created",
           "node_type": "trigger",
           "trigger_type": "record",
@@ -97,7 +97,7 @@
       }
     ],
     "edges": [
-      { "id": "e_trigger_build", "source": "record.Deal", "target": "BUILD_TASKS" },
+      { "id": "e_trigger_build", "source": "record:Deal", "target": "BUILD_TASKS" },
       { "id": "e_build_qual", "source": "BUILD_TASKS", "target": "CREATE_QUAL_TASK" },
       { "id": "e_qual_check", "source": "CREATE_QUAL_TASK", "target": "CHECK_VALUE" },
       { "id": "e_check_dm", "source": "CHECK_VALUE", "target": "CREATE_DM_TASK" }

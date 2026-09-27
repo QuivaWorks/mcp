@@ -35,9 +35,9 @@
     },
     "nodes": [
       {
-        "id": "record.UWQuote",
+        "id": "record:UWQuote",
         "data": {
-          "id": "record.UWQuote",
+          "id": "record:UWQuote",
           "name": "On quote written",
           "node_type": "trigger",
           "trigger_type": "record",
@@ -198,7 +198,7 @@
       }
     ],
     "edges": [
-      { "id": "e_trigger_GATE", "source": "record.UWQuote", "target": "GATE_SUBMITTED" },
+      { "id": "e_trigger_GATE", "source": "record:UWQuote", "target": "GATE_SUBMITTED" },
       { "id": "e_GATE_PRICE", "source": "GATE_SUBMITTED", "target": "PRICE" },
       { "id": "e_PRICE_CHECK", "source": "PRICE", "target": "CHECK_VALID" },
       { "id": "e_CHECK_STAMP_PRICED", "source": "CHECK_VALID", "target": "STAMP_PRICED" },

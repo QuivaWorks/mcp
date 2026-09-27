@@ -4,9 +4,9 @@
   "config": {
     "nodes": [
       {
-        "id": "record.Activity",
+        "id": "record:Activity",
         "data": {
-          "id": "record.Activity",
+          "id": "record:Activity",
           "node_type": "trigger",
           "payload": {
             "record_config_id": "Activity",
@@ -184,7 +184,7 @@
     "edges": [
       {
         "id": "e_record_Activity_CHECK_COMPLETED",
-        "source": "record.Activity",
+        "source": "record:Activity",
         "target": "CHECK_COMPLETED"
       },
       {

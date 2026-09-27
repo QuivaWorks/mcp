@@ -66,6 +66,7 @@ export const GOTCHAS = [
   'email nodes send ONE email to ONE recipient ("to" must be a single address, not a list) through the account\'s verified sending domain. The result {msg_id, accepted, status: "queued"} means accepted for sending, not delivered: suppression and consent are applied later. There is no retry, so do not wrap it in options.attempts.',
   'verify-signature is the opposite of verify-challenge: a failed check REFUSES the run (401 "unauthorized", run status "refused") instead of returning a result to branch on. Map headers/body as "$.env.headers" / "$.trigger" with NO leading pipe; a pipe turns the object into a string and every call fails.',
   'input / human-in-the-loop payload is {title, description, message, priority, assignees} (assignees = comma-separated user ids). The spec\'s "notify" email/slack block is not read by the current engine.',
+  'Prefer the task node\'s list_tasks for a filtered task lookup over a quiva-endpoint node on microstrate.workspaces.get.tasks. A quiva-endpoint node sends no filters or space_id on that subject and silently queries the default space. See get_node_type_reference("quiva-endpoint").header_lift.',
 ];
 
 export const NODE_TYPES = {
@@ -129,7 +130,7 @@ export const NODE_TYPES = {
       event_filter:
         'payload.event_type is matched against the `x-event-type` header. An array present and non-empty is matched exactly; an ABSENT or empty array defaults to `["record-created", "record-updated"]` (hub-service/service/record_trigger_events.go defaultRecordTriggerEventTypes) — NOT every record event. `record-patched` (a partial save) must be named explicitly to be received.',
       records_side:
-        'The publish is OPT-IN on the records side: records-service only republishes when the create/update body sets `completed: true` (or passes `test_flow`). A plain create fires nothing. See quiva-records-mcp get_records_reference("flow-triggers").',
+        'record_create republishes (as record-created) only when the body sets `completed: true` (or passes `test_flow`), and not with suppress_events - a plain create fires nothing. record_update republishes on any write that actually changes the record: the completed false->true transition publishes as record-updated (matching the default event_filter), any OTHER real change (data, folder, etc.) publishes as record-patched regardless of completed, and a no-op write or one with suppress_events publishes nothing. See quiva-records-mcp get_records_reference("flow-triggers").',
       test_flow:
         'create_record accepts `test_flow: { subject, run_id }`, which runs ONLY that flow and suppresses every configured trigger — the way to exercise a flow without a record config wired up. hub-service turns run_id into `ms.hub.run.<run_id>.<subject>` when it is not already a run subject.',
     },
@@ -673,6 +674,8 @@ export const NODE_TYPES = {
     required: ['id', 'node_type', 'subject', 'payload'],
     subject_is_allowlisted:
       'THE SUBJECT IS A CLOSED ALLOWLIST, not an arbitrary bus subject. providers.InvokeEndpoint (hub-service/providers/endpoint.go) checks the subject against data.AllowedEndpoints and returns "endpoint not allowed: <subject>"; publish refuses the same subjects up front (hub-service/validate/workflow.go). list_quiva_endpoints returns the list (hub-service/data/endpoints.go): microstrate.storage.* KV/object/stream operations, file-generator template-trigger, hub schedule-flow / unschedule-flow / scheduled-flows, email send/status, numbergen get.counter / put.increment / post.counter, accounts distribution-message and hub workflow-run, plus the entries the task and email nodes use. A flow cannot reach any other platform service this way. For a gap-free reference number use microstrate.numbergen.put.increment, which is compare-and-swap guarded; read back the counter name it returns, because the service normalises hyphens away.',
+    header_lift:
+      'Prefer the task node\'s list_tasks operation over this node on microstrate.workspaces.get.tasks (or any other subject whose declared fields are header-mapped) for a FILTERED lookup — see get_node_type_reference("task").operations.list_tasks. The lift moves a declared header field out of the payload onto its x-param-* (or x-param-query-*) header; a field the payload does not carry is simply not sent, and every other payload field passes through untouched. Only the task node performs this lift. A quiva-endpoint node strips every x-param-* header and adds none (hub-service/providers/endpoint.go endpointHeaders), so on microstrate.workspaces.get.tasks space_id and every filter in the payload are ignored: workspaces-service falls back to the \"default\" space and returns up to 300 of its tasks, unfiltered - the wrong space, silently. Use list_tasks.',
     nodeLevelProps: {
       subject: 'REQUIRED — endpoint subject, and it MUST be one of the allowlisted subjects from list_quiva_endpoints',
       options:
@@ -712,7 +715,7 @@ export const NODE_TYPES = {
       comment_task: 'Required: task_id, body. Optional: internal, mentions, reply_id, attachments.',
       complete_task_action: 'Required: task_id, action_id. Optional: done (default true; false unticks).',
       list_tasks:
-        'Required: space_id. Optional filters: folder and source (exact match), currency (exact, case-sensitive), value ("min,max"), expected_close ("from,to"), status, title (word search, not exact), archived, limit (default 300), offset. Filter on folder to find a task this flow created, so a replay updates it instead of creating a duplicate.',
+        'Required: space_id. Optional filters: folder and source (exact match), currency (exact, case-sensitive), value ("min,max"), expected_close ("from,to"), status, title (word search, not exact), archived, limit (default 300), offset. Filter on folder to find a task this flow created, so a replay updates it instead of creating a duplicate. Prefer this over a quiva-endpoint node on the same subject for a filtered lookup — see get_node_type_reference("quiva-endpoint").header_lift.',
       delete_task: 'Required: task_id. Optional: delete_subtasks (subtasks are NOT deleted with their parent unless set). Deletes permanently; archiving only hides.',
       delete_tasks_in_folder:
         'Required: space_id, plus folder OR contact (a blank pair is refused, not read as "every folder"). Deletes every task with that exact folder, archived ones included.',
