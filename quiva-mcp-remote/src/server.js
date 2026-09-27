@@ -147,7 +147,8 @@ export async function createApp(config = loadConfig(), { log = console.error } =
         if (req.method !== 'GET' && req.method !== 'HEAD') throw new HttpError(405, -32000, 'Method not allowed');
         return sendJson(res, 200, { ok: true });
       }
-      if (path !== '/mcp') return sendJson(res, 404, { error: 'not found' });
+      // cerberus rewrites the path to /<subdomain>/mcp before its proxy forwards it.
+      if (path !== '/mcp' && !path.endsWith('/mcp')) return sendJson(res, 404, { error: 'not found' });
 
       const retryAfter = limiter.take(clientIp(req, config.trustProxy));
       if (retryAfter) throw new HttpError(429, -32000, 'Too many requests', { 'Retry-After': String(retryAfter) });

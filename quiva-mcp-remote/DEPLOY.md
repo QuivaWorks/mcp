@@ -69,6 +69,27 @@ context.
   just closed and get a 502. If that shows up, raise it above 90000 rather than
   retrying in clients.
 
+## Staging: mapping in place (2026-09-27)
+
+- `/mcp` on gateway `lqTzBJz_D5ms` is created, read back and reloaded: subject
+  `ms.gateway.lqTzBJz_D5ms.mapping.*.mcp`, resource `http://127.0.0.1:8765`
+  (versions 1 and 2 both exist and are identical; proxy routing ignores them).
+- `method: "*"` works: before deploy the route answers 502 (no backend), unknown paths still 404.
+- Cerberus and the containers share the staging host, so the service binds loopback:
+  `HOST=127.0.0.1`, `PORT=8765`, `ALLOWED_HOSTS=127.0.0.1:8765`. No firewall rule needed.
+- Deploy config lives in evari-olympus `deploy/env/staging.env` (section 20, manifest
+  `DEPLOY_VARS_QUIVA_MCP_REMOTE`, `DEPLOY_CREDS_MODE_QUIVA_MCP_REMOTE=none`).
+- The service is deployed and `https://api.microstrate.io/mcp` answers 401 with a Bearer challenge.
+
+## Production: mapping in place (2026-09-27), service not yet deployed
+
+- `/mcp` on gateway `T41F4CcPZpws` is created, read back and reloaded: subject
+  `ms.gateway.T41F4CcPZpws.mapping.*.mcp`, resource `http://10.154.0.8:8765`, version 1 only.
+  It answers 502 until the container runs.
+- The container host is `temp-service` (10.154.0.8); cerberus runs on the gateway VMs
+  (10.154.0.5–.7). Bind `HOST=10.154.0.8`, `ALLOWED_HOSTS=10.154.0.8:8765`, and allow 8765
+  from the gateway VMs only. Config: evari-olympus `deploy/env/production.env` section 20.
+
 ## Runtime placement
 
 The mesh runs containers with `--network=host` on a VM's internal IP
