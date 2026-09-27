@@ -179,6 +179,16 @@ describe('HTTP guards', () => {
     }
   });
 
+  test('a gateway-prefixed path (/<subdomain>/mcp) is served; other paths 404', async () => {
+    const post = (p) => fetch(`${base}${p}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${API_KEY}` },
+      body: JSON.stringify(initialize),
+    });
+    assert.equal((await post('/api/mcp')).status, 200);
+    assert.equal((await post('/api/other')).status, 404);
+  });
+
   test('GET /healthz -> 200 {ok:true}', async () => {
     const res = await fetch(`${base}/healthz`);
     assert.equal(res.status, 200);
