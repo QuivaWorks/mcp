@@ -128,10 +128,12 @@ never fires — silently, with no error anywhere.
    record  — get_node_type_reference("trigger").record_trigger. Node id MUST
      be "record:<record_config_id>" (COLON — a legacy dotted form still
      dispatches for a handful of pre-existing nodes, but create/update now
-     reject a dot). records-service only republishes when the write sets
-     completed:true (or test_flow). event_type omitted defaults to
-     ["record-created","record-updated"], not every record event —
-     "record-patched" must be named explicitly.
+     reject a dot). record_create only republishes when the write sets
+     completed:true (or test_flow); record_update republishes on ANY real
+     change (record-patched), not only completed - the completed false->true
+     transition alone publishes as record-updated. event_type omitted
+     defaults to ["record-created","record-updated"], not every record event
+     — "record-patched" must be named explicitly to catch a plain data change.
    task — get_node_type_reference("trigger").task_trigger. Node id MUST be
      "task:<space_id>" (COLON, same reasoning as record — a dotted id splits
      into two subject tokens and breaks workflow-history's node lookup).
@@ -185,7 +187,9 @@ THREE THINGS NAMED "TASK" — pick the right one
 - task NODE (node_type: "task") — PERFORMS one of 13 task operations
   (create, update, comment, complete an action, find, delete, schedule a task
   event, ...) as a step inside an already-running flow. Egress.
-  get_node_type_reference("task").
+  get_node_type_reference("task"). Prefer its list_tasks operation over a
+  quiva-endpoint node for a FILTERED task lookup — see
+  get_node_type_reference("quiva-endpoint").header_lift.
 - task_schedule_create / schedule_task_event (quiva-workspaces-mcp; the
   space/task "Automation" UI section) — a per-task CRON TIMER with
   action_type: "flow". Fires at a scheduled time regardless of any task

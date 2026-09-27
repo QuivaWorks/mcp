@@ -4,9 +4,9 @@
   "config": {
     "nodes": [
       {
-        "id": "record.Deal",
+        "id": "record:Deal",
         "data": {
-          "id": "record.Deal",
+          "id": "record:Deal",
           "node_type": "trigger",
           "payload": {
             "record_config_id": "Deal",
@@ -210,7 +210,7 @@
     "edges": [
       {
         "id": "e_record_Deal_BUILD",
-        "source": "record.Deal",
+        "source": "record:Deal",
         "target": "BUILD"
       },
       {
