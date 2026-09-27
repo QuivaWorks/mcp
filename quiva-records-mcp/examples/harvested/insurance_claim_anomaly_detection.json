@@ -1,0 +1,509 @@
+{
+  "slug": "insurance_claim_anomaly_detection",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "config_id": "insurance_claim_anomaly_detection",
+    "harvested": "live record config (configs only — no record data)"
+  },
+  "featured": false,
+  "teaches": [
+    "required fields",
+    "enums",
+    "format: email",
+    "schema types: integer, number, object, string"
+  ],
+  "form_node_count": 0,
+  "config": {
+    "id": "insurance_claim_anomaly_detection",
+    "name": "Insurance Claim Anomaly Detection",
+    "description": "Record configuration for tracking and analyzing insurance claims for anomalies and fraud indicators in car insurance claims.",
+    "label": "Insurance Claim Anomaly Detection",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "anomaly_details": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Anomaly Details",
+              "placeholder": "Describe the specific anomalies that were detected"
+            }
+          },
+          "description": "Specific anomalies detected",
+          "type": "string",
+          "minLength": 1
+        },
+        "anomaly_type": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Anomaly Type",
+              "options": [
+                {
+                  "text": "Suspicious Pattern",
+                  "value": "Suspicious Pattern"
+                },
+                {
+                  "text": "Fraud Indicator",
+                  "value": "Fraud Indicator"
+                },
+                {
+                  "text": "Excessive Damage",
+                  "value": "Excessive Damage"
+                },
+                {
+                  "text": "Cost Anomaly",
+                  "value": "Cost Anomaly"
+                },
+                {
+                  "text": "Timeline Mismatch",
+                  "value": "Timeline Mismatch"
+                },
+                {
+                  "text": "Other",
+                  "value": "Other"
+                }
+              ]
+            }
+          },
+          "description": "Category of anomaly detected",
+          "type": "string",
+          "enum": [
+            "Suspicious Pattern",
+            "Fraud Indicator",
+            "Excessive Damage",
+            "Cost Anomaly",
+            "Timeline Mismatch",
+            "Other"
+          ]
+        },
+        "claim_amount": {
+          "display": {
+            "formatter": {
+              "props": {
+                "decimalPlace": 2
+              },
+              "type": "currency"
+            }
+          },
+          "ui": {
+            "inputType": "currency",
+            "props": {
+              "decimalPlace": 2,
+              "label": "Claim Amount",
+              "min": 0
+            }
+          },
+          "description": "The monetary value of the claim",
+          "type": "number",
+          "minimum": 0
+        },
+        "claim_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Claim ID",
+              "placeholder": "e.g., CLM-2024-001234"
+            }
+          },
+          "description": "Unique identifier for the insurance claim",
+          "type": "string"
+        },
+        "claimant_email": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Claimant Email",
+              "placeholder": "e.g., john.doe@example.com"
+            }
+          },
+          "description": "Contact email",
+          "type": "string",
+          "format": "email"
+        },
+        "claimant_name": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Claimant Name",
+              "placeholder": "e.g., John Doe"
+            }
+          },
+          "description": "Full name of the claimant",
+          "type": "string",
+          "minLength": 1
+        },
+        "date_created": {
+          "display": {
+            "formatter": {
+              "type": "date"
+            }
+          },
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Date Created"
+            }
+          },
+          "description": "Auto-generated creation date",
+          "type": "string"
+        },
+        "date_of_loss": {
+          "display": {
+            "formatter": {
+              "type": "date"
+            }
+          },
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Date of Loss"
+            }
+          },
+          "description": "When the incident occurred",
+          "type": "string"
+        },
+        "incident_description": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Incident Description",
+              "placeholder": "Provide a detailed account of what happened"
+            }
+          },
+          "description": "Detailed description of the claim",
+          "type": "string",
+          "minLength": 1
+        },
+        "incident_location": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Incident Location",
+              "placeholder": "e.g., 123 Main St, Springfield, IL"
+            }
+          },
+          "description": "Geographic location of the incident",
+          "type": "string",
+          "minLength": 1
+        },
+        "investigation_status": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Investigation Status",
+              "options": [
+                {
+                  "text": "Not Started",
+                  "value": "Not Started"
+                },
+                {
+                  "text": "In Progress",
+                  "value": "In Progress"
+                },
+                {
+                  "text": "On Hold",
+                  "value": "On Hold"
+                },
+                {
+                  "text": "Completed",
+                  "value": "Completed"
+                }
+              ]
+            }
+          },
+          "description": "Current status of the investigation",
+          "type": "string",
+          "enum": [
+            "Not Started",
+            "In Progress",
+            "On Hold",
+            "Completed"
+          ]
+        },
+        "investigator_notes": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Investigator Notes",
+              "placeholder": "Add internal notes about the investigation"
+            }
+          },
+          "description": "Internal notes from investigation",
+          "type": "string"
+        },
+        "last_updated": {
+          "display": {
+            "formatter": {
+              "type": "date"
+            }
+          },
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Last Updated"
+            }
+          },
+          "description": "Auto-generated last update date",
+          "type": "string"
+        },
+        "recommended_action": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Recommended Action",
+              "options": [
+                {
+                  "text": "Approve",
+                  "value": "Approve"
+                },
+                {
+                  "text": "Deny",
+                  "value": "Deny"
+                },
+                {
+                  "text": "Investigate Further",
+                  "value": "Investigate Further"
+                },
+                {
+                  "text": "Request Documentation",
+                  "value": "Request Documentation"
+                },
+                {
+                  "text": "Refer to Fraud Team",
+                  "value": "Refer to Fraud Team"
+                }
+              ]
+            }
+          },
+          "description": "Recommended action based on analysis",
+          "type": "string",
+          "enum": [
+            "Approve",
+            "Deny",
+            "Investigate Further",
+            "Request Documentation",
+            "Refer to Fraud Team"
+          ]
+        },
+        "risk_score": {
+          "ui": {
+            "inputType": "number",
+            "props": {
+              "helpText": {
+                "markdown": "Enter a value between 1-100. Higher scores indicate greater risk."
+              },
+              "label": "Risk Score",
+              "max": 100,
+              "min": 1
+            }
+          },
+          "description": "Fraud/anomaly risk level on 1-100 scale",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "supporting_evidence": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Supporting Evidence",
+              "placeholder": "e.g., Document IDs, URLs, or reference numbers"
+            }
+          },
+          "description": "Links or references to supporting documents",
+          "type": "string"
+        },
+        "vehicle_make_model": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Vehicle Make/Model",
+              "placeholder": "e.g., Toyota Camry"
+            }
+          },
+          "description": "Make and model of the vehicle",
+          "type": "string",
+          "minLength": 1
+        },
+        "vehicle_type": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Vehicle Type",
+              "options": [
+                {
+                  "text": "Sedan",
+                  "value": "Sedan"
+                },
+                {
+                  "text": "SUV",
+                  "value": "SUV"
+                },
+                {
+                  "text": "Truck",
+                  "value": "Truck"
+                },
+                {
+                  "text": "Motorcycle",
+                  "value": "Motorcycle"
+                },
+                {
+                  "text": "Other",
+                  "value": "Other"
+                }
+              ]
+            }
+          },
+          "description": "Type of vehicle involved in the claim",
+          "type": "string",
+          "enum": [
+            "Sedan",
+            "SUV",
+            "Truck",
+            "Motorcycle",
+            "Other"
+          ]
+        }
+      },
+      "required": [
+        "claim_id",
+        "claim_amount",
+        "date_of_loss",
+        "claimant_name",
+        "claimant_email",
+        "vehicle_type",
+        "vehicle_make_model",
+        "incident_description",
+        "incident_location",
+        "anomaly_type",
+        "risk_score",
+        "anomaly_details",
+        "recommended_action",
+        "investigation_status"
+      ]
+    },
+    "views": {
+      "form": {
+        "type": "grid",
+        "props": {
+          "gridTemplateColumns": "1fr 1fr",
+          "gap": 16
+        },
+        "children": [
+          {
+            "type": "field",
+            "field": "claim_id"
+          },
+          {
+            "type": "field",
+            "field": "claim_amount"
+          },
+          {
+            "type": "field",
+            "field": "date_of_loss"
+          },
+          {
+            "type": "field",
+            "field": "claimant_name"
+          },
+          {
+            "type": "field",
+            "field": "claimant_email"
+          },
+          {
+            "type": "field",
+            "field": "vehicle_type"
+          },
+          {
+            "type": "field",
+            "field": "vehicle_make_model"
+          },
+          {
+            "type": "field",
+            "field": "incident_location"
+          },
+          {
+            "type": "field",
+            "field": "incident_description"
+          },
+          {
+            "type": "field",
+            "field": "anomaly_type"
+          },
+          {
+            "type": "field",
+            "field": "risk_score"
+          },
+          {
+            "type": "field",
+            "field": "anomaly_details"
+          },
+          {
+            "type": "field",
+            "field": "supporting_evidence"
+          },
+          {
+            "type": "field",
+            "field": "recommended_action"
+          },
+          {
+            "type": "field",
+            "field": "investigation_status"
+          },
+          {
+            "type": "field",
+            "field": "investigator_notes"
+          },
+          {
+            "type": "field",
+            "field": "date_created"
+          },
+          {
+            "type": "field",
+            "field": "last_updated"
+          }
+        ]
+      },
+      "table": {
+        "type": "table",
+        "columns": [
+          {
+            "field": "claim_id",
+            "order": 1
+          },
+          {
+            "field": "claimant_name",
+            "order": 2
+          },
+          {
+            "field": "claim_amount",
+            "order": 3
+          },
+          {
+            "field": "date_of_loss",
+            "order": 4
+          },
+          {
+            "field": "anomaly_type",
+            "order": 5
+          },
+          {
+            "field": "risk_score",
+            "order": 6
+          },
+          {
+            "field": "recommended_action",
+            "order": 7
+          },
+          {
+            "field": "investigation_status",
+            "order": 8
+          }
+        ]
+      }
+    },
+    "created_at": "2026-06-02T12:55:32Z",
+    "updated_at": "2026-06-02T13:07:08Z"
+  }
+}

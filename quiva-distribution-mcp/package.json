@@ -1,0 +1,22 @@
+{
+  "name": "quiva-distribution-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Quiva product distribution: products, grants, invitations and their status (accounts-service)",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "quiva-distribution-mcp": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node test/validate.test.js && node test/tools.test.js",
+    "harvest": "node tools/harvest-examples.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.24.0"
+  }
+}

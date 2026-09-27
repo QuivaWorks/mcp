@@ -1,0 +1,231 @@
+{
+  "id": "occupation_config",
+  "name": "Occupation Rate Table",
+  "description": "Publisher-side (Antipodean) reference table, loaded by P22 from verticals/antipodean/reference/occupations.csv, which is Rates.csv normalised. 6363 occupations keyed by an 8-digit code; 3000 of them are eligible for no product at all and are carried so a broker searching one gets an honest refusal rather than a missing entry. Not written by a flow or a form. The per-product columns are flat rather than nested because the supplied sheet is flat and every one of them has to be independently queryable. The per-product question set and hazard class are payload only, NOT indexed: they carry a value on 5-53% of rows and the index has no negation, so declaring them would add 27,000 rows that answer no filter over a field while looking exactly like rows that do. They are read off the record the code lookup already fetched.",
+  "label": "Occupation",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "occupation_code": {
+        "type": "string",
+        "title": "Occupation code",
+        "description": "The natural key. gen_occupation stores THIS value, never the label (01-key-list.json system_keys S-06) \u2014 a wording change must not re-key every historical submission. identity_fields for the P22 loader job.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Occupation code"
+          }
+        }
+      },
+      "occupation_label": {
+        "type": "string",
+        "title": "Occupation label",
+        "description": "The second and last use of text_sortable in the whole vertical \u2014 a human-readable value both typed against and read down a list (contract artefact 2 \u00a72.1).",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Occupation label"
+          }
+        }
+      },
+      "occupation_category": {
+        "type": "string",
+        "description": "ANZSIC division, the two leading digits of occupation_code. 89 distinct values across the table; the P22 load uses it as the folder."
+      },
+      "occupation_active": {
+        "type": "string",
+        "title": "Occupation active",
+        "description": "ADDED BY ARTEFACT 1. A retired occupation cannot be deleted \u2014 bound policies reference it \u2014 so the lookup filters on this positive flag rather than on 'not retired'.",
+        "ui": {
+          "inputType": "toggle",
+          "props": {
+            "label": "Occupation active"
+          }
+        },
+        "enum": [
+          "true",
+          "false"
+        ]
+      },
+      "itpi_eligibility": {
+        "type": "string",
+        "description": "Information Technology Professional Indemnity. Rates.csv states eligibility as yes / no / REFER \u2014 three-valued, not a boolean. 209 occupations are Refer for a product they are otherwise quotable for, which is why this replaced product_code_list: a list of eligible products cannot carry Refer."
+      },
+      "itpi_question_set": {
+        "type": "string",
+        "description": "Information Technology Professional Indemnity: which block of QuestionSet_v1 the quote form renders for this occupation. The join between the rate table and the question set."
+      },
+      "itpi_hazard_class": {
+        "type": "string",
+        "description": "Information Technology Professional Indemnity: the rate table row. ITPI is numeric 1-20 (plus 99, whose rate is 1.0 for both sections and which is a sentinel, not a rate); Allied Health is AH01-AH15; General Property is EMPTY on every row of v1."
+      },
+      "itpi_min_excess": {
+        "type": "number",
+        "description": "Information Technology Professional Indemnity: minimum excess, in dollars."
+      },
+      "itpi_min_premium": {
+        "type": "number",
+        "description": "Information Technology Professional Indemnity: minimum premium, in dollars."
+      },
+      "itpi_default_limit_pi": {
+        "type": "number",
+        "description": "Default professional indemnity limit."
+      },
+      "itpi_default_ri_pi": {
+        "type": "string",
+        "description": "Default reinstatements on the PI limit."
+      },
+      "itpi_default_limit_ppl": {
+        "type": "number",
+        "description": "Default public and products liability limit."
+      },
+      "itpi_endorsements": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Information Technology Professional Indemnity: endorsement codes attaching automatically."
+      },
+      "itpi_wording": {
+        "type": "string",
+        "description": "Information Technology Professional Indemnity: policy wording code."
+      },
+      "ah_eligibility": {
+        "type": "string",
+        "description": "Allied Health. Rates.csv states eligibility as yes / no / REFER \u2014 three-valued, not a boolean. 209 occupations are Refer for a product they are otherwise quotable for, which is why this replaced product_code_list: a list of eligible products cannot carry Refer."
+      },
+      "ah_question_set": {
+        "type": "string",
+        "description": "Allied Health: which block of QuestionSet_v1 the quote form renders for this occupation. The join between the rate table and the question set."
+      },
+      "ah_hazard_class": {
+        "type": "string",
+        "description": "Allied Health: the rate table row. ITPI is numeric 1-20 (plus 99, whose rate is 1.0 for both sections and which is a sentinel, not a rate); Allied Health is AH01-AH15; General Property is EMPTY on every row of v1."
+      },
+      "ah_min_excess": {
+        "type": "number",
+        "description": "Allied Health: minimum excess, in dollars."
+      },
+      "ah_min_premium": {
+        "type": "number",
+        "description": "Allied Health: minimum premium, in dollars."
+      },
+      "ah_default_limit": {
+        "type": "string",
+        "description": "Allied Health default limits. A SENTENCE in the source \u2014 '$1m PI $10m PL' on every row \u2014 not an amount, so it is stored verbatim rather than split into two numbers we would be inventing."
+      },
+      "ah_endorsements": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Allied Health: endorsement codes attaching automatically."
+      },
+      "ah_wording": {
+        "type": "string",
+        "description": "Allied Health: policy wording code."
+      },
+      "gp_eligibility": {
+        "type": "string",
+        "description": "General Property. Rates.csv states eligibility as yes / no / REFER \u2014 three-valued, not a boolean. 209 occupations are Refer for a product they are otherwise quotable for, which is why this replaced product_code_list: a list of eligible products cannot carry Refer."
+      },
+      "gp_question_set": {
+        "type": "string",
+        "description": "General Property: which block of QuestionSet_v1 the quote form renders for this occupation. The join between the rate table and the question set."
+      },
+      "gp_hazard_class": {
+        "type": "string",
+        "description": "General Property: the rate table row. ITPI is numeric 1-20 (plus 99, whose rate is 1.0 for both sections and which is a sentinel, not a rate); Allied Health is AH01-AH15; General Property is EMPTY on every row of v1."
+      },
+      "gp_min_excess": {
+        "type": "number",
+        "description": "General Property: minimum excess, in dollars."
+      },
+      "gp_min_premium": {
+        "type": "number",
+        "description": "General Property: minimum premium, in dollars."
+      },
+      "gp_default_limit": {
+        "type": "number",
+        "description": "Default General Property limit."
+      },
+      "gp_endorsements": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "General Property: endorsement codes attaching automatically."
+      },
+      "gp_wording": {
+        "type": "string",
+        "description": "General Property: policy wording code."
+      }
+    }
+  },
+  "views": {
+    "table": {
+      "type": "table",
+      "columns": [
+        {
+          "field": "occupation_code",
+          "order": 0
+        },
+        {
+          "field": "occupation_label",
+          "order": 1
+        },
+        {
+          "field": "occupation_category",
+          "order": 2
+        },
+        {
+          "field": "itpi_eligibility",
+          "order": 3
+        },
+        {
+          "field": "ah_eligibility",
+          "order": 4
+        },
+        {
+          "field": "gp_eligibility",
+          "order": 5
+        },
+        {
+          "field": "occupation_active",
+          "order": 6
+        }
+      ]
+    }
+  },
+  "index_fields": [
+    {
+      "field": "occupation_code",
+      "type": "keyword"
+    },
+    {
+      "field": "occupation_label",
+      "type": "text_sortable"
+    },
+    {
+      "field": "occupation_category",
+      "type": "keyword"
+    },
+    {
+      "field": "occupation_active",
+      "type": "keyword"
+    },
+    {
+      "field": "itpi_eligibility",
+      "type": "keyword"
+    },
+    {
+      "field": "ah_eligibility",
+      "type": "keyword"
+    },
+    {
+      "field": "gp_eligibility",
+      "type": "keyword"
+    }
+  ]
+}

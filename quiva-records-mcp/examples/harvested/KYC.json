@@ -1,0 +1,287 @@
+{
+  "slug": "KYC",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "config_id": "KYC",
+    "harvested": "live record config (configs only — no record data)"
+  },
+  "featured": false,
+  "teaches": [
+    "required fields",
+    "format: date",
+    "enums",
+    "schema types: boolean, object, string"
+  ],
+  "form_node_count": 0,
+  "config": {
+    "id": "KYC",
+    "name": "KYC",
+    "description": "Know Your Customer / AML data capture and verification outcome for a client. Compliance fields are locked; advisors may add custom fields. Written by flows/kyc.json.",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "assessmentRationale": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Assessment Rationale"
+            }
+          },
+          "title": "Assessment Rationale",
+          "description": "Rationale recorded by the screening assessment (and advisor notes on manual review)",
+          "type": "string"
+        },
+        "beneficialOwners": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Beneficial Ownership"
+            }
+          },
+          "title": "Beneficial Ownership",
+          "description": "Beneficial owners where the client is an entity or trust; 'self' for individuals",
+          "type": "string"
+        },
+        "beneficialOwnershipConfirmed": {
+          "ui": {
+            "inputType": "checkbox",
+            "props": {
+              "label": "Beneficial Ownership Confirmed"
+            }
+          },
+          "title": "Beneficial Ownership Confirmed",
+          "description": "Beneficial ownership has been confirmed",
+          "type": "boolean"
+        },
+        "dob": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Date of Birth"
+            }
+          },
+          "title": "Date of Birth",
+          "description": "Date of birth (YYYY-MM-DD)",
+          "type": "string",
+          "format": "date"
+        },
+        "email": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Email"
+            }
+          },
+          "title": "Email",
+          "description": "Client contact email",
+          "type": "string"
+        },
+        "fullLegalName": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Full Legal Name"
+            }
+          },
+          "title": "Full Legal Name",
+          "description": "Client's full legal name as it appears on identity documents",
+          "type": "string"
+        },
+        "idDocumentNumber": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "ID Document Number"
+            }
+          },
+          "title": "ID Document Number",
+          "description": "Reference number of the identity document",
+          "type": "string"
+        },
+        "idDocumentType": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "ID Document Type"
+            }
+          },
+          "title": "ID Document Type",
+          "description": "Identity document used for verification",
+          "type": "string",
+          "enum": [
+            "passport",
+            "drivers_licence",
+            "national_id",
+            "other"
+          ]
+        },
+        "nationality": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Nationality"
+            }
+          },
+          "title": "Nationality",
+          "description": "Country of citizenship",
+          "type": "string"
+        },
+        "pepAssessment": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "PEP Assessment"
+            }
+          },
+          "title": "PEP Assessment",
+          "description": "Outcome of the PEP screening assessment",
+          "type": "string"
+        },
+        "pepSelfDeclared": {
+          "ui": {
+            "inputType": "checkbox",
+            "props": {
+              "label": "PEP (Self-Declared)"
+            }
+          },
+          "title": "PEP (Self-Declared)",
+          "description": "Client self-declared as a Politically Exposed Person",
+          "type": "boolean"
+        },
+        "residentialAddress": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Residential Address"
+            }
+          },
+          "title": "Residential Address",
+          "description": "Current residential address",
+          "type": "string"
+        },
+        "riskRating": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Risk Rating"
+            }
+          },
+          "title": "Risk Rating",
+          "description": "Assessed AML risk rating",
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "sanctionsCheckStatus": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Sanctions Check"
+            }
+          },
+          "title": "Sanctions Check",
+          "description": "Outcome of the sanctions list screening",
+          "type": "string",
+          "enum": [
+            "not_run",
+            "clear",
+            "potential_match",
+            "match"
+          ]
+        },
+        "sanctionsMatchSummary": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Sanctions Match Summary"
+            }
+          },
+          "title": "Sanctions Match Summary",
+          "description": "Summary of any sanctions list matches and their disposition",
+          "type": "string"
+        },
+        "screeningReference": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Screening Reference"
+            }
+          },
+          "title": "Screening Reference",
+          "description": "Flow run id of the screening execution, for audit",
+          "type": "string"
+        },
+        "sourceOfFunds": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Source of Funds"
+            }
+          },
+          "title": "Source of Funds",
+          "description": "Declared source of funds / wealth",
+          "type": "string"
+        },
+        "sourceOfFundsVerified": {
+          "ui": {
+            "inputType": "checkbox",
+            "props": {
+              "label": "Source of Funds Verified"
+            }
+          },
+          "title": "Source of Funds Verified",
+          "description": "Source of funds has been verified",
+          "type": "boolean"
+        },
+        "verificationMethod": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Verification Method"
+            }
+          },
+          "title": "Verification Method",
+          "description": "How identity was verified",
+          "type": "string",
+          "enum": [
+            "electronic",
+            "documentary",
+            "advisor_in_person",
+            "chatbot_assisted"
+          ]
+        },
+        "verificationStatus": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Verification Status"
+            }
+          },
+          "title": "Verification Status",
+          "description": "Current KYC verification state. Set by flows/kyc.json.",
+          "type": "string",
+          "enum": [
+            "pending",
+            "in_progress",
+            "review",
+            "verified",
+            "failed"
+          ]
+        }
+      },
+      "required": [
+        "fullLegalName",
+        "dob",
+        "residentialAddress",
+        "sourceOfFunds",
+        "verificationStatus"
+      ]
+    },
+    "created_at": "2026-07-14T14:28:32Z",
+    "updated_at": "2026-07-14T14:28:32Z"
+  }
+}

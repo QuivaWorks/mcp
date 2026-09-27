@@ -1,0 +1,37 @@
+{
+  "config_id": "zz_fs_demo_clone",
+  "data": {
+    "financial_situation_id": "FS-DEMO-0001",
+    "client_id": "FACLIENT-DEMO-01",
+    "status": "active",
+    "jurisdiction": "australia",
+    "kyc_status": "verified",
+    "aml_status": "verified",
+    "kyc_verification_date": "2026-06-30",
+    "kyc_provider": "Onfido",
+    "total_assets": 1250000,
+    "total_liabilities": 320000,
+    "net_worth": 930000,
+    "liquid_assets": 180000,
+    "employment_status": "employed",
+    "investment_experience": "moderate",
+    "risk_profile": "balanced",
+    "relationship_status": "married",
+    "dependents": [
+      {
+        "name": "Ada Doe",
+        "date_of_birth": "2015-04-12",
+        "relationship": "child"
+      },
+      {
+        "name": "Sam Doe",
+        "date_of_birth": "2018-09-03",
+        "relationship": "child"
+      }
+    ],
+    "created_date": "2026-07-27",
+    "created_by": "someone@example.invalid",
+    "last_modified_date": "2026-07-27",
+    "last_modified_by": "someone@example.invalid"
+  }
+}

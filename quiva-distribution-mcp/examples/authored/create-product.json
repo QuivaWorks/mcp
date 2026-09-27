@@ -1,0 +1,19 @@
+{
+  "slug": "create-product",
+  "of": "product",
+  "teaches": "The create_product WRITE body. Every action key is one of record_configs; one button per type per record set; only \"create\" and \"list\" pass the current engine check. version, publisher_account_id and published_at are the service's and are never sent.",
+  "payload": {
+    "code": "support-plan",
+    "name": "Support plan",
+    "active": true,
+    "record_configs": [
+      { "id": "support_request_config", "label": "Requests" }
+    ],
+    "actions": {
+      "support_request_config": [
+        { "type": "create", "label": "New request" },
+        { "type": "list", "label": "All requests" }
+      ]
+    }
+  }
+}

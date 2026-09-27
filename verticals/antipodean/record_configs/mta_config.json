@@ -1,0 +1,205 @@
+{
+  "id": "mta_config",
+  "name": "MTA",
+  "description": "Publisher-side (Antipodean). Mid-term adjustment to a bound policy. Spec \u00a75.5 is one sentence \u2014 under-specified (plan \u00a76.1); mta_status and change_description are wave-1 authored pending a fuller spec.",
+  "label": "MTA",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "mta_reference": {
+        "type": "string",
+        "title": "MTA reference",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "MTA reference"
+          }
+        }
+      },
+      "policy_number": {
+        "type": "string",
+        "title": "Policy number",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Policy number"
+          }
+        }
+      },
+      "policy_id": {
+        "type": "string",
+        "title": "Policy id (record id)",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Policy id (record id)"
+          }
+        }
+      },
+      "broker_id": {
+        "type": "string",
+        "title": "Broker id (distributor account id)",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Broker id (distributor account id)"
+          }
+        }
+      },
+      "mta_status": {
+        "type": "string",
+        "title": "MTA status",
+        "description": "Flow 8 asks for DRAFT or REFERRED as an explicit OR, never 'not BOUND' (contract artefact 2 limits.L1). Under-specified in spec \u00a75.5 (plan \u00a76.1) \u2014 this vocabulary is wave-1 authored, matching policy_config.mta_state's transitions.",
+        "enum": [
+          "DRAFT",
+          "REFERRED",
+          "BOUND",
+          "DECLINED"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "MTA status",
+            "options": [
+              {
+                "text": "Draft",
+                "value": "DRAFT"
+              },
+              {
+                "text": "Referred",
+                "value": "REFERRED"
+              },
+              {
+                "text": "Bound",
+                "value": "BOUND"
+              },
+              {
+                "text": "Declined",
+                "value": "DECLINED"
+              }
+            ]
+          }
+        }
+      },
+      "effective_date": {
+        "type": "string",
+        "title": "Effective date",
+        "description": "'bound on the expiring term after T-100' is a date window over this field.",
+        "format": "date-time",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Effective date"
+          }
+        }
+      },
+      "revision_index": {
+        "type": "number",
+        "title": "Revision index",
+        "minimum": 0,
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Revision index"
+          }
+        }
+      },
+      "premium_adjustment": {
+        "type": "number",
+        "title": "Premium adjustment",
+        "description": "Net written premium is bound premium plus MTA adjustments minus cancellation refunds (contract artefact 2).",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Premium adjustment"
+          }
+        }
+      },
+      "change_description": {
+        "type": "string",
+        "title": "Change description",
+        "description": "Wave-1 authored \u2014 spec \u00a75.5 is one sentence (plan \u00a76.1: 'under-specified'). What changed, in the broker's or underwriter's words.",
+        "ui": {
+          "inputType": "textarea",
+          "props": {
+            "label": "Change description"
+          }
+        }
+      }
+    }
+  },
+  "views": {
+    "table": {
+      "type": "table",
+      "columns": [
+        {
+          "field": "mta_reference",
+          "order": 0
+        },
+        {
+          "field": "policy_number",
+          "order": 1
+        },
+        {
+          "field": "policy_id",
+          "order": 2
+        },
+        {
+          "field": "broker_id",
+          "order": 3
+        },
+        {
+          "field": "mta_status",
+          "order": 4
+        },
+        {
+          "field": "effective_date",
+          "order": 5
+        },
+        {
+          "field": "revision_index",
+          "order": 6
+        },
+        {
+          "field": "premium_adjustment",
+          "order": 7
+        }
+      ]
+    }
+  },
+  "index_fields": [
+    {
+      "field": "mta_reference",
+      "type": "keyword"
+    },
+    {
+      "field": "policy_number",
+      "type": "keyword"
+    },
+    {
+      "field": "policy_id",
+      "type": "keyword"
+    },
+    {
+      "field": "broker_id",
+      "type": "keyword"
+    },
+    {
+      "field": "mta_status",
+      "type": "keyword"
+    },
+    {
+      "field": "effective_date",
+      "type": "datetime"
+    },
+    {
+      "field": "revision_index",
+      "type": "numeric"
+    },
+    {
+      "field": "premium_adjustment",
+      "type": "numeric"
+    }
+  ]
+}

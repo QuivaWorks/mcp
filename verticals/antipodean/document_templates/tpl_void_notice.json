@@ -1,0 +1,30 @@
+{
+  "key": "tpl_void_notice",
+  "label": "Notice of Voidance",
+  "source": {
+    "key": "obj://microstrate-documents/antipodean.tpl_void_notice.docx",
+    "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  },
+  "output": {
+    "name": "void-notice-{policy_number}",
+    "content_type": "application/pdf",
+    "bucket": "microstrate-documents",
+    "folder": "antipodean.policies"
+  },
+  "_notes": {
+    "source_file": "tpl_void_notice.docx sits beside this config in the repo. It is NOT deployed by the vertical \u2014 only this config is. Upload the DOCX to the target account first with a POST (not PUT) to /api/default-storage/object/microstrate-documents/antipodean.tpl_void_notice.docx; a PUT returns 200 and stores nothing.",
+    "placeholders": [
+      "inception_date",
+      "outstanding_invoice_number",
+      "policy_number"
+    ],
+    "scalar_tags": [
+      "{inception_date}",
+      "{outstanding_invoice_number}",
+      "{policy_number}"
+    ],
+    "loop_arrays": [],
+    "payload_contract": "A trigger payload MUST supply every scalar key below and, for each loop, an array under the loop's own name. Any placeholder with no matching key renders as an EMPTY STRING, silently, and the job still reports success (docxtemplater nullGetter -> ''). Names are exactly as extracted from the committed .docx by verify_merge_tags.py; re-extract after ANY edit to the DOCX \u2014 never hand-edit this list.",
+    "source_record": "policy_config (policy_number, inception_date) + invoice_config (invoice_number, joined via policy_id), read by flow 4 policy-void at the day-61 timer."
+  }
+}

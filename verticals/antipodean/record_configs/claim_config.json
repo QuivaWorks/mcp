@@ -1,0 +1,647 @@
+{
+ "id": "claim_config",
+ "name": "Claim",
+ "description": "Publisher-side (Antipodean) \u2014 open questions OQ-17 and OQ-10 not yet settled (is claims lodgement distributor-side or publisher-side); see contract artefact 2 \u00a76. Needs the uploader input type for documents (plan \u00a76.1).",
+ "label": "Claim",
+ "schema": {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+   "claim_number": {
+    "type": "string",
+    "title": "Claim number",
+    "ui": {
+     "inputType": "text",
+     "props": {
+      "label": "Claim number"
+     }
+    }
+   },
+   "policy_number": {
+    "type": "string",
+    "title": "Policy number",
+    "ui": {
+     "inputType": "text",
+     "props": {
+      "label": "Policy number"
+     }
+    }
+   },
+   "policy_id": {
+    "type": "string",
+    "title": "Policy id (record id)",
+    "ui": {
+     "inputType": "text",
+     "props": {
+      "label": "Policy id (record id)"
+     }
+    }
+   },
+   "broker_id": {
+    "type": "string",
+    "title": "Broker id (distributor account id)",
+    "ui": {
+     "inputType": "text",
+     "props": {
+      "label": "Broker id (distributor account id)"
+     }
+    }
+   },
+   "product_code": {
+    "type": "string",
+    "title": "Product code",
+    "ui": {
+     "inputType": "text",
+     "props": {
+      "label": "Product code"
+     }
+    }
+   },
+   "claim_status": {
+    "type": "string",
+    "title": "Claim status",
+    "description": "Vocabulary per spec \u00a74.7's claims lifecycle.",
+    "enum": [
+     "NOTIFIED",
+     "UNDER_REVIEW",
+     "AWAITING_INFORMATION",
+     "SETTLED",
+     "CLOSED",
+     "DECLINED"
+    ],
+    "ui": {
+     "inputType": "dropdown",
+     "props": {
+      "label": "Claim status",
+      "options": [
+       {
+        "text": "Notified",
+        "value": "NOTIFIED"
+       },
+       {
+        "text": "Under Review",
+        "value": "UNDER_REVIEW"
+       },
+       {
+        "text": "Awaiting Information",
+        "value": "AWAITING_INFORMATION"
+       },
+       {
+        "text": "Settled",
+        "value": "SETTLED"
+       },
+       {
+        "text": "Closed",
+        "value": "CLOSED"
+       },
+       {
+        "text": "Declined",
+        "value": "DECLINED"
+       }
+      ]
+     }
+    }
+   },
+   "claim_open": {
+    "type": "string",
+    "title": "Claim open",
+    "description": "ADDED BY ARTEFACT 1. 'Any open claims' (canc_open_claims, and the cancellation referral check) is 'not SETTLED and not CLOSED' \u2014 two negations. This is the positive form, and it is the field the cancellation flow reads.",
+    "enum": [
+     "true",
+     "false"
+    ],
+    "ui": {
+     "inputType": "dropdown",
+     "props": {
+      "label": "Claim open",
+      "options": [
+       {
+        "text": "True",
+        "value": "true"
+       },
+       {
+        "text": "False",
+        "value": "false"
+       }
+      ]
+     }
+    }
+   },
+   "date_notified": {
+    "type": "string",
+    "title": "Date notified",
+    "format": "date-time",
+    "ui": {
+     "inputType": "date",
+     "props": {
+      "label": "Date notified"
+     }
+    }
+   },
+   "date_of_loss": {
+    "type": "string",
+    "title": "Date of loss",
+    "format": "date-time",
+    "ui": {
+     "inputType": "date",
+     "props": {
+      "label": "Date of loss"
+     }
+    }
+   },
+   "estimated_loss": {
+    "type": "number",
+    "title": "Estimated loss",
+    "minimum": 0,
+    "ui": {
+     "inputType": "text",
+     "props": {
+      "label": "Estimated loss"
+     }
+    }
+   },
+   "claimant_details": {
+    "type": "string",
+    "title": "Claimant details",
+    "description": "Free text \u2014 no named query consumer and no mid-string search exists to make one useful (contract artefact 2 \u00a75).",
+    "ui": {
+     "inputType": "textarea",
+     "props": {
+      "label": "Claimant details"
+     }
+    }
+   },
+   "incident_description": {
+    "type": "string",
+    "title": "Incident description",
+    "description": "Free text \u2014 no named query consumer (contract artefact 2 \u00a75).",
+    "ui": {
+     "inputType": "textarea",
+     "props": {
+      "label": "Incident description"
+     }
+    }
+   },
+   "documents": {
+    "type": "array",
+    "title": "Documents",
+    "description": "FNOL attachments and supporting documents. Uploader input type (plan \u00a76.1). Uploaded through the gateway \u2014 plan \u00a71.8 'documents cross inbound too'. Not indexable (array).",
+    "items": {
+     "type": "object",
+     "properties": {
+      "object_key": {
+       "type": "string",
+       "title": "Object store key",
+       "ui": {
+        "inputType": "text",
+        "props": {
+         "label": "Object store key"
+        }
+       }
+      },
+      "file_name": {
+       "type": "string",
+       "title": "File name",
+       "ui": {
+        "inputType": "text",
+        "props": {
+         "label": "File name"
+        }
+       }
+      },
+      "content_type": {
+       "type": "string",
+       "title": "Content type",
+       "ui": {
+        "inputType": "text",
+        "props": {
+         "label": "Content type"
+        }
+       }
+      }
+     }
+    },
+    "ui": {
+     "inputType": "array",
+     "props": {
+      "label": "Documents"
+     }
+    }
+   }
+  }
+ },
+ "views": {
+  "table": {
+   "type": "table",
+   "columns": [
+    {
+     "field": "claim_number",
+     "order": 0
+    },
+    {
+     "field": "policy_number",
+     "order": 1
+    },
+    {
+     "field": "broker_id",
+     "order": 2
+    },
+    {
+     "field": "product_code",
+     "order": 3
+    },
+    {
+     "field": "claim_status",
+     "order": 4
+    },
+    {
+     "field": "claim_open",
+     "order": 5
+    },
+    {
+     "field": "date_notified",
+     "order": 6
+    },
+    {
+     "field": "date_of_loss",
+     "order": 7
+    },
+    {
+     "field": "estimated_loss",
+     "order": 8
+    }
+   ]
+  },
+  "forms": [
+   {
+    "id": "default",
+    "title": "Claim",
+    "layout": {
+     "type": "grid",
+     "props": {
+      "gridTemplateColumns": "1fr",
+      "gap": 16
+     },
+     "children": [
+      {
+       "type": "grid",
+       "props": {
+        "gridTemplateColumns": "1fr 1fr 1fr 1fr"
+       },
+       "children": [
+        {
+         "type": "field",
+         "field": "claim_number",
+         "inputType": "text",
+         "props": {
+          "label": "Claim number"
+         },
+         "rules": [
+          {
+           "id": "claim_number.readonly",
+           "property": "readonly",
+           "logic": true,
+           "description": "Minted by the claim-intake flow from the claim request; not edited by hand."
+          }
+         ]
+        },
+        {
+         "type": "field",
+         "field": "policy_number",
+         "inputType": "text",
+         "props": {
+          "label": "Policy number"
+         },
+         "rules": [
+          {
+           "id": "policy_number.readonly",
+           "property": "readonly",
+           "logic": true,
+           "description": "Copied from the policy by the claim-intake flow; not edited by hand."
+          }
+         ]
+        },
+        {
+         "type": "field",
+         "field": "broker_id",
+         "inputType": "text",
+         "props": {
+          "label": "Broker id (distributor account id)"
+         },
+         "rules": [
+          {
+           "id": "broker_id.readonly",
+           "property": "readonly",
+           "logic": true,
+           "description": "Copied by the claim-intake flow; not edited by hand."
+          }
+         ]
+        },
+        {
+         "type": "field",
+         "field": "product_code",
+         "inputType": "text",
+         "props": {
+          "label": "Product code"
+         },
+         "rules": [
+          {
+           "id": "product_code.readonly",
+           "property": "readonly",
+           "logic": true,
+           "description": "Copied by the claim-intake flow; not edited by hand."
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "grid",
+       "props": {
+        "gridTemplateColumns": "1fr 1fr"
+       },
+       "children": [
+        {
+         "type": "field",
+         "field": "date_notified",
+         "inputType": "date",
+         "props": {
+          "label": "Date notified"
+         },
+         "rules": [
+          {
+           "id": "date_notified.readonly",
+           "property": "readonly",
+           "logic": true,
+           "description": "Stamped by the claim-intake flow; not edited by hand."
+          }
+         ]
+        },
+        {
+         "type": "field",
+         "field": "date_of_loss",
+         "inputType": "date",
+         "props": {
+          "label": "Date of loss"
+         },
+         "rules": [
+          {
+           "id": "date_of_loss.readonly",
+           "property": "readonly",
+           "logic": true,
+           "description": "Copied from the FNOL request by the claim-intake flow; not edited by hand."
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "grid",
+       "props": {
+        "gridTemplateColumns": "1fr 1fr"
+       },
+       "children": [
+        {
+         "type": "field",
+         "field": "claim_status",
+         "inputType": "dropdown",
+         "props": {
+          "label": "Claim status",
+          "options": [
+           {
+            "text": "Notified",
+            "value": "NOTIFIED"
+           },
+           {
+            "text": "Under Review",
+            "value": "UNDER_REVIEW"
+           },
+           {
+            "text": "Awaiting Information",
+            "value": "AWAITING_INFORMATION"
+           },
+           {
+            "text": "Settled",
+            "value": "SETTLED"
+           },
+           {
+            "text": "Closed",
+            "value": "CLOSED"
+           },
+           {
+            "text": "Declined",
+            "value": "DECLINED"
+           }
+          ]
+         },
+         "rules": [
+          {
+           "id": "claim_status.required",
+           "property": "required",
+           "logic": true,
+           "description": "The claims handling team must drive this through its lifecycle."
+          }
+         ]
+        },
+        {
+         "type": "field",
+         "field": "claim_open",
+         "inputType": "dropdown",
+         "props": {
+          "label": "Claim open",
+          "options": [
+           {
+            "text": "True",
+            "value": "true"
+           },
+           {
+            "text": "False",
+            "value": "false"
+           }
+          ]
+         },
+         "rules": [
+          {
+           "id": "claim_open.value",
+           "property": "value",
+           "logic": {
+            "if": [
+             {
+              "in": [
+               {
+                "var": "claim_status"
+               },
+               [
+                "SETTLED",
+                "CLOSED",
+                "DECLINED"
+               ]
+              ]
+             },
+             "false",
+             "true"
+            ]
+           },
+           "description": "Derived from claim status: false once SETTLED, CLOSED or DECLINED, true otherwise \u2014 this is the field the cancellation flow reads, so it must never drift from claim_status by hand-editing."
+          },
+          {
+           "id": "claim_open.readonly",
+           "property": "readonly",
+           "logic": true,
+           "description": "Derived from claim_status; not edited by hand."
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "grid",
+       "props": {
+        "gridTemplateColumns": "1fr"
+       },
+       "children": [
+        {
+         "type": "field",
+         "field": "estimated_loss",
+         "inputType": "number",
+         "props": {
+          "label": "Estimated loss",
+          "min": 0
+         }
+        }
+       ]
+      },
+      {
+       "type": "grid",
+       "props": {
+        "gridTemplateColumns": "1fr"
+       },
+       "children": [
+        {
+         "type": "field",
+         "field": "incident_description",
+         "inputType": "textarea",
+         "props": {
+          "label": "Incident description"
+         }
+        }
+       ]
+      },
+      {
+       "type": "grid",
+       "props": {
+        "gridTemplateColumns": "1fr"
+       },
+       "children": [
+        {
+         "type": "field",
+         "field": "claimant_details",
+         "inputType": "textarea",
+         "props": {
+          "label": "Claimant details"
+         }
+        }
+       ]
+      },
+      {
+       "type": "grid",
+       "props": {
+        "gridTemplateColumns": "1fr"
+       },
+       "children": [
+        {
+         "type": "array-field",
+         "field": "documents",
+         "props": {
+          "label": "Documents",
+          "itemLabel": "Document"
+         },
+         "children": [
+          {
+           "type": "grid",
+           "props": {
+            "gridTemplateColumns": "2fr 2fr 1fr"
+           },
+           "children": [
+            {
+             "type": "field",
+             "field": "file_name",
+             "inputType": "text",
+             "props": {
+              "label": "File name"
+             }
+            },
+            {
+             "type": "field",
+             "field": "object_key",
+             "inputType": "text",
+             "props": {
+              "label": "Object store key"
+             },
+             "rules": [
+              {
+               "id": "object_key.readonly",
+               "property": "readonly",
+               "logic": true,
+               "description": "Set by the upload mechanism once the file lands in the object store; not typed by hand."
+              }
+             ]
+            },
+            {
+             "type": "field",
+             "field": "content_type",
+             "inputType": "text",
+             "props": {
+              "label": "Content type"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   }
+  ]
+ },
+ "index_fields": [
+  {
+   "field": "claim_number",
+   "type": "keyword"
+  },
+  {
+   "field": "policy_number",
+   "type": "keyword"
+  },
+  {
+   "field": "broker_id",
+   "type": "keyword"
+  },
+  {
+   "field": "product_code",
+   "type": "keyword"
+  },
+  {
+   "field": "claim_status",
+   "type": "keyword"
+  },
+  {
+   "field": "claim_open",
+   "type": "keyword"
+  },
+  {
+   "field": "date_notified",
+   "type": "datetime"
+  },
+  {
+   "field": "date_of_loss",
+   "type": "datetime"
+  },
+  {
+   "field": "estimated_loss",
+   "type": "numeric"
+  }
+ ]
+}

@@ -1,0 +1,48 @@
+{
+  "slug": "agent-unusual-agent-type",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "subject": "ms.hub.config.agent.annie",
+    "path_id": "annie",
+    "name": "Annie",
+    "harvested_from": "GET /hub/agent"
+  },
+  "teaches": [
+    "agent_type is NOT the closed enum the docs describe — this live value is outside { \"\", \"deep-research\" }"
+  ],
+  "facts": [
+    "llm_provider \"claude\" / model \"claude-haiku-4-5\"",
+    "shared: \"team\"",
+    "llm_config: {\"temperature\":0.2,\"max_tokens\":64000,\"max_turns\":6}"
+  ],
+  "config": {
+    "name": "Annie",
+    "agent_type": "annie",
+    "llm_provider": "claude",
+    "model": "claude-haiku-4-5",
+    "has_tools": true,
+    "timeout": 300,
+    "context_limit": 50000,
+    "message_history_limit": 200,
+    "prompt": "",
+    "llm_config": {
+      "temperature": 0.2,
+      "max_tokens": 64000,
+      "max_turns": 6
+    },
+    "ai_smart_context": true,
+    "ai_summary_threshold": 0.7,
+    "ai_summary_model": "claude-3-5-sonnet-20241022",
+    "preserve_most_recent": 5,
+    "ai_prompt": false,
+    "alias": "annie",
+    "await": true,
+    "id": "JIwnnH5U9ABCShS9dJzPw",
+    "agent_template_subject": "ms.hub.config.agent.annie",
+    "api_key_source": "system",
+    "shared": "team",
+    "owner": "",
+    "global_instructions": false,
+    "global_knowledge": false
+  }
+}

@@ -1,0 +1,131 @@
+{
+  "slug": "review-board",
+  "kind": "write-payloads",
+  "not_evidence": "HAND-WRITTEN. Every harvested example is a READ response and therefore carries server-set fields (owner, created_at, url, and on a task watchers/muted/subtasks/task_actions). This example exists because a create/update body is a DIFFERENT shape from a read: build it from scratch, never echo a GET back. It is not proof the platform accepts it — tools/push-example.mjs is.",
+  "teaches": [
+    "create_space: id must be ^\\w+$ and is UPPERCASED server-side, so reference the space (and its task ids) by the uppercase form",
+    "statuses[] carry the board's presentation fields (color, order, complete, is_visible) and a `role` — automation moves tasks by role, never by literal id",
+    "each role is unique in the space, and a terminal role (done, lost) sits on a complete status",
+    "priorities[] need icon + icon_type + icon_color together — priorityIconClass() reads icon_type unconditionally",
+    "base_record names the record config contacts are keyed on; create_login_on_create stays false unless you mean to hand every contact a portal sign-in",
+    "create_task: the id is SERVER-GENERATED as {SPACEID}-{n}; status/priority are ids from THAT space",
+    "time is logged with add_time_log, one entry per call — the server mints the id, stamps the user and timestamps, and hydrates spent/remaining/progress onto the task",
+    "a task action write recomputes the task status by role: none done -> todo, some -> working, all -> done",
+    "a sub-task is a task with `parent`; one level deep",
+    "create_contact and create_task `identity` land the same person on one folder"
+  ],
+  "space": {
+    "id": "mcp_test_review_board",
+    "name": "Content Review (MCP test)",
+    "description": "Authored by quiva-workspaces-mcp to verify board rendering end to end.",
+    "default_status": "awaiting_info",
+    "statuses": [
+      { "id": "awaiting_info", "name": "Awaiting Info", "color": "#9ca3af", "order": 10, "complete": false, "is_visible": true, "role": "todo" },
+      { "id": "in_review", "name": "In Review", "color": "#3b82f6", "order": 20, "complete": false, "is_visible": true, "role": "working" },
+      { "id": "escalated", "name": "Escalated", "color": "#eab308", "order": 30, "complete": false, "is_visible": true },
+      { "id": "approved", "name": "Approved", "color": "#22c55e", "order": 40, "complete": true, "is_visible": true, "role": "done" },
+      { "id": "rejected", "name": "Rejected", "color": "#DC2626", "order": 50, "complete": true, "is_visible": true, "role": "lost" }
+    ],
+    "priorities": [
+      { "id": "routine", "name": "Routine", "icon": "angle-down", "icon_type": "light", "icon_color": "#1E3A8A" },
+      { "id": "standard", "name": "Standard", "icon": "equals", "icon_type": "light", "icon_color": "#e8b800", "default": true },
+      { "id": "urgent", "name": "Urgent", "icon": "angles-up", "icon_type": "light", "icon_color": "#DC2626" }
+    ],
+    "tags": [
+      { "id": "large_change", "name": "Large Change", "color": "#DC2626" },
+      { "id": "new_request", "name": "New Request", "color": "#22c55e" }
+    ],
+    "base_record": {
+      "config_id": "Client",
+      "identity_fields": ["email"],
+      "display_fields": ["first_name", "last_name"],
+      "label": "Contact",
+      "create_login_on_create": false,
+      "enable_distribution": false
+    }
+  },
+  "task": {
+    "space_id": "MCP_TEST_REVIEW_BOARD",
+    "title": "Review the Q3 supplier onboarding checklist",
+    "description": "Check every figure against its source before the checklist is published.",
+    "status": "in_review",
+    "priority": "urgent",
+    "due_date": "2026-10-15T00:00:00Z",
+    "tags": ["large_change"],
+    "time_tracking": { "estimate": { "time_in_seconds": 7200 } },
+    "_people_note": "assignees[] and reporter are USER UUIDs resolved from list_users — placeholders here so a shipped example carries nobody's identity. tools/push-example.mjs substitutes real accounts before sending, matched on email.",
+    "assignees": ["00000000-0000-0000-0000-000000000000"],
+    "reporter": "00000000-0000-0000-0000-000000000001"
+  },
+  "subtask": {
+    "space_id": "MCP_TEST_REVIEW_BOARD",
+    "title": "Confirm the contract dates with the supplier",
+    "_parent_note": "tools/push-example.mjs sets `parent` to the task created above."
+  },
+  "time_logs": [
+    {
+      "time_spent": { "time_in_seconds": 3600 },
+      "started_at": "2026-07-29T09:00:00Z",
+      "description": "Read the checklist and listed the figures to check"
+    },
+    {
+      "time_spent": { "time_in_seconds": 1800 },
+      "started_at": "2026-07-29T13:00:00Z",
+      "description": "Checked the figures against the source documents"
+    }
+  ],
+  "task_action": {
+    "id": "ta_check_source_figures",
+    "description": "Check the source before quoting any figure in the checklist",
+    "done": false,
+    "resources": [
+      {
+        "resource_id": "project_brief",
+        "resource_type": "record-config",
+        "metadata": { "note": "record the checked source here" }
+      }
+    ]
+  },
+  "contact": {
+    "space_id": "MCP_TEST_REVIEW_BOARD",
+    "first_name": "Mcp",
+    "last_name": "Test Contact",
+    "email": "mcp-test-contact@example.com"
+  },
+  "identity_task": {
+    "space_id": "MCP_TEST_REVIEW_BOARD",
+    "title": "Follow up with the new contact",
+    "identity": { "email": "mcp-test-contact@example.com" }
+  },
+  "comment": {
+    "body": "Checked the figures against the brief. Escalating for sign-off by the operations manager."
+  },
+  "reaction": { "reaction": { "👀": true } },
+  "reaction_key_must_be_a_real_emoji": {
+    "was_wrong": "An earlier version of this example used { \"eyes\": true } — a shortcode NAME. It shipped to staging, where the comment showed a broken reaction until it was corrected.",
+    "why": "The reaction key is stored VERBATIM and rendered as-is. Nothing on the platform converts a shortcode name into a glyph.",
+    "verified_live": "2026-07-30 on comment c_EjFPH9ZyI5. Posting { \"eyes\": true } stored the literal string; posting { \"👀\": true } stored and rendered the emoji.",
+    "fix": "Pass the emoji character itself. validate_payload ERRORS on a non-emoji key."
+  },
+  "time_logs_are_a_subresource": {
+    "what": "PUT /workspaces/task/{id}/time-log, one entry per call (#1292). The server mints `tl_<random>`, stamps the user from the JWT and sets created_at/updated_at. The task stores only time_tracking.estimate; logs, spent, remaining and progress_percent are hydrated on every read.",
+    "replaced": "The old contract — a client-minted logs[] array sent through update_task and replaced wholesale — is gone. Logs written that way are still in some stored tasks but nothing reads them.",
+    "source": "workspaces-service/handler/task_time_logs.go; handler/tasks.go hydrateTimeTracking"
+  },
+  "task_action_moves_status_by_role": {
+    "what": "After a task-action write the task status is recomputed: none done -> the todo role (Awaiting Info here), some -> working (In Review), all -> done (Approved). An id the space lacks is never written.",
+    "replaced": "The 2026-08-04 finding that a write reset the task to `backlog`.",
+    "source": "workspaces-service/handler/task_actions.go resolveTaskStatusFromActions"
+  },
+  "field_shapes_that_are_read_only": {
+    "space": ["owner", "created_at", "updated_at", "url", "records", "tasks", "files"],
+    "task": ["id", "created_at", "updated_at", "created_by", "url", "watchers", "muted", "subtasks", "task_actions", "base_record_skipped"],
+    "comment": ["id", "author", "created_at", "updated_at", "url", "reactions", "subject", "sequence", "modified", "type"]
+  },
+  "how_to_verify_on_staging": [
+    "node tools/push-example.mjs --cleanup (targets QUIVA_API_URL from .env; refuses anything but staging)",
+    "or by hand: validate_payload, create_space, create_task, add_time_log twice, set_task_action, create_comment, react_to_comment",
+    "the five columns render in order with their colours; Approved and Rejected are completed columns",
+    "clean up with delete_task (delete_subtasks: true) then delete_space — both return { message: 'success' }, not 204"
+  ]
+}

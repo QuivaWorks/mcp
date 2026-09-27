@@ -1,0 +1,31 @@
+{
+  "slug": "distributor-granted-products",
+  "kind": "harvested",
+  "source": {
+    "harvested_at": "2026-09-27"
+  },
+  "teaches": "list_granted_products: a granted product with no published definition is dropped from products[] and named only in notices[].",
+  "response": {
+    "request": {
+      "method": "GET",
+      "path": "/accounts/distribution-granted-products",
+      "query": {
+        "publisher_account_id": "<<ACCOUNT_1>>"
+      }
+    },
+    "status": 200,
+    "refused": false,
+    "body": {
+      "data": {
+        "distribution_id": "<<DISTRIBUTION_8>>",
+        "notices": [
+          "<<PRODUCT_7>> is granted but the publisher has published no definition for it, so it has no buttons"
+        ],
+        "products": [],
+        "publisher_account_id": "<<ACCOUNT_1>>",
+        "publisher_name": "<<NAME_2>>",
+        "space_id": "<<SPACE_2>>"
+      }
+    }
+  }
+}

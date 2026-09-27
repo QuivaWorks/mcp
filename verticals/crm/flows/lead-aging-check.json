@@ -1,0 +1,128 @@
+{
+  "name": "Lead Aging Check",
+  "description": "Daily. Finds contacts with no logged activity for 30 days or more and raises ONE digest task. Derived from Activity records, since the shared Client record has no activity field.",
+  "config": {
+    "nodes": [
+      {
+        "id": "SCHEDULE",
+        "data": {
+          "id": "SCHEDULE",
+          "node_type": "trigger",
+          "payload": {
+            "trigger_on": "2026-08-05T07:00:00Z",
+            "trigger_every": "24h",
+            "trigger": {}
+          },
+          "name": "Daily lead aging check",
+          "trigger_type": "schedule"
+        }
+      },
+      {
+        "id": "LIST_ACTIVITIES",
+        "data": {
+          "id": "LIST_ACTIVITIES",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/records/Activity",
+            "method": "GET",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "query": {
+              "limit": 500
+            }
+          }
+        }
+      },
+      {
+        "id": "FIND_STALE",
+        "data": {
+          "id": "FIND_STALE",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function(){var rows=(list&&list.results)||list||[];var latest={},now=Date.now();for(var i=0;i<rows.length;i++){var d=rows[i].data||{};var c=String(d.related_contact_id||'');if(!c)continue;var t=d.completed_at?Date.parse(d.completed_at):(d.scheduled_date?Date.parse(d.scheduled_date):0);if(!latest[c]||t>latest[c])latest[c]=t;}var out=[];for(var k in latest){var days=Math.floor((now-latest[k])/86400000);if(days>=30)out.push('- contact '+k+': '+days+' days since last activity');}return{count:out.length,body:out.join('\\n')||'None.'};})();",
+            "params": {
+              "list": "$.LIST_ACTIVITIES.data"
+            }
+          }
+        }
+      },
+      {
+        "id": "CHECK_ANY",
+        "data": {
+          "id": "CHECK_ANY",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": ">",
+                "input": [
+                  "$.FIND_STALE.count",
+                  0
+                ]
+              },
+              "outcome": "CREATE_DIGEST"
+            },
+            {
+              "outcome": "RESOLVE_SUCCESS"
+            }
+          ]
+        }
+      },
+      {
+        "id": "CREATE_DIGEST",
+        "data": {
+          "id": "CREATE_DIGEST",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/workspaces/task",
+            "method": "POST",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "space_id": "CRM_ACTIVITIES",
+              "title": "Contacts going cold",
+              "description": "Contacts with no activity for 30+ days:\n\n|$.FIND_STALE.body",
+              "status": "to_do",
+              "priority": "medium",
+              "tags": [
+                "crm",
+                "digest",
+                "lead-aging"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_SCHEDULE_LIST_ACTIVITIES",
+        "source": "SCHEDULE",
+        "target": "LIST_ACTIVITIES"
+      },
+      {
+        "id": "e_LIST_ACTIVITIES_FIND_STALE",
+        "source": "LIST_ACTIVITIES",
+        "target": "FIND_STALE"
+      },
+      {
+        "id": "e_FIND_STALE_CHECK_ANY",
+        "source": "FIND_STALE",
+        "target": "CHECK_ANY"
+      },
+      {
+        "id": "e_CHECK_ANY_CREATE_DIGEST",
+        "source": "CHECK_ANY",
+        "target": "CREATE_DIGEST"
+      }
+    ],
+    "result": {
+      "status": "success",
+      "stale": "$.FIND_STALE.count"
+    }
+  }
+}

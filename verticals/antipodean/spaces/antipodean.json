@@ -1,0 +1,82 @@
+{
+  "id": "ANTIPODEAN",
+  "name": "Antipodean Underwriting",
+  "description": "Publisher-side underwriting work items: referrals raised off the 41-rule engine, sanctions hits, claims intake and void-override requests. Every task here is created by a flow in the publisher's own account (plan §6.3) except the underwriter's own status moves. See contract artefact 4 (docs/antipodean spec/contracts/04-status-vocabulary.json) for the full status/priority/tag contract this space implements literally.",
+  "default_status": "open",
+  "statuses": [
+    { "id": "open", "name": "Open", "color": "#6B7280", "order": 1, "complete": false, "role": "intake", "is_visible": true },
+    { "id": "in_review", "name": "In Review", "color": "#3B82F6", "order": 2, "complete": false, "role": "working", "is_visible": true },
+    { "id": "awaiting_broker", "name": "Awaiting Broker", "color": "#F59E0B", "order": 3, "complete": false, "is_visible": true },
+    { "id": "approved", "name": "Approved", "color": "#10B981", "order": 4, "complete": true, "role": "won", "is_visible": true },
+    { "id": "declined", "name": "Declined", "color": "#EF4444", "order": 5, "complete": true, "role": "lost", "is_visible": true },
+    { "id": "closed", "name": "Closed", "color": "#9CA3AF", "order": 6, "complete": true, "role": "done", "is_visible": true },
+    { "id": "lapsed", "name": "Lapsed", "color": "#A78BFA", "order": 7, "complete": true, "role": "expired", "is_visible": true }
+  ],
+  "priorities": [
+    { "id": "highest", "name": "Highest", "icon": "angles-up", "icon_type": "light", "icon_color": "#DC2626", "default": false },
+    { "id": "high", "name": "High", "icon": "angle-up", "icon_type": "light", "icon_color": "#ff6600", "default": false },
+    { "id": "medium", "name": "Medium", "icon": "equals", "icon_type": "light", "icon_color": "#e8b800", "default": true },
+    { "id": "low", "name": "Low", "icon": "angle-down", "icon_type": "light", "icon_color": "#1E3A8A", "default": false },
+    { "id": "lowest", "name": "Lowest", "icon": "angles-down", "icon_type": "light", "icon_color": "#3B82F6", "default": false }
+  ],
+  "tags": [
+    { "id": "referral", "name": "Referral", "color": "#4338CA", "text_color": "#FFFFFF" },
+    { "id": "sanctions", "name": "Sanctions", "color": "#B91C1C", "text_color": "#FFFFFF" },
+    { "id": "claim", "name": "Claim", "color": "#0F766E", "text_color": "#FFFFFF" },
+    { "id": "override", "name": "Override", "color": "#7C2D12", "text_color": "#FFFFFF" },
+    { "id": "renewal", "name": "Renewal", "color": "#1D4ED8", "text_color": "#FFFFFF" }
+  ],
+  "base_record": {
+    "config_id": "broker_config",
+    "identity_fields": ["broker_id", "primary_contact_email"],
+    "label": "Brokerage"
+  },
+  "view": {
+    "tasks": {
+      "board": {
+        "card": {
+          "fields": {
+            "priority": { "visible": true, "display": { "type": "icon_and_text" } },
+            "assignees": { "visible": true },
+            "tags": { "visible": true },
+            "actions_progress": { "visible": true, "display": { "show_count": true, "show_percentage": false } }
+          }
+        }
+      }
+    }
+  },
+  "record_configs": [
+    { "id": "quote_config" },
+    { "id": "policy_config" },
+    { "id": "invoice_config" },
+    { "id": "decision_config" },
+    { "id": "submission_config" },
+    { "id": "quote_activity_config" },
+    { "id": "claim_config" },
+    { "id": "cancellation_config" },
+    { "id": "mta_config" },
+    { "id": "clause_config" },
+    { "id": "broker_config" }
+  ],
+  "record_config_ids": [
+    "quote_config",
+    "policy_config",
+    "invoice_config",
+    "decision_config",
+    "submission_config",
+    "quote_activity_config",
+    "claim_config",
+    "cancellation_config",
+    "mta_config",
+    "clause_config",
+    "broker_config"
+  ],
+  "_notes": {
+    "record_config_ids": "Written alongside record_configs for frontend read-compat only (space-record-configs.utils.ts). model.Space (workspaces-service/model/api.go:98-125) has NO record_config_ids field, so the typed unmarshal on write and the typed read both drop it — contract artefact 4's record_configs_rule. Verification must assert only on record_configs.",
+    "record_configs_scope": "Publisher-account configs only (plan §6.1/§6.4). quote_outcome_config, mta_request_config, cancellation_request_config and claim_request_config are distributor-side records living in the distributor's own account/space, not this one. occupation_config and postcode_state_config are rating lookup tables, not task-linked workflow records, so they are not listed here.",
+    "base_record": "Points at broker_config (the brokerage contact), not a per-quote or per-insured record, so referral/sanctions/claims/override tasks for one brokerage group under one folder (plan §6.4). identity_fields tries broker_id (the stable business key assigned at onboarding) before falling back to primary_contact_email. A flow creating a task sets `identity: {\"broker_id\": \"...\"}` on the create_task/post.task call (model.CreateTaskRequest.Identity, workspaces-service/model/api.go:255-261) to key it.",
+    "statuses": "Ids, roles, order and colour are copied verbatim from contract artefact 4 (04-status-vocabulary.json), which is authoritative. `awaiting_broker` deliberately carries no role — A4-2 in that artefact names it the one entry that could be cut, and it is kept for the board and flow 13's ageing per that artefact's decision. `closed` carries role `done` specifically so a task's last action completing does not fall back to Space.FirstCompleteStatusID() and land on `approved`, which would issue a quote (workspaces-service/model/api.go:206-208, handler/task_actions.go:81-84).",
+    "priorities": "All five shipped ids declared even though only highest/high/medium have a flow writer — priorities is replace-wholesale on any later write, and dropping low/lowest here would delete them from this space and reassign any task carrying one via priorityMigrationTarget.",
+    "view": "view.tasks.board.card.fields per recon-c's build item 1 — the entire board-card surface this space needs (priority icon_and_text, assignees, tags, actions_progress). Not covered by contract artefact 4, which is scoped to status/priority/tag ids only."
+  }
+}

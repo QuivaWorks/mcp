@@ -1,0 +1,54 @@
+{
+  "slug": "space-IBHUB",
+  "kind": "space",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "id": "IBHUB",
+    "url": "https://app.microstrate.io/en/hub/spaces/IBHUB/tasks",
+    "harvested_from": "GET /workspaces/spaces"
+  },
+  "teaches": [
+    "4 custom board statuses (columns)",
+    "statuses carry the board's presentation fields (color, order, complete) — the API does not require them, the board reads them",
+    "read-only fields a create/update body must NOT echo back: owner, created_at, updated_at, url"
+  ],
+  "config": {
+    "name": "Broker Hub",
+    "id": "IBHUB",
+    "description": "House insurance broker folders, tasks and other resources related to insurance broker clients",
+    "statuses": [
+      {
+        "id": "to_do",
+        "name": "To Do",
+        "color": "#3b82f6",
+        "order": 1,
+        "complete": false
+      },
+      {
+        "id": "in_progress",
+        "name": "In Progress",
+        "color": "#f59e0b",
+        "order": 2,
+        "complete": false
+      },
+      {
+        "id": "in_review",
+        "name": "In Review",
+        "color": "#8b5cf6",
+        "order": 3,
+        "complete": false
+      },
+      {
+        "id": "completed",
+        "name": "Completed",
+        "color": "#10b981",
+        "order": 4,
+        "complete": false
+      }
+    ],
+    "owner": "<<REDACTED:user-id>>",
+    "created_at": "2026-07-07T10:04:33Z",
+    "updated_at": "2026-07-27T11:32:03Z",
+    "url": "https://app.microstrate.io/en/hub/spaces/IBHUB/tasks"
+  }
+}

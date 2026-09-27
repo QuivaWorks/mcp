@@ -1,0 +1,1173 @@
+<title>Insurance Underwriting Portal — How It Works</title>
+
+<style>
+  :root {
+    --paper:        #F4F6F8;
+    --surface:      #FFFFFF;
+    --surface-sunk: #EAEEF2;
+    --ink:          #16202B;
+    --ink-soft:     #3D4A56;
+    --muted:        #5E6C78;
+    --rule:         #D3DAE1;
+    --rule-soft:    #E3E8ED;
+    --accent:       #1F5C8B;
+    --accent-soft:  #E8F0F6;
+    --warn:         #A6541F;
+    --warn-soft:    #F7EDE5;
+    --good:         #2F6B4F;
+    --good-soft:    #E8F1EC;
+
+    --serif: Georgia, "Iowan Old Style", "Palatino Linotype", Palatino, "Times New Roman", serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+    --measure: 66ch;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:        #111820;
+      --surface:      #18212B;
+      --surface-sunk: #1E2833;
+      --ink:          #E5EAEE;
+      --ink-soft:     #BAC5CE;
+      --muted:        #8B9AA6;
+      --rule:         #2C3946;
+      --rule-soft:    #232E39;
+      --accent:       #6FA8CE;
+      --accent-soft:  #1B2B38;
+      --warn:         #D08A5A;
+      --warn-soft:    #2E2119;
+      --good:         #6FA98A;
+      --good-soft:    #16261F;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:        #111820;
+    --surface:      #18212B;
+    --surface-sunk: #1E2833;
+    --ink:          #E5EAEE;
+    --ink-soft:     #BAC5CE;
+    --muted:        #8B9AA6;
+    --rule:         #2C3946;
+    --rule-soft:    #232E39;
+    --accent:       #6FA8CE;
+    --accent-soft:  #1B2B38;
+    --warn:         #D08A5A;
+    --warn-soft:    #2E2119;
+    --good:         #6FA98A;
+    --good-soft:    #16261F;
+  }
+
+  :root[data-theme="light"] {
+    --paper:        #F4F6F8;
+    --surface:      #FFFFFF;
+    --surface-sunk: #EAEEF2;
+    --ink:          #16202B;
+    --ink-soft:     #3D4A56;
+    --muted:        #5E6C78;
+    --rule:         #D3DAE1;
+    --rule-soft:    #E3E8ED;
+    --accent:       #1F5C8B;
+    --accent-soft:  #E8F0F6;
+    --warn:         #A6541F;
+    --warn-soft:    #F7EDE5;
+    --good:         #2F6B4F;
+    --good-soft:    #E8F1EC;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .shell {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 24px 96px;
+  }
+
+  @media (min-width: 1000px) {
+    .shell {
+      grid-template-columns: 232px minmax(0, 1fr);
+      gap: 56px;
+      padding: 0 32px 120px;
+    }
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    grid-column: 1 / -1;
+    border-bottom: 1px solid var(--rule);
+    padding: 64px 0 32px;
+    margin-bottom: 48px;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 18px;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(2.1rem, 5vw, 3.1rem);
+    line-height: 1.12;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0 0 20px;
+  }
+
+  .standfirst {
+    font-size: 1.1rem;
+    color: var(--ink-soft);
+    max-width: var(--measure);
+    margin: 0;
+  }
+
+  .meta-line {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    margin-top: 28px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  /* ---------- contents rail ---------- */
+
+  nav.rail { display: none; }
+
+  @media (min-width: 1000px) {
+    nav.rail {
+      display: block;
+      position: sticky;
+      top: 32px;
+      align-self: start;
+      max-height: calc(100vh - 64px);
+      overflow-y: auto;
+      padding-bottom: 24px;
+    }
+  }
+
+  nav.rail p {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 14px;
+  }
+
+  nav.rail ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+    border-left: 1px solid var(--rule);
+  }
+
+  nav.rail a {
+    display: block;
+    padding-left: 14px;
+    font-size: 14.5px;
+    line-height: 1.35;
+    color: var(--ink-soft);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    margin-left: -1px;
+  }
+
+  nav.rail a:hover,
+  nav.rail a:focus-visible {
+    color: var(--accent);
+    border-left-color: var(--accent);
+  }
+
+  /* ---------- prose ---------- */
+
+  main { min-width: 0; }
+
+  section { margin-bottom: 72px; scroll-margin-top: 24px; }
+
+  h2 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 1.75rem;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0 0 8px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  h2 .num {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    vertical-align: 0.35em;
+    margin-right: 12px;
+  }
+
+  h3 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 1.24rem;
+    letter-spacing: -0.005em;
+    text-wrap: balance;
+    margin: 36px 0 6px;
+  }
+
+  p, ul, ol { max-width: var(--measure); }
+  p { margin: 0 0 16px; }
+  li { margin-bottom: 8px; }
+  ul, ol { padding-left: 22px; margin: 0 0 18px; }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+  strong { font-weight: 650; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--surface-sunk);
+    padding: 0.13em 0.38em;
+    border-radius: 2px;
+  }
+
+  /* ---------- status stamps ---------- */
+
+  .stamp {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border: 1px solid currentColor;
+    border-radius: 2px;
+    white-space: nowrap;
+    vertical-align: 2px;
+  }
+  .stamp.works   { color: var(--good); background: var(--good-soft); }
+  .stamp.blocked { color: var(--warn); background: var(--warn-soft); }
+  .stamp.waiting { color: var(--accent); background: var(--accent-soft); }
+
+  /* ---------- component cards ---------- */
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 24px 26px;
+    margin-bottom: 20px;
+  }
+
+  .card > :last-child { margin-bottom: 0; }
+
+  .card-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px 14px;
+    margin-bottom: 14px;
+  }
+
+  .card-head h3 { margin: 0; }
+
+  .internal {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  dl.facts {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 4px 20px;
+    margin: 0 0 4px;
+    max-width: var(--measure);
+  }
+  @media (min-width: 620px) {
+    dl.facts { grid-template-columns: 148px minmax(0, 1fr); }
+  }
+  dl.facts dt {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-top: 5px;
+  }
+  dl.facts dd { margin: 0 0 12px; }
+  dl.facts dd:last-of-type { margin-bottom: 0; }
+
+  /* ---------- callouts ---------- */
+
+  .note {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 16px 20px;
+    margin: 0 0 22px;
+    max-width: var(--measure);
+    border-radius: 0 3px 3px 0;
+  }
+  .note > :last-child { margin-bottom: 0; }
+  .note.caution { border-left-color: var(--warn); background: var(--warn-soft); }
+
+  .note-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--warn);
+    display: block;
+    margin-bottom: 7px;
+  }
+  .note:not(.caution) .note-label { color: var(--accent); }
+
+  /* ---------- journey ---------- */
+
+  ol.journey { list-style: none; padding: 0; margin: 0; max-width: none; }
+
+  ol.journey > li {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 0 20px;
+    padding-bottom: 30px;
+    margin: 0;
+    position: relative;
+  }
+
+  ol.journey > li::before {
+    content: "";
+    position: absolute;
+    left: 15px;
+    top: 30px;
+    bottom: 0;
+    width: 1px;
+    background: var(--rule);
+  }
+  ol.journey > li:last-child::before { display: none; }
+
+  .step-mark {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 50%;
+    width: 31px;
+    height: 31px;
+    display: grid;
+    place-items: center;
+    position: relative;
+    z-index: 1;
+  }
+
+  .step-body > :last-child { margin-bottom: 0; }
+  .step-body h3 { margin-top: 0; margin-bottom: 6px; font-size: 1.12rem; }
+  .step-body .who {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  /* ---------- tables ---------- */
+
+  .scroll { overflow-x: auto; margin: 0 0 22px; border: 1px solid var(--rule); border-radius: 3px; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 15px;
+    background: var(--surface);
+  }
+
+  th, td {
+    text-align: left;
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+  }
+
+  th {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 400;
+    background: var(--surface-sunk);
+    white-space: nowrap;
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* ---------- footer ---------- */
+
+  footer {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--rule);
+    padding-top: 28px;
+    color: var(--muted);
+    font-size: 14.5px;
+  }
+  footer p { max-width: var(--measure); }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="shell">
+
+  <header class="masthead">
+    <p class="eyebrow">Commercial &amp; Specialty Risks — Builders Risk</p>
+    <h1>The Insurance Underwriting Portal, explained</h1>
+    <p class="standfirst">
+      What we built, why each piece exists, and how the pieces work together to
+      take a builder's enquiry through to a live insurance policy. Written for
+      someone who has not seen the system before. Every section has a link you
+      can open and check for yourself.
+    </p>
+    <div class="meta-line">
+      <span>Built 4 August 2026</span>
+      <span>11 components</span>
+      <span>Platform: Quiva</span>
+    </div>
+  </header>
+
+  <nav class="rail" aria-label="Contents">
+    <p>Contents</p>
+    <ol>
+      <li><a href="#honest">Where it stands today</a></li>
+      <li><a href="#blocks">The five building blocks</a></li>
+      <li><a href="#what">What we built</a></li>
+      <li><a href="#journey">How a deal flows through it</a></li>
+      <li><a href="#limits">What it deliberately cannot do</a></li>
+      <li><a href="#links">Everywhere to look</a></li>
+      <li><a href="#next">What happens next</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <section id="honest">
+      <h2><span class="num">01</span>Where it stands today</h2>
+
+      <p>
+        The portal is a working system for underwriting <strong>Builders Risk</strong>
+        insurance — cover for a building while it is under construction. An underwriter
+        can record who is asking for cover, capture the details of the building project,
+        price it, turn an accepted price into a policy, and produce the paperwork.
+      </p>
+
+      <p>
+        Three things are true at once, and it is worth being straight about all three
+        before anything else.
+      </p>
+
+      <h3>The information and the paperwork work properly</h3>
+      <p>
+        The forms, the workspace, the printable quote and the printable policy schedule
+        are all built, live, and tested. You can open them right now.
+      </p>
+
+      <h3>The pricing maths is correct, and we proved it</h3>
+      <p>
+        We ran a real example through the system: a $500,000 timber-framed new build,
+        eight months long, a builder with seven years' experience, in a standard urban
+        area. The system produced a premium of <strong>$2,012.50</strong> — matching, to
+        the cent, the figure worked out by hand in the original requirements document.
+      </p>
+
+      <div class="note caution">
+        <span class="note-label">The one significant catch</span>
+        <p>
+          <strong>The automatic steps do not currently start when a person presses Save
+          on a form.</strong> This is a fault in the platform itself, not in anything we
+          built — the Save button leaves out a small piece of information that the
+          automation system needs before it will run.
+        </p>
+        <p>
+          We proved this precisely. We created two identical quotes. One saved the normal
+          way did nothing at all. One saved with that missing piece included priced itself
+          correctly and raised the right follow-up task. One field is the entire
+          difference.
+        </p>
+        <p>
+          So until a developer fixes that, an underwriter has to do the pricing and the
+          policy creation by hand. Everything needed for it to work automatically is
+          already built and waiting.
+        </p>
+      </div>
+
+      <p>
+        One automatic step is unaffected and genuinely runs every day: the renewal check.
+        It works because it runs on a timer rather than reacting to somebody saving a form.
+      </p>
+    </section>
+
+    <section id="blocks">
+      <h2><span class="num">02</span>The five building blocks</h2>
+
+      <p>
+        Everything in the portal is made from five kinds of thing. The platform has its own
+        names for them, which you will see in the screens, so both names are given here.
+      </p>
+
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>In plain words</th>
+              <th>Called internally</th>
+              <th>What it is for</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>A form that holds information</td>
+              <td><code>record config</code></td>
+              <td>Defines what questions get asked and what answers are allowed. Filling one in creates a <code>record</code> — one applicant, one quote, one policy.</td>
+            </tr>
+            <tr>
+              <td>A shared workspace</td>
+              <td><code>space</code></td>
+              <td>Where the team's work lives. Holds the to-do list and links the relevant forms together in one place.</td>
+            </tr>
+            <tr>
+              <td>A job on someone's list</td>
+              <td><code>task</code></td>
+              <td>A single piece of work assigned to a person, with a status and a due date. Most are raised automatically.</td>
+            </tr>
+            <tr>
+              <td>An automatic helper</td>
+              <td><code>flow</code></td>
+              <td>A set of steps the system runs on its own — do the pricing sum, create the policy, check for renewals.</td>
+            </tr>
+            <tr>
+              <td>A printable document</td>
+              <td><code>document template</code></td>
+              <td>A Word layout with gaps in it. The system fills the gaps from a quote or policy and produces a finished PDF.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        There is a sixth, smaller one: an <strong>assistant</strong> (<code>assistant</code>),
+        a chat helper that answers questions about the pricing rules; and a
+        <strong>meeting notes format</strong> (<code>meeting template</code>) that structures
+        the write-up of an underwriting meeting.
+      </p>
+    </section>
+
+    <section id="what">
+      <h2><span class="num">03</span>What we built</h2>
+
+      <p>
+        Eleven components in total. Each one below says what it is for, what it is called
+        internally, and where to see it.
+      </p>
+
+      <h3>Forms that hold the information</h3>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>Applicant</h3>
+          <span class="internal">record config &middot; UWClient</span>
+          <span class="stamp works">Live</span>
+        </div>
+        <p>
+          The builder, contractor or property owner asking for cover. Their legal business
+          name, address, contact details, licence number, how long they have been trading,
+          and what kind of business they are.
+        </p>
+        <dl class="facts">
+          <dt>Why it exists</dt>
+          <dd>Two of these details change the price. A builder trading under two years pays 25% more; one trading over ten years pays 10% less. So this is not just an address book — it feeds the pricing.</dd>
+          <dt>Size</dt>
+          <dd>8 questions</dd>
+          <dt>See it</dt>
+          <dd><a href="https://app.microstrate.io/en/hub/records/configs/UWClient">Open the Applicant form</a></dd>
+        </dl>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>Quote</h3>
+          <span class="internal">record config &middot; UWQuote</span>
+          <span class="stamp works">Live</span>
+        </div>
+        <p>
+          The heart of the system. Everything needed to price a job: who is insured, the
+          project itself (what is being built, where, how big, how long, what it is made
+          of), how much cover is wanted, and an assessment of what could go wrong on site.
+          It then holds the price the system works out.
+        </p>
+        <dl class="facts">
+          <dt>Why it exists</dt>
+          <dd>A quote is a real business document with a life of its own — it gets drafted, submitted, priced, then accepted, declined or left to expire. It needs to be a thing you can find, revisit and report on, not a passing conversation.</dd>
+          <dt>Clever bit</dt>
+          <dd>The form changes as you fill it in. Tick "prior losses" and a box appears asking for details. Choose "Renovation" and it asks about the scope of the renovation. Choose "Demolition" and it asks for the demolition permit instead. Irrelevant questions stay hidden.</dd>
+          <dt>Size</dt>
+          <dd>47 questions, in six labelled groups</dd>
+          <dt>See it</dt>
+          <dd><a href="https://app.microstrate.io/en/hub/records/configs/UWQuote">Open the Quote form</a></dd>
+        </dl>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>Policy</h3>
+          <span class="internal">record config &middot; UWPolicy</span>
+          <span class="stamp works">Live</span>
+        </div>
+        <p>
+          The live insurance contract, created once a customer accepts a quote. Carries the
+          policy number, the dates cover runs between, the premium, and whether it has been
+          paid. It always records which quote it came from.
+        </p>
+        <dl class="facts">
+          <dt>Why it exists separately</dt>
+          <dd>A quote is an offer; a policy is a promise. They need to be kept apart. A quote can be re-priced or withdrawn — a policy, once issued, is a contract, and the paperwork has to reflect what was actually agreed.</dd>
+          <dt>Size</dt>
+          <dd>29 questions</dd>
+          <dt>See it</dt>
+          <dd><a href="https://app.microstrate.io/en/hub/records/configs/UWPolicy">Open the Policy form</a></dd>
+        </dl>
+      </div>
+
+      <h3>Where the team works</h3>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>Underwriting workspace</h3>
+          <span class="internal">space &middot; UNDERWRITING</span>
+          <span class="stamp works">Live</span>
+        </div>
+        <p>
+          The team's shared home. Its to-do list is where every piece of follow-up work
+          appears: review this price, finish setting up that policy, chase these renewals.
+          Jobs move through four states — Open, In&nbsp;Progress, Completed, Cancelled.
+        </p>
+        <dl class="facts">
+          <dt>Why it exists</dt>
+          <dd>Because the automatic helpers need somewhere to put work. The system cannot email anyone or send an alert — creating a job on someone's list is the only way it can get a person's attention. That makes this workspace the portal's inbox.</dd>
+          <dt>Also here</dt>
+          <dd>All three forms are linked into this workspace, so an underwriter finds applicants, quotes and policies in one place rather than hunting for them.</dd>
+          <dt>See it</dt>
+          <dd>
+            <a href="https://app.microstrate.io/en/hub/spaces/UNDERWRITING/tasks">The to-do list</a>
+            &nbsp;·&nbsp;
+            <a href="https://app.microstrate.io/en/hub/spaces/UNDERWRITING/records">The records</a>
+          </dd>
+        </dl>
+        <div class="note">
+          <span class="note-label">There is real test data in here</span>
+          <p>
+            Four jobs and several quotes, all named starting <code>ZZZ TEST</code>. They
+            are ours, from proving the system works, and they are safe to ignore or delete.
+            The one worth opening is
+            <a href="https://app.microstrate.io/en/hub/spaces/UNDERWRITING/tasks?task=UNDERWRITING-2">Review priced quote</a>
+            — the system wrote that itself, including the premium, the moment the quote was priced.
+          </p>
+        </div>
+      </div>
+
+      <h3>The automatic helpers</h3>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>Price the quote</h3>
+          <span class="internal">flow &middot; Quote Pricing</span>
+          <span class="stamp blocked">Built, not triggering</span>
+        </div>
+        <p>
+          When a quote is marked ready, this works out the premium and writes it back onto
+          the quote, then asks an underwriter to check it.
+        </p>
+        <dl class="facts">
+          <dt>What it does</dt>
+          <dd>Checks the essential details are present. Looks up the base rate for the type of project. Works out the starting premium from the value insured. Applies four adjustments — for how long the job runs, what it is built from, how experienced the builder is, and how risky the location is. Enforces the $500 minimum. Marks the quote "Priced" and raises a review job.</dd>
+          <dt>If something is missing</dt>
+          <dd>It puts the quote back to Draft and raises a job naming exactly which details are needed, rather than pricing something incomplete.</dd>
+          <dt>Why a helper, not a form</dt>
+          <dd>A form can hold a number but cannot work one out from other numbers. Any calculation has to be done by a helper like this one.</dd>
+          <dt>Status</dt>
+          <dd>The maths is correct and proven. It does not start on its own when someone presses Save — see <a href="#honest">Where it stands today</a>.</dd>
+          <dt>See it</dt>
+          <dd><a href="https://app.microstrate.io/en/hub/flows/ms+hub+config+workflow+3184361339+3685425597">Open Quote Pricing</a></dd>
+        </dl>
+        <div class="note">
+          <span class="note-label">Worth knowing</span>
+          <p>
+            The rate tables live in the helper as editable settings, not buried in code. The
+            base rates, all four adjustment tables and the minimum premium can be changed
+            without rebuilding anything. It is still a change someone technical makes — but
+            it is a change to a list of numbers, not to a program.
+          </p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>Turn an accepted quote into a policy</h3>
+          <span class="internal">flow &middot; Quote Acceptance and Policy Creation</span>
+          <span class="stamp blocked">Built, not triggering</span>
+        </div>
+        <p>
+          When a customer accepts, this creates the policy, copies the agreed details across,
+          works out the dates, links the two records together, and asks an underwriter to
+          finish the setup.
+        </p>
+        <dl class="facts">
+          <dt>What it does</dt>
+          <dd>Gives the policy a reference. Sets cover to start on the project start date and run twelve months. Copies the insured, the project and the cover across. Marks the premium as unpaid. Points the quote at its new policy so the trail is intact both ways.</dd>
+          <dt>Why it exists</dt>
+          <dd>Re-typing agreed figures from a quote onto a policy is exactly where expensive mistakes happen. Copying them mechanically means the policy cannot disagree with what was quoted.</dd>
+          <dt>Status</dt>
+          <dd>Tested and working end to end — it created a policy, linked it, and raised the setup job. Same triggering limitation as above.</dd>
+          <dt>See it</dt>
+          <dd><a href="https://app.microstrate.io/en/hub/flows/ms+hub+config+workflow+3184361339+3737665316">Open Quote Acceptance</a></dd>
+        </dl>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>Daily renewal check</h3>
+          <span class="internal">flow &middot; Daily Renewal Scan</span>
+          <span class="stamp works">Runs daily</span>
+        </div>
+        <p>
+          Every morning this looks through the live policies for any expiring in about a
+          month, and raises a single job listing them so nobody's renewal is missed.
+        </p>
+        <dl class="facts">
+          <dt>Why one job, not one per policy</dt>
+          <dd>The platform's helpers can read many records but can only write to one place. So a job per expiring policy is not possible. A single summary listing them all is — and it is arguably better, because an underwriter sees the whole week's renewals in one view instead of a scattered pile of reminders.</dd>
+          <dt>Status</dt>
+          <dd>Genuinely working. We ran it and it correctly found one policy expiring in 29 days and listed it, with its reference, customer, project, date and premium.</dd>
+          <dt>When</dt>
+          <dd>Every 24 hours, first run 5 August at 07:00 UTC</dd>
+          <dt>See it</dt>
+          <dd>
+            <a href="https://app.microstrate.io/en/hub/flows/ms+hub+config+workflow+3184361339+695113787">Open the Renewal Scan</a>
+            &nbsp;·&nbsp;
+            <a href="https://app.microstrate.io/en/hub/scheduled">Scheduled jobs</a>
+          </dd>
+        </dl>
+      </div>
+
+      <h3>The paperwork</h3>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>Builders Risk Quotation</h3>
+          <span class="internal">document template &middot; builders_risk_quote</span>
+          <span class="stamp works">Live</span>
+        </div>
+        <p>
+          The quote a customer actually receives. Six sections: who is insured, the project,
+          the cover, the price with every adjustment shown and explained, the terms, and how
+          to accept — with signature lines.
+        </p>
+        <dl class="facts">
+          <dt>Why show the workings</dt>
+          <dd>A customer who can see that their timber frame cost them more and their ten years' experience saved them money can have a sensible conversation about it. A single unexplained number invites an argument.</dd>
+          <dt>Filled-in gaps</dt>
+          <dd>28, every one checked against the Quote form</dd>
+          <dt>Tested</dt>
+          <dd>We generated one with a marker in every gap and confirmed all 28 filled in. A gap that does not match its source silently prints as blank — so this check matters more than it sounds.</dd>
+        </dl>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>Builders Risk Policy Schedule</h3>
+          <span class="internal">document template &middot; builders_risk_policy_schedule</span>
+          <span class="stamp works">Live</span>
+        </div>
+        <p>
+          The formal document confirming cover is in place: policy number, exactly when cover
+          runs, what is covered, the premium, how to pay, how to claim, and how to cancel.
+        </p>
+        <dl class="facts">
+          <dt>Filled-in gaps</dt>
+          <dd>22, all confirmed filling correctly</dd>
+          <dt>Where documents go</dt>
+          <dd>Into file storage, with a link recorded on the quote or policy. The platform cannot attach a file directly onto a record, so the record holds a pointer and you follow it.</dd>
+          <dt>See both</dt>
+          <dd>
+            <a href="https://app.microstrate.io/en/hub/account?tab=specialization">Templates, under Specialization</a>
+            &nbsp;·&nbsp;
+            <a href="https://app.microstrate.io/en/hub/resources/storage/obj/manage?bucket=microstrate-documents">The generated files</a>
+          </dd>
+        </dl>
+        <div class="note">
+          <span class="note-label">Two test documents to open</span>
+          <p>
+            In the file store you will find two PDFs with <code>ZZZ</code> in the name. Every
+            filled-in gap reads <code>ZZZ-&lt;name&gt;-OK</code>. That is deliberate: it shows
+            at a glance which piece of information landed in which slot on the page.
+          </p>
+        </div>
+      </div>
+
+      <h3>The two that are built but not yet switched on</h3>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>Underwriting Assistant</h3>
+          <span class="internal">assistant</span>
+          <span class="stamp waiting">Waiting to be installed</span>
+        </div>
+        <p>
+          A chat helper for underwriters. It knows every pricing rule by heart and can explain
+          how a premium was arrived at, talk through cover and exclusions, and walk someone
+          through the process.
+        </p>
+        <dl class="facts">
+          <dt>What it will not do</dt>
+          <dd>It cannot look anything up. It cannot fetch a quote or a policy. We built it to say so plainly and ask for the details to be pasted in, rather than inventing a number — a made-up premium in a customer conversation is far worse than no answer.</dd>
+          <dt>Also built in</dt>
+          <dd>It knows which figures are filled in automatically, so if one is blank it says the automation has not run rather than reading the blank as zero.</dd>
+          <dt>Why no link</dt>
+          <dd>It is written and ready, but assistants are created at the moment the portal is installed into a company's account. Nothing exists to open until then.</dd>
+        </dl>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>Underwriter Meeting Summary</h3>
+          <span class="internal">meeting template</span>
+          <span class="stamp waiting">Waiting to be installed</span>
+        </div>
+        <p>
+          A fixed structure for writing up an underwriting meeting: who was there, which risks
+          were discussed, what was decided about pricing, what worried people, what was referred
+          on, and who agreed to do what.
+        </p>
+        <dl class="facts">
+          <dt>Why it matters</dt>
+          <dd>Months later, when a claim comes in, the only record of <em>why</em> a risk was priced or declined the way it was may be these notes. The template forces the reasoning to be written down, not just the outcome.</dd>
+        </dl>
+      </div>
+    </section>
+
+    <section id="journey">
+      <h2><span class="num">04</span>How a deal flows through it</h2>
+
+      <p>
+        This is the whole product in sequence. Each step says who does it, and where the
+        automation would take over if it were triggering.
+      </p>
+
+      <ol class="journey">
+        <li>
+          <span class="step-mark">1</span>
+          <div class="step-body">
+            <h3>A builder asks for cover</h3>
+            <p class="who">Underwriter · Applicant form</p>
+            <p>
+              An underwriter records the business: name, address, contact, licence, years
+              trading. This is now a permanent record everything else can point at.
+            </p>
+          </div>
+        </li>
+
+        <li>
+          <span class="step-mark">2</span>
+          <div class="step-body">
+            <h3>The project is written up as a quote</h3>
+            <p class="who">Underwriter · Quote form</p>
+            <p>
+              What is being built, where, how big, how long, what from. How much cover is
+              wanted. What could go wrong on site. The form hides the questions that do not
+              apply. It starts as a <strong>Draft</strong>, and the underwriter moves it to
+              <strong>Submitted</strong> when it is complete.
+            </p>
+          </div>
+        </li>
+
+        <li>
+          <span class="step-mark">3</span>
+          <div class="step-body">
+            <h3>The premium is worked out</h3>
+            <p class="who">Automatic helper · Quote Pricing</p>
+            <p>
+              Base rate for the project type, multiplied by the value insured, then adjusted
+              four times — duration, construction, builder experience, location. Minimum $500.
+              The price and every adjustment are written back onto the quote, which becomes
+              <strong>Priced</strong>, and a review job appears on the underwriter's list.
+            </p>
+            <p>
+              <span class="stamp blocked">Manual for now</span> &nbsp;Until the platform fault
+              is fixed, an underwriter applies the rate tables themselves and types the result in.
+              The Assistant can talk them through it.
+            </p>
+          </div>
+        </li>
+
+        <li>
+          <span class="step-mark">4</span>
+          <div class="step-body">
+            <h3>The quote document goes out</h3>
+            <p class="who">Underwriter · Quotation template</p>
+            <p>
+              A PDF is produced from the priced quote, showing the price and how it was
+              reached, with signature lines. It is filed in storage and linked from the quote.
+            </p>
+          </div>
+        </li>
+
+        <li>
+          <span class="step-mark">5</span>
+          <div class="step-body">
+            <h3>The customer accepts</h3>
+            <p class="who">Underwriter · Quote form</p>
+            <p>
+              The underwriter sets the quote to <strong>Accepted</strong>. That single change
+              is the signal for everything in the next step.
+            </p>
+          </div>
+        </li>
+
+        <li>
+          <span class="step-mark">6</span>
+          <div class="step-body">
+            <h3>The policy is created</h3>
+            <p class="who">Automatic helper · Quote Acceptance</p>
+            <p>
+              A policy appears, carrying the agreed figures across untouched. It gets a
+              reference, cover dates running twelve months from the project start, and a
+              premium marked unpaid. The quote and policy point at each other. A setup job
+              lands on the underwriter's list, due tomorrow.
+            </p>
+            <p>
+              <span class="stamp blocked">Manual for now</span> &nbsp;Same fault. The
+              underwriter creates the policy by hand and copies the figures across.
+            </p>
+          </div>
+        </li>
+
+        <li>
+          <span class="step-mark">7</span>
+          <div class="step-body">
+            <h3>The policy schedule is issued</h3>
+            <p class="who">Underwriter · Policy Schedule template</p>
+            <p>
+              The formal confirmation of cover, produced from the policy and sent to the
+              customer.
+            </p>
+          </div>
+        </li>
+
+        <li>
+          <span class="step-mark">8</span>
+          <div class="step-body">
+            <h3>A month before expiry, the renewal is flagged</h3>
+            <p class="who">Automatic helper · Daily Renewal Scan</p>
+            <p>
+              Every morning the system checks for policies expiring in about a month and
+              raises one job listing them all. The underwriter works down the list, raising a
+              renewal quote for each — which starts this whole sequence again at step&nbsp;2.
+            </p>
+            <p><span class="stamp works">Working today</span></p>
+          </div>
+        </li>
+      </ol>
+
+      <div class="note">
+        <span class="note-label">How the pieces hold together</span>
+        <p>
+          The <strong>forms</strong> hold the facts. The <strong>helpers</strong> move facts
+          between forms and do the sums forms cannot. The <strong>workspace</strong> is where
+          helpers ask people for things. The <strong>templates</strong> turn facts into
+          paperwork a customer can read. And the references — every quote and policy has one —
+          are the thread that lets you follow one job from enquiry to renewal.
+        </p>
+      </div>
+    </section>
+
+    <section id="limits">
+      <h2><span class="num">05</span>What it deliberately cannot do</h2>
+
+      <p>
+        The original requirements asked for a number of things the platform genuinely cannot
+        provide. They were left out on purpose rather than half-built, and it is better to
+        know that now than to discover it in a demo.
+      </p>
+
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Asked for</th>
+              <th>Why not</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>A drag-and-drop board of work</td>
+              <td>No board view exists on the platform. Work shows as a list.</td>
+            </tr>
+            <tr>
+              <td>Notifications and emails</td>
+              <td>Nothing can send a message. A job on someone's list is the only way to get their attention — so every "notify the underwriter" step became a job instead.</td>
+            </tr>
+            <tr>
+              <td>Reference numbers like <code>BR-2026-00001</code></td>
+              <td>The platform has no safe way to count. Two people accepting at the same moment could get the same number. References are built from each record's own unique id instead — guaranteed unique, just not in sequence.</td>
+            </tr>
+            <tr>
+              <td>Documents attached to a record</td>
+              <td>Records hold no files. Documents go to file storage and the record holds a link.</td>
+            </tr>
+            <tr>
+              <td>Sorting and filtering the lists</td>
+              <td>Table views can choose which columns appear, and nothing more.</td>
+            </tr>
+            <tr>
+              <td>One renewal quote raised per expiring policy</td>
+              <td>A helper can read many records but write to one. Hence the single summary list.</td>
+            </tr>
+            <tr>
+              <td>Automatic reassignment when a risk is referred to a colleague</td>
+              <td>Same reason — it would mean reassigning several jobs at once.</td>
+            </tr>
+            <tr>
+              <td>Reporting, conversion rates, productivity figures</td>
+              <td>These are platform-wide capabilities, not something a product like this can add.</td>
+            </tr>
+            <tr>
+              <td>Access control, change history, encryption, uptime guarantees</td>
+              <td>Also platform-wide concerns, outside what this portal configures.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        There is a fuller written record of all of this, with the reason for each decision, in
+        the project's own specification document.
+      </p>
+    </section>
+
+    <section id="links">
+      <h2><span class="num">06</span>Everywhere to look</h2>
+
+      <p>Every link here has been checked and goes to a real screen.</p>
+
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>To see</th>
+              <th>Go to</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>The to-do list</td><td><a href="https://app.microstrate.io/en/hub/spaces/UNDERWRITING/tasks">Underwriting workspace</a></td></tr>
+            <tr><td>Applicants, quotes and policies</td><td><a href="https://app.microstrate.io/en/hub/spaces/UNDERWRITING/records">Workspace records</a></td></tr>
+            <tr><td>The Quote form</td><td><a href="https://app.microstrate.io/en/hub/records/configs/UWQuote">UWQuote</a></td></tr>
+            <tr><td>The Policy form</td><td><a href="https://app.microstrate.io/en/hub/records/configs/UWPolicy">UWPolicy</a></td></tr>
+            <tr><td>The Applicant form</td><td><a href="https://app.microstrate.io/en/hub/records/configs/UWClient">UWClient</a></td></tr>
+            <tr><td>Pricing helper</td><td><a href="https://app.microstrate.io/en/hub/flows/ms+hub+config+workflow+3184361339+3685425597">Quote Pricing</a></td></tr>
+            <tr><td>Policy creation helper</td><td><a href="https://app.microstrate.io/en/hub/flows/ms+hub+config+workflow+3184361339+3737665316">Quote Acceptance</a></td></tr>
+            <tr><td>Renewal helper</td><td><a href="https://app.microstrate.io/en/hub/flows/ms+hub+config+workflow+3184361339+695113787">Daily Renewal Scan</a></td></tr>
+            <tr><td>All helpers, and their run history</td><td><a href="https://app.microstrate.io/en/hub/flows">Flows</a></td></tr>
+            <tr><td>What is scheduled to run</td><td><a href="https://app.microstrate.io/en/hub/scheduled">Scheduled triggers</a></td></tr>
+            <tr><td>The document templates</td><td><a href="https://app.microstrate.io/en/hub/account?tab=specialization">Account → Specialization</a></td></tr>
+            <tr><td>Generated PDFs and template sources</td><td><a href="https://app.microstrate.io/en/hub/resources/storage/obj/manage?bucket=microstrate-documents">Document storage</a></td></tr>
+            <tr><td>The packaged portal, ready to install</td><td><a href="https://app.microstrate.io/en/hub/spaces/VERTICAL/files">Template library</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <span class="note-label">A tip for looking around</span>
+        <p>
+          Start with the <a href="https://app.microstrate.io/en/hub/records/configs/UWQuote">Quote form</a>.
+          It is the most substantial thing here and shows the conditional questions working —
+          switch "Prior losses?" on and watch a new box appear; change the project type between
+          New Construction, Renovation and Demolition and watch the questions change with it.
+        </p>
+      </div>
+    </section>
+
+    <section id="next">
+      <h2><span class="num">07</span>What happens next</h2>
+
+      <p>Three things are outstanding, in order of importance.</p>
+
+      <h3>Install it into a real company account</h3>
+      <p>
+        The whole portal is packaged and ready — 11 components sitting in the
+        <a href="https://app.microstrate.io/en/hub/spaces/VERTICAL/files">template library</a>,
+        waiting to be switched on. Doing that needs a company account other than the one it was
+        built in, which we do not currently have access to. Installing it into the account it was
+        built in would prove nothing, because everything is already there.
+      </p>
+      <p>
+        This is the last unproven step. Everything up to it has been tested.
+      </p>
+
+      <h3>Get the automation fault fixed</h3>
+      <p>
+        A developer needs to make the Save button include the piece of information the automation
+        system waits for. We have a precise write-up of where and why, with a reproducible test.
+      </p>
+      <p>
+        One thing to weigh before it is done: that change switches automatic steps on across the
+        whole platform, including for the two products already live with customers, some of them
+        possibly for the first time. It should be tested somewhere safe first.
+      </p>
+
+      <h3>Have an underwriter use it</h3>
+      <p>
+        Everything reported here was tested by us. The forms have not yet been through a real
+        underwriter pricing a real job, which is the only way to find out whether the questions
+        are the right questions and in the right order.
+      </p>
+    </section>
+
+    <footer>
+      <p>
+        Insurance Underwriting Portal — Builders Risk. Built on the Quiva platform,
+        4&nbsp;August&nbsp;2026. Everything described here has been checked against the
+        live system; where something is untested or blocked, it says so.
+      </p>
+    </footer>
+
+  </main>
+</div>

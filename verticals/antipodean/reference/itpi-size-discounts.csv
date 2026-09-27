@@ -1,0 +1,11 @@
+band_id,revenue_min,revenue_max,discount_percent
+itpi_size_01,0,100000,0
+itpi_size_02,100001,300000,10
+itpi_size_03,300001,500000,15
+itpi_size_04,500001,750000,35
+itpi_size_05,750001,1.5e+06,45
+itpi_size_06,1.5e+06,2.5e+06,55
+itpi_size_07,2.5e+06,5e+06,65
+itpi_size_08,5e+06,7.5e+06,70
+itpi_size_09,7.5e+06,1e+07,75
+itpi_size_10,1e+07,2.5e+07,80

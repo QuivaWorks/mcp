@@ -1,0 +1,224 @@
+{
+ "name": "outcome-materialise",
+ "description": "D2 (distributor side). Writes the outcome record from a decision the publisher projects over this account's own gateway mapping POST /decision. Create-or-update, version-ordered, one writer: nothing else writes quote_outcome. config.result names DECIDE_WRITE, the last node every branch reaches -- a result naming a node only one branch reaches 504s an awaited run while the run succeeds.",
+ "config": {
+  "static": {
+   "space_id": "ANTIPODEAN"
+  },
+  "result": "$.DECIDE_WRITE",
+  "nodes": [
+   {
+    "id": "TRIGGER_DECISION",
+    "data": {
+     "id": "TRIGGER_DECISION",
+     "node_type": "trigger",
+     "payload": {},
+     "name": "Decision projected by the publisher (gateway)"
+    }
+   },
+   {
+    "id": "NORMALISE",
+    "data": {
+     "id": "NORMALISE",
+     "node_type": "eval",
+     "payload": {
+      "code": "(function () {\n  var p = trg || {};\n  // A '@' in a subject breaks consumer delivery and acks; a dotted ref_id\n  // misroutes on positional subject parsing. Nothing here reaches a subject,\n  // but a record id that carries either is a forged id, not a real one.\n  function cleanId(v) {\n    var s = String(v == null ? '' : v);\n    return /^[A-Za-z0-9_-]{1,128}$/.test(s) ? s : '';\n  }\n  var quoteId = cleanId(p.quote_id);\n  var ver = Number(p.submission_version);\n  if (!isFinite(ver)) ver = 0;\n  return {\n    ok: quoteId !== '' && ver > 0,\n    reason: quoteId === '' ? 'missing or malformed quote_id'\n          : (ver > 0 ? '' : 'missing or non-positive submission_version'),\n    quote_id: quoteId,\n    submission_version: ver,\n    outcome_filter: JSON.stringify([{ field: 'quote_id', keyword: quoteId }]),\n    fields: {\n      quote_id: quoteId,\n      submission_version: ver,\n      quote_reference: String(p.quote_reference || ''),\n      outcome: String(p.outcome || ''),\n      outcome_status: String(p.outcome_status || ''),\n      outcome_current: 'true',\n      product_code: String(p.product_code || ''),\n      product_version: String(p.product_version || ''),\n      decision_seq: Number(p.decision_seq || 0),\n      decided_at: String(p.decided_at || ''),\n      total_payable: Number(p.total_payable || 0),\n      premium_breakdown: (p.premium_breakdown && typeof p.premium_breakdown === 'object') ? p.premium_breakdown : {},\n      reasons: Array.isArray(p.reasons) ? p.reasons : [],\n      documents: Array.isArray(p.documents) ? p.documents : [],\n      quote_validity_expiry: String(p.quote_validity_expiry || ''),\n      policy_number: String(p.policy_number || ''),\n      bound_at: String(p.bound_at || '')\n    }\n  };\n})();",
+      "params": {
+       "trg": "$.trigger"
+      }
+     },
+     "name": "Normalise + validate the projection"
+    }
+   },
+   {
+    "id": "FIND_OUTCOME",
+    "data": {
+     "id": "FIND_OUTCOME",
+     "node_type": "http",
+     "payload": {
+      "url": "https://api.microstrate.io/records",
+      "method": "GET",
+      "headers": {
+       "Authorization": "Bearer |$.env.auth_token",
+       "Content-Type": "application/json"
+      },
+      "query": {
+       "space_id": "$.static.space_id",
+       "config_id": "quote_outcome_config",
+       "filter": "$.NORMALISE.outcome_filter",
+       "limit": 5
+      }
+     },
+     "name": "Existing outcome for this quote?"
+    }
+   },
+   {
+    "id": "DECIDE_WRITE",
+    "data": {
+     "id": "DECIDE_WRITE",
+     "node_type": "eval",
+     "payload": {
+      "code": "(function () {\n  var rows = (q && q.results) ? q.results : [];\n  // The index can return one record twice across an update, so de-duplicate by\n  // record id before deciding anything from a count.\n  var seen = {}, uniq = [];\n  for (var i = 0; i < rows.length; i++) {\n    var r = rows[i] || {};\n    if (!r.id || seen[r.id]) continue;\n    seen[r.id] = true; uniq.push(r);\n  }\n  if (!nrm.ok) return { action: 'refuse', reason: nrm.reason, record_id: '', stored_version: 0 };\n  if (uniq.length === 0) return { action: 'create', reason: 'no outcome record for this quote', record_id: '', stored_version: 0, payload: nrm.fields };\n  var cur = uniq[0];\n  var stored = Number((cur.data && cur.data.submission_version) || 0);\n  if (nrm.submission_version < stored) {\n    return { action: 'stale', reason: 'decision for v' + nrm.submission_version + ' arrived after v' + stored, record_id: cur.id, stored_version: stored };\n  }\n  return { action: 'update', reason: '', record_id: cur.id, stored_version: stored, payload: nrm.fields };\n})();",
+      "params": {
+       "q": "$.FIND_OUTCOME.data",
+       "nrm": "$.NORMALISE"
+      }
+     },
+     "name": "Create, update, drop stale, or refuse"
+    }
+   },
+   {
+    "id": "WRITE_GATE",
+    "data": {
+     "id": "WRITE_GATE",
+     "node_type": "condition",
+     "payload": [
+      {
+       "condition": {
+        "operator": "=",
+        "input": [
+         "$.DECIDE_WRITE.action",
+         "refuse"
+        ]
+       },
+       "outcome": "REFUSE"
+      },
+      {
+       "condition": {
+        "operator": "=",
+        "input": [
+         "$.DECIDE_WRITE.action",
+         "stale"
+        ]
+       },
+       "outcome": "DROP_STALE"
+      },
+      {
+       "condition": {
+        "operator": "=",
+        "input": [
+         "$.DECIDE_WRITE.action",
+         "update"
+        ]
+       },
+       "outcome": "UPDATE_OUTCOME"
+      },
+      {
+       "outcome": "CREATE_OUTCOME"
+      }
+     ],
+     "name": "Write gate"
+    }
+   },
+   {
+    "id": "REFUSE",
+    "data": {
+     "id": "REFUSE",
+     "node_type": "error",
+     "payload": {
+      "message": "Refusing the projection: |$.DECIDE_WRITE.reason",
+      "status_code": 400
+     },
+     "name": "Refuse a malformed projection"
+    }
+   },
+   {
+    "id": "DROP_STALE",
+    "data": {
+     "id": "DROP_STALE",
+     "node_type": "eval",
+     "payload": {
+      "code": "(function(){ return { dropped: true, reason: r, stored_version: sv }; })();",
+      "params": {
+       "r": "$.DECIDE_WRITE.reason",
+       "sv": "$.DECIDE_WRITE.stored_version"
+      }
+     },
+     "name": "Drop a stale decision"
+    }
+   },
+   {
+    "id": "CREATE_OUTCOME",
+    "data": {
+     "id": "CREATE_OUTCOME",
+     "node_type": "http",
+     "payload": {
+      "url": "https://api.microstrate.io/records/quote_outcome_config",
+      "method": "POST",
+      "headers": {
+       "Authorization": "Bearer |$.env.auth_token",
+       "Content-Type": "application/json"
+      },
+      "data": {
+       "space_id": "$.static.space_id",
+       "folder": "$.NORMALISE.quote_id",
+       "data": "$.DECIDE_WRITE.payload"
+      }
+     },
+     "name": "Create the outcome record"
+    }
+   },
+   {
+    "id": "UPDATE_OUTCOME",
+    "data": {
+     "id": "UPDATE_OUTCOME",
+     "node_type": "http",
+     "payload": {
+      "url": "https://api.microstrate.io/records/quote_outcome_config/|$.DECIDE_WRITE.record_id",
+      "method": "PUT",
+      "headers": {
+       "Authorization": "Bearer |$.env.auth_token",
+       "Content-Type": "application/json"
+      },
+      "data": {
+       "data": "$.DECIDE_WRITE.payload"
+      }
+     },
+     "name": "Update the outcome record"
+    }
+   }
+  ],
+  "edges": [
+   {
+    "id": "TRIGGER_DECISION-NORMALISE",
+    "source": "TRIGGER_DECISION",
+    "target": "NORMALISE"
+   },
+   {
+    "id": "NORMALISE-FIND_OUTCOME",
+    "source": "NORMALISE",
+    "target": "FIND_OUTCOME"
+   },
+   {
+    "id": "FIND_OUTCOME-DECIDE_WRITE",
+    "source": "FIND_OUTCOME",
+    "target": "DECIDE_WRITE"
+   },
+   {
+    "id": "DECIDE_WRITE-WRITE_GATE",
+    "source": "DECIDE_WRITE",
+    "target": "WRITE_GATE"
+   },
+   {
+    "id": "WRITE_GATE-REFUSE",
+    "source": "WRITE_GATE",
+    "target": "REFUSE"
+   },
+   {
+    "id": "WRITE_GATE-DROP_STALE",
+    "source": "WRITE_GATE",
+    "target": "DROP_STALE"
+   },
+   {
+    "id": "WRITE_GATE-UPDATE_OUTCOME",
+    "source": "WRITE_GATE",
+    "target": "UPDATE_OUTCOME"
+   },
+   {
+    "id": "WRITE_GATE-CREATE_OUTCOME",
+    "source": "WRITE_GATE",
+    "target": "CREATE_OUTCOME"
+   }
+  ]
+ }
+}

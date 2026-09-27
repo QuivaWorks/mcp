@@ -1,0 +1,30 @@
+{
+  "name": "Void Override",
+  "description": "Raised by flow 4 (policy-void) at day 61 when a policy's void timer fires unpaid. Extending the term instead of letting the void stand requires a written justification \u2014 there is no audit trail on a record edit anywhere in the platform, so the justification captured here, on this task's required form field, is the only record of why an override happened (spec \u00a74.5.5).",
+  "vertical": "antipodean",
+  "priority": "medium",
+  "tags": [
+    "override"
+  ],
+  "task_actions": [
+    {
+      "kind": "form",
+      "description": "Confirm the term-extension override and record a justification",
+      "config_id": "policy_config",
+      "configs": [
+        {
+          "id": "policy_config",
+          "view": "override"
+        }
+      ]
+    }
+  ],
+  "_notes": {
+    "priority_and_tag": "Both copied verbatim from contract artefact 4: priority `medium` (the space default; flow 4 policy-void writes it explicitly on this task kind) and tag `override`, which also feeds the \u00a74.5.5 audit surface \u2014 the only cheap way to list every override raised.",
+    "no_referral_tag": "Same load-bearing exclusion as Sanctions/Claims \u2014 no `referral` tag means flow 11 never acts on a Void Override task, however its status moves. This is what stops ticking this task's action from ever issuing a quote (\u00a76.4).",
+    "COORDINATION_REQUIRED_view_override": "This form action is pinned to policy_config's `override` view \u2014 a saved entry with id 'override' under policy_config.views.forms[]. That view does not exist yet: policy_config.json (wave 2/2b's file, not edited by wave 3) currently has only a `table` view, verified live by reading the file. The dependency is exact: (1) a views.forms[] entry with \"id\": \"override\", and (2) within it, a field node for `void_override_reason` (already present in policy_config's schema, description already reads 'Enforced by the task template's required form field, not by this schema') carrying `\"rules\": [{ \"property\": \"required\", \"logic\": true, \"description\": \"...\" }]` \u2014 the same rule shape used live in the CRM vertical (verticals/crm/record_configs/Deal.json, lost_reason.required) and confirmed against records-service's ViewNode/RecordViews model (no view-level or schema-level `required` flag exists outside a field's own `rules` array; the schema's top-level `required: []` is a different, always-on mechanism that would block every write to the record, not just this task's form). This is the ONLY place \u00a74.5's 'mandatory' can live, per \u00a76.4, because no audit trail on a record edit exists anywhere.",
+    "why_view_not_schema_required": "Putting void_override_reason in policy_config.schema.required would make it mandatory on every write to every policy \u2014 including the ones that never touch voiding. The per-view `rules` mechanism scopes the requirement to exactly this form action, which is the only place a human is asked for it.",
+    "assignees": "Deliberately left unset \u2014 see the Underwriting Review template's note; no real underwriter/authorised-override user id exists on this staging account to hardcode. recon-c build item 10 additionally names a CEL policy gate on `session.user_id`/`session.role` for reinstatement, which is a platform-work item, not a task-template field.",
+    "installed_on_staging": "Created via POST /workspaces/task-template on api.microstrate.io (account 8243246585) as tt_7kLYbeG4uA. Verified back via GET /workspaces/task-template/tt_7kLYbeG4uA and GET /workspaces/task-templates?vertical=antipodean (4 results). Not deployed via the vertical-folder mechanism \u2014 task_templates is not one of the six routing-key folders in \u00a78.11, so this file is the authored source of truth and the id above is the live install; there is no deploy step that re-derives one from the other."
+  }
+}

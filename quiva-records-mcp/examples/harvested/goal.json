@@ -1,0 +1,476 @@
+{
+  "slug": "goal",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "config_id": "goal",
+    "harvested": "live record config (configs only — no record data)"
+  },
+  "featured": false,
+  "teaches": [
+    "required fields",
+    "format: date",
+    "enums",
+    "schema types: array, number|null, object, string, string|null"
+  ],
+  "form_node_count": 0,
+  "config": {
+    "id": "goal",
+    "name": "Goal",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "client_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Client ID"
+            }
+          },
+          "type": "string"
+        },
+        "created_by": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Created By"
+            }
+          },
+          "type": "string"
+        },
+        "created_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Created Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "goal_description": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Goal Description"
+            }
+          },
+          "type": "string"
+        },
+        "goal_id": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Goal ID"
+            }
+          },
+          "type": "string"
+        },
+        "goal_owner": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Goal Owner",
+              "options": [
+                {
+                  "text": "Primary Client",
+                  "value": "primary_client"
+                },
+                {
+                  "text": "Joint Client",
+                  "value": "joint_client"
+                },
+                {
+                  "text": "Both",
+                  "value": "both"
+                }
+              ]
+            }
+          },
+          "type": "string",
+          "enum": [
+            "primary_client",
+            "joint_client",
+            "both"
+          ]
+        },
+        "goal_type": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Goal Type",
+              "options": [
+                {
+                  "text": "Retirement",
+                  "value": "retirement"
+                },
+                {
+                  "text": "Education",
+                  "value": "education"
+                },
+                {
+                  "text": "Home Purchase",
+                  "value": "home_purchase"
+                },
+                {
+                  "text": "Wealth Accumulation",
+                  "value": "wealth_accumulation"
+                },
+                {
+                  "text": "Debt Reduction",
+                  "value": "debt_reduction"
+                },
+                {
+                  "text": "Income Protection",
+                  "value": "income_protection"
+                },
+                {
+                  "text": "Estate Planning",
+                  "value": "estate_planning"
+                },
+                {
+                  "text": "Tax Planning",
+                  "value": "tax_planning"
+                },
+                {
+                  "text": "Other",
+                  "value": "other"
+                }
+              ]
+            }
+          },
+          "type": "string",
+          "enum": [
+            "retirement",
+            "education",
+            "home_purchase",
+            "wealth_accumulation",
+            "debt_reduction",
+            "income_protection",
+            "estate_planning",
+            "tax_planning",
+            "other"
+          ]
+        },
+        "last_modified_by": {
+          "ui": {
+            "inputType": "text",
+            "props": {
+              "label": "Last Modified By"
+            }
+          },
+          "type": "string"
+        },
+        "last_modified_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Last Modified Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        },
+        "notes": {
+          "ui": {
+            "inputType": "textarea",
+            "props": {
+              "label": "Notes"
+            }
+          },
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "priority": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Priority",
+              "options": [
+                {
+                  "text": "Low",
+                  "value": "low"
+                },
+                {
+                  "text": "Medium",
+                  "value": "medium"
+                },
+                {
+                  "text": "High",
+                  "value": "high"
+                },
+                {
+                  "text": "Critical",
+                  "value": "critical"
+                }
+              ]
+            }
+          },
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "progress_percentage": {
+          "ui": {
+            "inputType": "number",
+            "props": {
+              "label": "Progress Percentage",
+              "max": 100,
+              "min": 0
+            }
+          },
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "status": {
+          "ui": {
+            "inputType": "dropdown",
+            "props": {
+              "label": "Status",
+              "options": [
+                {
+                  "text": "Active",
+                  "value": "active"
+                },
+                {
+                  "text": "Achieved",
+                  "value": "achieved"
+                },
+                {
+                  "text": "On Hold",
+                  "value": "on_hold"
+                },
+                {
+                  "text": "Abandoned",
+                  "value": "abandoned"
+                }
+              ]
+            }
+          },
+          "default": "active",
+          "type": "string",
+          "enum": [
+            "active",
+            "achieved",
+            "on_hold",
+            "abandoned"
+          ]
+        },
+        "strategy_ids": {
+          "ui": {
+            "inputType": "array",
+            "props": {
+              "helpText": {
+                "markdown": "IDs of strategies addressing this goal"
+              },
+              "label": "Strategy IDs"
+            }
+          },
+          "description": "IDs of strategies addressing this goal",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "strategy_id": {
+                "ui": {
+                  "inputType": "text",
+                  "props": {
+                    "helpText": {
+                      "markdown": "ID of strategy"
+                    },
+                    "label": "Strategy ID"
+                  }
+                },
+                "description": "ID of strategy",
+                "type": "string"
+              }
+            },
+            "required": [
+              "strategy_id"
+            ]
+          }
+        },
+        "target_amount": {
+          "ui": {
+            "inputType": "currency",
+            "props": {
+              "label": "Target Amount"
+            }
+          },
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "target_date": {
+          "ui": {
+            "inputType": "date",
+            "props": {
+              "label": "Target Date"
+            }
+          },
+          "type": "string",
+          "format": "date"
+        }
+      },
+      "required": [
+        "goal_id",
+        "client_id",
+        "goal_type",
+        "goal_description",
+        "goal_owner",
+        "target_date",
+        "priority",
+        "status",
+        "created_date",
+        "created_by",
+        "last_modified_date",
+        "last_modified_by"
+      ]
+    },
+    "views": {
+      "form": {
+        "type": "grid",
+        "props": {
+          "gridTemplateColumns": "1fr",
+          "gap": 20
+        },
+        "children": [
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr 1fr",
+              "gap": 15
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "goal_id"
+              },
+              {
+                "type": "field",
+                "field": "client_id"
+              },
+              {
+                "type": "field",
+                "field": "goal_type"
+              },
+              {
+                "type": "field",
+                "field": "goal_owner"
+              },
+              {
+                "type": "field",
+                "field": "goal_description"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr 1fr",
+              "gap": 15
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "target_amount"
+              },
+              {
+                "type": "field",
+                "field": "target_date"
+              },
+              {
+                "type": "field",
+                "field": "priority"
+              }
+            ]
+          },
+          {
+            "type": "grid",
+            "props": {
+              "gridTemplateColumns": "1fr 1fr",
+              "gap": 15
+            },
+            "children": [
+              {
+                "type": "field",
+                "field": "status"
+              },
+              {
+                "type": "field",
+                "field": "progress_percentage"
+              },
+              {
+                "type": "field",
+                "field": "notes"
+              },
+              {
+                "type": "field",
+                "field": "strategy_ids"
+              },
+              {
+                "type": "field",
+                "field": "created_date"
+              },
+              {
+                "type": "field",
+                "field": "created_by"
+              },
+              {
+                "type": "field",
+                "field": "last_modified_date"
+              },
+              {
+                "type": "field",
+                "field": "last_modified_by"
+              }
+            ]
+          }
+        ]
+      },
+      "table": {
+        "type": "table",
+        "columns": [
+          {
+            "field": "goal_id",
+            "order": 1
+          },
+          {
+            "field": "client_id",
+            "order": 2
+          },
+          {
+            "field": "goal_type",
+            "order": 3
+          },
+          {
+            "field": "target_date",
+            "order": 4
+          },
+          {
+            "field": "priority",
+            "order": 5
+          },
+          {
+            "field": "status",
+            "order": 6
+          },
+          {
+            "field": "progress_percentage",
+            "order": 7
+          }
+        ]
+      }
+    },
+    "created_at": "2026-07-10T14:47:31Z",
+    "updated_at": "2026-07-10T15:25:31Z"
+  }
+}

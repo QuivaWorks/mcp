@@ -1,0 +1,102 @@
+{
+  "id": "postcode_state_config",
+  "name": "Postcode to State",
+  "description": "Publisher-side (Antipodean) reference table, loaded by P22 from CSV. Resolves a postcode to a state so the right stamp duty rate applies \u2014 CONDITIONAL on open question 7 (is stamp duty apportioned by gen_revenue_* splits or by business-address postcode). The mapping CONTENT is in no supplied file (contract artefact 2).",
+  "label": "Postcode/State",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "postcode": {
+        "type": "string",
+        "title": "Postcode",
+        "description": "The natural key. STRING, not number \u2014 leading zeros are significant in NT and parts of ACT; a numeric index field would coerce '0800' to 800 and match nothing (contract artefact 2). identity_fields for the P22 loader job.",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Postcode"
+          }
+        }
+      },
+      "state": {
+        "type": "string",
+        "title": "State",
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "State",
+            "options": [
+              {
+                "text": "NSW",
+                "value": "NSW"
+              },
+              {
+                "text": "VIC",
+                "value": "VIC"
+              },
+              {
+                "text": "QLD",
+                "value": "QLD"
+              },
+              {
+                "text": "WA",
+                "value": "WA"
+              },
+              {
+                "text": "SA",
+                "value": "SA"
+              },
+              {
+                "text": "TAS",
+                "value": "TAS"
+              },
+              {
+                "text": "ACT",
+                "value": "ACT"
+              },
+              {
+                "text": "NT",
+                "value": "NT"
+              }
+            ]
+          }
+        },
+        "enum": [
+          "NSW",
+          "VIC",
+          "QLD",
+          "WA",
+          "SA",
+          "TAS",
+          "ACT",
+          "NT"
+        ]
+      }
+    }
+  },
+  "views": {
+    "table": {
+      "type": "table",
+      "columns": [
+        {
+          "field": "postcode",
+          "order": 0
+        },
+        {
+          "field": "state",
+          "order": 1
+        }
+      ]
+    }
+  },
+  "index_fields": [
+    {
+      "field": "postcode",
+      "type": "keyword"
+    },
+    {
+      "field": "state",
+      "type": "keyword"
+    }
+  ]
+}

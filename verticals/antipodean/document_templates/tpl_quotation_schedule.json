@@ -1,0 +1,41 @@
+{
+  "key": "tpl_quotation_schedule",
+  "label": "Quotation Schedule",
+  "source": {
+    "key": "obj://microstrate-documents/antipodean.tpl_quotation_schedule.docx",
+    "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  },
+  "output": {
+    "name": "quotation-schedule-{quote_reference}",
+    "content_type": "application/pdf",
+    "bucket": "microstrate-documents",
+    "folder": "antipodean.quotes"
+  },
+  "_notes": {
+    "source_file": "tpl_quotation_schedule.docx sits beside this config in the repo. It is NOT deployed by the vertical \u2014 only this config is. Upload the DOCX to the target account first with a POST (not PUT) to /api/default-storage/object/microstrate-documents/antipodean.tpl_quotation_schedule.docx; a PUT returns 200 and stores nothing.",
+    "placeholders": [
+      "#broker_reasons",
+      ".",
+      "/broker_reasons",
+      "gen_occupation",
+      "gen_policyholder_name",
+      "outcome_status",
+      "quote_reference",
+      "quote_validity_expiry",
+      "total_payable"
+    ],
+    "scalar_tags": [
+      "{gen_occupation}",
+      "{gen_policyholder_name}",
+      "{outcome_status}",
+      "{quote_reference}",
+      "{quote_validity_expiry}",
+      "{total_payable}"
+    ],
+    "loop_arrays": [
+      "broker_reasons"
+    ],
+    "payload_contract": "A trigger payload MUST supply every scalar key below and, for each loop, an array under the loop's own name. Any placeholder with no matching key renders as an EMPTY STRING, silently, and the job still reports success (docxtemplater nullGetter -> ''). Names are exactly as extracted from the committed .docx by verify_merge_tags.py; re-extract after ANY edit to the DOCX \u2014 never hand-edit this list.",
+    "source_record": "submission_config (answers, quote_reference) + decision_config (outcome, quote_validity_expiry, total_payable, broker_reasons). Generated publisher-side at the ACCEPT/REFER decision."
+  }
+}

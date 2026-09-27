@@ -1,0 +1,28 @@
+{
+  "name": "Underwriting Review",
+  "description": "Referral raised by flow 1 (underwriting-evaluate) when the 41-rule engine returns REFER. Review the submission, the referral reasons and the interim premium, then move this task to Approved or Declined \u2014 flow 11 (referral-decide) reads that move and writes decision_config accordingly. Do not tick the form action and leave the task open: the underwriter's own status move is what flow 11 watches, not the action.",
+  "vertical": "antipodean",
+  "priority": "high",
+  "tags": [
+    "referral"
+  ],
+  "task_actions": [
+    {
+      "kind": "form",
+      "description": "Record the referral decision \u2014 outcome, reasons and premium breakdown",
+      "config_id": "decision_config",
+      "configs": [
+        {
+          "id": "decision_config"
+        }
+      ]
+    }
+  ],
+  "_notes": {
+    "priority_and_tag": "Both copied verbatim from contract artefact 4 (04-status-vocabulary.json): priority `high` and tag `referral` are what flow 1 writes on this task kind. The `referral` tag is flow 11's mandatory gate \u2014 omitting it here would make a task seeded from this template invisible to flow 11 even after an underwriter approves it.",
+    "form_action": "Pinned to decision_config with no named view (empty `view` = the config's default view, per TaskTemplateActionConfig's doc comment in workspaces-service/model/api.go:325-334). decision_config has only a `table` view at time of writing (verified by reading record_configs/decision_config.json, not edited) \u2014 no dedicated 'underwriter' view exists yet to pin to. Leaving `view` unset is forward-compatible: whichever wave adds decision_config's form view, this template resolves it without a coordinated rename. This differs from the Void Override template below, which DOES pin a view, because that one is the plan's stated required-field mechanism and cannot be left to resolve itself.",
+    "status_and_A4-1": "Contract artefact 4's open ambiguity A4-1 leaves 'does this task carry a form action at all' explicitly undecided and safe either way. This template includes one because \u00a76.4 and recon-c build item 5 both ask for it, and because the space's `closed` status (role: done) absorbs the platform's status-reset side effect of seeding a task action at creation time (AddTaskActionHandler -> updateTaskStatusFromActions), which lands back on `open` here since ANTIPODEAN declares no `todo` role and default_status is `open` \u2014 a harmless no-op only because the action is seeded at creation, never added to an already-worked task (status_write_prohibitions #2 in artefact 4).",
+    "assignees": "Deliberately left unset. The account's only listed users (via list_users) are demo/test accounts belonging to other verticals (FAHUB client folders, admin demo logins) \u2014 none represent a real Antipodean underwriter, compliance, claims or finance user. Hardcoding one of those ids as a default assignee would misroute work. Assignment happens at task-creation/instantiation time by whoever is doing the work.",
+    "installed_on_staging": "Created via POST /workspaces/task-template on api.microstrate.io (account 8243246585) as tt_VXYm5b7CGU. Verified back via GET /workspaces/task-template/tt_VXYm5b7CGU and GET /workspaces/task-templates?vertical=antipodean (4 results). Not deployed via the vertical-folder mechanism \u2014 task_templates is not one of the six routing-key folders in \u00a78.11, so this file is the authored source of truth and the id above is the live install; there is no deploy step that re-derives one from the other."
+  }
+}

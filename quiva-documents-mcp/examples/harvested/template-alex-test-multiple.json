@@ -1,0 +1,52 @@
+{
+  "slug": "template-alex-test-multiple",
+  "kind": "template",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "subject": "ms.document.template.alex-test-multiple",
+    "key": "alex-test-multiple",
+    "harvested_from": "published version"
+  },
+  "teaches": [
+    "DOCX source rendered to a different output content_type",
+    "2 signatories with an explicit signing `order` (sequential signing)",
+    "signatory validity window ({\"year\":1}, {\"year\":1})",
+    "sub_templates: [] — no live template on this environment uses conditions"
+  ],
+  "redactions": 0,
+  "label": "Alex Test Multiple",
+  "config": {
+    "key": "alex-test-multiple",
+    "label": "Alex Test Multiple",
+    "modified": 1784719354,
+    "output": {
+      "content_type": "application/pdf"
+    },
+    "sequence": 111,
+    "signatories": [
+      {
+        "email": "{directorEmail}",
+        "name": "{directorName}",
+        "order": 1,
+        "validity": {
+          "year": 1
+        }
+      },
+      {
+        "email": "{actorEmail}",
+        "name": "{actorName}",
+        "order": 2,
+        "validity": {
+          "year": 1
+        }
+      }
+    ],
+    "source": {
+      "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "key": "Sample_Insurance_Certificate_2_signatures.docx"
+    },
+    "sub_templates": [],
+    "subject": "ms.document.template.alex-test-multiple",
+    "type": "published"
+  }
+}

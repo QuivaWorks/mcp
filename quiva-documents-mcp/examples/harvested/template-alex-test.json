@@ -1,0 +1,44 @@
+{
+  "slug": "template-alex-test",
+  "kind": "template",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "subject": "ms.document.template.alex-test",
+    "key": "alex-test",
+    "harvested_from": "published version"
+  },
+  "teaches": [
+    "DOCX source rendered to a different output content_type",
+    "one e-signature signatory with expression name/email",
+    "signatory validity window ({\"year\":1})",
+    "sub_templates: [] — no live template on this environment uses conditions"
+  ],
+  "redactions": 0,
+  "label": "Alex Test",
+  "config": {
+    "key": "alex-test",
+    "label": "Alex Test",
+    "modified": 1784651749,
+    "output": {
+      "content_type": "application/pdf"
+    },
+    "sequence": 77,
+    "signatories": [
+      {
+        "email": "{email}",
+        "name": "{firstName}",
+        "order": 1,
+        "validity": {
+          "year": 1
+        }
+      }
+    ],
+    "source": {
+      "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "key": "Sample_Insurance_Certificate _.docx"
+    },
+    "sub_templates": [],
+    "subject": "ms.document.template.alex-test",
+    "type": "published"
+  }
+}

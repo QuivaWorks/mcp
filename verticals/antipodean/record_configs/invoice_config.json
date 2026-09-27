@@ -1,0 +1,271 @@
+{
+  "id": "invoice_config",
+  "name": "Invoice",
+  "description": "Publisher-side (Antipodean) \u2014 open question OQ-17 not yet settled; see contract artefact 2 \u00a76. Spec \u00a75.3, fully enumerated (plan \u00a76.1). One invoice per bind, driving the day-46/day-61 timer backstops.",
+  "label": "Invoice",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "invoice_number": {
+        "type": "string",
+        "title": "Invoice number",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Invoice number"
+          }
+        }
+      },
+      "policy_number": {
+        "type": "string",
+        "title": "Policy number",
+        "description": "Flow 3 fires on a timer holding a policy id and must find the invoice by policy_number (contract artefact 2).",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Policy number"
+          }
+        }
+      },
+      "policy_id": {
+        "type": "string",
+        "title": "Policy id (record id)",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Policy id (record id)"
+          }
+        }
+      },
+      "broker_id": {
+        "type": "string",
+        "title": "Broker id (distributor account id)",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Broker id (distributor account id)"
+          }
+        }
+      },
+      "payment_status": {
+        "type": "string",
+        "title": "Payment status",
+        "description": "Same field as plan \u00a76.1's 'invoice_state' \u2014 one spelling; spec's enumerated name wins (01-key-list.json system_keys S-02). 'Not paid' is written as an OR over unpaid|overdue, never as a negation (contract artefact 2 limits.L1). Vocabulary: spec \u00a75.3.",
+        "enum": [
+          "unpaid",
+          "paid",
+          "overdue",
+          "refunded",
+          "cancelled"
+        ],
+        "ui": {
+          "inputType": "dropdown",
+          "props": {
+            "label": "Payment status",
+            "options": [
+              {
+                "text": "Unpaid",
+                "value": "unpaid"
+              },
+              {
+                "text": "Paid",
+                "value": "paid"
+              },
+              {
+                "text": "Overdue",
+                "value": "overdue"
+              },
+              {
+                "text": "Refunded",
+                "value": "refunded"
+              },
+              {
+                "text": "Cancelled",
+                "value": "cancelled"
+              }
+            ]
+          }
+        }
+      },
+      "issue_date": {
+        "type": "string",
+        "title": "Issue date",
+        "format": "date-time",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Issue date"
+          }
+        }
+      },
+      "due_date": {
+        "type": "string",
+        "title": "Due date",
+        "description": "issue_date + 45 days. The day-46 backstop reads it.",
+        "format": "date-time",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Due date"
+          }
+        }
+      },
+      "void_deadline": {
+        "type": "string",
+        "title": "Void deadline",
+        "description": "issue_date + 60 days. The day-61 backstop reads it.",
+        "format": "date-time",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Void deadline"
+          }
+        }
+      },
+      "paid_date": {
+        "type": "string",
+        "title": "Paid date",
+        "description": "NULLABLE \u2014 RFC3339 or empty string, never a placeholder (contract artefact 2 limits.L8, PRE-3).",
+        "format": "date-time",
+        "ui": {
+          "inputType": "date",
+          "props": {
+            "label": "Paid date"
+          }
+        }
+      },
+      "amount_due": {
+        "type": "number",
+        "title": "Amount due",
+        "minimum": 0,
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Amount due"
+          }
+        }
+      },
+      "amount_paid": {
+        "type": "number",
+        "title": "Amount paid",
+        "description": "'nothing paid' must be asked as exact:0 \u2014 min:0 and max:0 are both indistinguishable from unset (contract artefact 2 limits.L5).",
+        "minimum": 0,
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Amount paid"
+          }
+        }
+      },
+      "payment_type": {
+        "type": "string",
+        "title": "Payment type",
+        "description": "A constant ('Payment on account' \u2014 spec \u00a75.3). Not indexed; one value indexes nothing (contract artefact 2 \u00a75).",
+        "ui": {
+          "inputType": "text",
+          "props": {
+            "label": "Payment type"
+          }
+        }
+      }
+    }
+  },
+  "views": {
+    "table": {
+      "type": "table",
+      "columns": [
+        {
+          "field": "invoice_number",
+          "order": 0
+        },
+        {
+          "field": "policy_number",
+          "order": 1
+        },
+        {
+          "field": "policy_id",
+          "order": 2
+        },
+        {
+          "field": "broker_id",
+          "order": 3
+        },
+        {
+          "field": "payment_status",
+          "order": 4
+        },
+        {
+          "field": "issue_date",
+          "order": 5
+        },
+        {
+          "field": "due_date",
+          "order": 6
+        },
+        {
+          "field": "void_deadline",
+          "order": 7
+        },
+        {
+          "field": "paid_date",
+          "order": 8
+        },
+        {
+          "field": "amount_due",
+          "order": 9
+        },
+        {
+          "field": "amount_paid",
+          "order": 10
+        }
+      ]
+    }
+  },
+  "index_fields": [
+    {
+      "field": "invoice_number",
+      "type": "keyword"
+    },
+    {
+      "field": "policy_number",
+      "type": "keyword"
+    },
+    {
+      "field": "policy_id",
+      "type": "keyword"
+    },
+    {
+      "field": "broker_id",
+      "type": "keyword"
+    },
+    {
+      "field": "payment_status",
+      "type": "keyword"
+    },
+    {
+      "field": "issue_date",
+      "type": "datetime"
+    },
+    {
+      "field": "due_date",
+      "type": "datetime"
+    },
+    {
+      "field": "void_deadline",
+      "type": "datetime"
+    },
+    {
+      "field": "paid_date",
+      "type": "datetime"
+    },
+    {
+      "field": "amount_due",
+      "type": "numeric"
+    },
+    {
+      "field": "amount_paid",
+      "type": "numeric"
+    }
+  ]
+}

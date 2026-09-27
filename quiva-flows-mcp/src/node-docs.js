@@ -1,0 +1,950 @@
+// Canonical node type reference for Quiva workflows.
+//
+// Derived from the flow engine source (hub-service/runner/graph.go,
+// hub-service/model/request.go), NOT just the OpenAPI spec — the spec has a
+// few shapes the engine does not actually accept. Engine-truth wins here.
+
+export const JSONPATH_GUIDE = `
+Data references (JSONPath) usable inside node payloads:
+  $.trigger              - the trigger input passed to the run
+  $.trigger.<field>      - a field of the trigger object
+  $.static               - workflow static variables (config.static + static nodes)
+  $.context              - context variables passed at run time
+  $.env.auth_token       - the run's auth token
+  $.env.run_id           - the tracking/run id
+  $.env.headers          - request headers map
+  $.<NODE_ID>            - the full output of an upstream node
+  $.<NODE_ID>.result     - the text/object result of an agent node (agent output is an object; .result holds the answer)
+
+Concatenation inside a payload string — the resolver splits on "|" and joins the
+parts, so a pipe lets you mix literals with JSONPath in one value:
+  "$.trigger.firstName| |$.trigger.lastName"   -> "Ada Lovelace"  (the " " between pipes is a literal space)
+  "Bearer |$.env.auth_token"                   -> "Bearer eyJ..."
+  "Summarise: |$.trigger.text"                 -> literal prefix + resolved value
+
+Secrets: "SECRET::MY_SECRET_NAME::" anywhere in a payload is replaced with the
+account secret of that name at run time (resolved by GetWorkflowConfig). Create
+the secret in the account first; the placeholder is safe to commit.
+
+JSONPath is resolved in every node payload EXCEPT:
+  - static nodes (literal values only)
+  - eval nodes (only the values inside payload.params are resolved; payload.code is plain JavaScript)
+
+Workflow-level config fields:
+  config.result  - JSONPath string selecting the run's return value, e.g. "$.FINAL_NODE.result".
+                   Without it the run returns the full step-by-step log array.
+  config.static  - object of static variables available via $.static
+  config.options - { run_type: "normal"|"debounced"|"ordered", order_on, debounce_on, debounce_time, debounce_max }
+`.trim();
+
+export const GOTCHAS = [
+  'Agent nodes: nest the inline definition under payload.agent ({name, llm_provider, model, ...}); flat payloads (api_key/llm_provider/model at payload top level) are silently dropped and the node fails with "a subject, node_subject or agent property is required". Only llm_provider "claude"/"anthropic" is supported. Use the platform model aliases claude-sonnet-5, claude-opus-5-5 or claude-haiku-4-5. Older names still run but are remapped (claude-sonnet-4-x -> claude-sonnet-5, claude-opus-4-x -> claude-opus-5-5; bellerophon-workforce/model/internal/model/model_info.go), so write the current name.',
+  'Agent results ($.<ID>.result) are STRINGS even with output_schema — and NOT raw JSON: verified live 2026-07-29, the string comes back MARKDOWN-FENCED (```json\\n{...}\\n```), so a bare JSON.parse THROWS. In an eval node, extract the object first: JSON.parse(String(r).match(/\\{[\\s\\S]*\\}/)[0]).',
+  'Published workflow subjects have NO "published" segment: ms.hub.config.workflow.{collection}.{flow}. Only drafts carry ".draft.". Get the published subject from list_workflows version=published.',
+  'Update records with PUT (the records service registers put.record; PATCH returns 500 despite the records openapi saying PATCH).',
+  'Use node_type "delay", NOT "wait". The OpenAPI spec says "wait" but the engine has no such handler — a "wait" node silently does nothing.',
+  'HTTP/integration payloads use "base_url" (snake_case), NOT "baseURL". A "baseURL" key is silently ignored and the request goes to just "url". Safest: put the full URL in "url".',
+  'Node IDs must match ^[a-zA-Z_][a-zA-Z0-9_:]*$ and must not be: trigger, static, RESOLVE_ERROR, RESOLVE_SUCCESS. The server only applies that regex when the request carries validate=true, and the flow editor does not send it, so UI-authored flows contain nanoid ids with hyphens (e.g. "QsY6OWA5xVhZn9aS3lF-Z"). Use server_validate=false to update such a flow. server_validate=false skips all of ValidateConfig (hub-service/handler/create-workflow.go): the id regex, reserved ids, payload-required, schedule options.attempts, function/flow subject required and subject-exists, duplicate node ids, and edge source/target checks. But every create/update still refuses an empty node or edge id, an id containing . * > @, a space, a tab or a newline, an unknown node_type, and a record/task trigger whose id does not address its config/space (hub-service/handler/create-workflow.go ValidateGraphIDs). Publish then runs the full server validator and refuses on any error (hub-service/handler/publish-workflow.go, hub-service/validate/workflow.go).',
+  'Changing flows needs the root, admin or developer role. create/update/publish/delete workflow and create/delete collection return 403 "changing a flow needs the root, admin or developer role" for any other role (collaborator, client, monitor, billing), and 401 when the token cannot be read (hub-service/handler/account_role.go refuseUnlessFlowAuthor). Reads and runs are not gated this way.',
+  'Awaited runs on an account routed through the run queue can answer 429 with Retry-After: 5 (the account\'s concurrent-run limit is full), 504 (the run did not finish before the gateway timeout; it may still complete, so check search_run_logs before re-running), 409 (the same run attempt is already queued) or 503 with Retry-After (the queue could not take it). Back off and retry the 429/503; do not blindly retry a 504 (hub-service/handler/run_queue.go respondSyncRun).',
+  'options.attempts (> 1) is refused on a schedule node, and on a quiva-endpoint node calling microstrate.hub.post.schedule-flow or microstrate.hub.delete.unschedule-flow: a retry stamps a null topic and the timer becomes permanently uncancellable while the run reports success (hub-service/validate/schedule_attempts.go).',
+  'Every node requires a payload (server rejects nodes without one).',
+  'function nodes require an existing "subject" (ms.compute.*); flow nodes require an existing "subject" (ms.hub.config.workflow.*). The server verifies these exist.',
+  'The graph must be acyclic. The server does NOT check for cycles — a cycle means those nodes simply never run.',
+  'Nodes with no incoming edges all start immediately in parallel. A graph with no edges runs every node simultaneously.',
+  'trigger nodes are skipped at runtime — they are editor/config metadata. You do not need one for the flow to run.',
+  'A "task" TRIGGER (trigger_type: "task", starts a flow on a workspaces task event) and the "task" NODE TYPE (node_type: "task", performs a task operation inside a run) are unrelated fields that share one word. Check node_type vs trigger_type, not the word "task", to tell them apart. Neither is `task_schedule_create` / `schedule_task_event`, which is a per-task cron timer, not an event trigger. See get_flows_reference("triggers").',
+  '"gateway" is a real, live trigger_type (an inbound HTTP call routed to this flow via a trigger-service gateway mapping, Resource/ResourceType bound to the flow) — it is easy to miss because it is neither in the OpenAPI spec nor obviously named, but examples/client-folder-creation.json is a harvested, published flow that uses it.',
+  'Condition branch targets are activated directly by the condition node, but you should still add edges condition -> target so merge-node bookkeeping works when a branch is skipped.',
+  'condition / rules nodes use the rule-engine v2 DSL: branches are { condition: { operator, input }, outcome }, NOT { if, then, else }. The editor labels them IF / ELSE IF / ELSE, which is why the wrong shape looks plausible. A condition payload IS the branch array (no "rules" wrapper); a rules payload is { rules: { name: <rule> }, facts, context }. Call get_flows_reference("rules-syntax").',
+  'An operator the rules engine does not implement fails the condition or rules node before evaluation: invalid rules: rule "<NODE_ID>" (<path>): unknown operator "<op>" (hub-service/jseval/rules_validate.go ValidateRules). The validator errors on it first; get the list from get_flows_reference("rules-syntax").',
+  'A conditional chain whose last branch still has a "condition" has no catch-all: a run where nothing matches fails with "failed to determine next steps". End with { "outcome": ... } and no condition.',
+  'Nodes and edges need flow-editor presentation fields (node: position/type/measured; edge: type/edgeType/sourceHandle/targetHandle) or the graph renders stacked at the origin. create_workflow / update_workflow auto-layout anything missing.',
+  'Pipe concatenation: "$.trigger.first| |$.trigger.last" joins values with a literal middle segment; "Bearer |$.env.auth_token" prefixes a literal. Secrets use the SECRET::NAME:: placeholder.',
+  'verify-challenge nodes: a FAILED challenge is a successful node returning { success: false }, not an error. The run continues downstream regardless, so you MUST branch on $.<ID>.success — otherwise every bot submission proceeds exactly as a person\'s would. Check $.<ID>.hostname too: one widget can allow several domains and a token solved on any of them verifies on all of them.',
+  'task nodes: "operation" is a NODE-LEVEL property (data.operation), not a payload field; the server refuses payload.operation, a missing operation and an unknown one (13 operations, see get_node_type_reference("task")). Omitting space_id is not neutral — it falls back to the ESCALATE space. An empty assignees list CLEARS assignees (only an absent field is no-change), and a mapped value resolving to nothing sends exactly that. status/priority/tags are free strings server-side, so a value the space does not define is stored and then matches no filter, and the task vanishes from every board.',
+  'email nodes send ONE email to ONE recipient ("to" must be a single address, not a list) through the account\'s verified sending domain. The result {msg_id, accepted, status: "queued"} means accepted for sending, not delivered: suppression and consent are applied later. There is no retry, so do not wrap it in options.attempts.',
+  'verify-signature is the opposite of verify-challenge: a failed check REFUSES the run (401 "unauthorized", run status "refused") instead of returning a result to branch on. Map headers/body as "$.env.headers" / "$.trigger" with NO leading pipe; a pipe turns the object into a string and every call fails.',
+  'input / human-in-the-loop payload is {title, description, message, priority, assignees} (assignees = comma-separated user ids). The spec\'s "notify" email/slack block is not read by the current engine.',
+  'Prefer the task node\'s list_tasks for a filtered task lookup over a quiva-endpoint node on microstrate.workspaces.get.tasks. A quiva-endpoint node sends no filters or space_id on that subject and silently queries the default space. See get_node_type_reference("quiva-endpoint").header_lift.',
+];
+
+export const NODE_TYPES = {
+  trigger: {
+    summary:
+      'Entry-point metadata for the visual editor. No trigger node is executed as a step — it is read elsewhere to decide when to start a run and to fill $.trigger. Real dispatch happens through THREE separate mechanisms, not one: hub-service\'s own hub.trigger.* subscriber ("record", "object-store", "email", and "task" — see task_trigger below), schedule-service at PUBLISH time ("schedule" — publish-workflow.go:58-99 unschedules the previous published trigger and installs the draft\'s), and trigger-service binding a gateway mapping directly to this flow ("gateway" — see gateway_trigger below, and note this path never touches hub.trigger.* at all). Only "manual", "webhook" and "embed" are purely presentational with no dispatch behind them. ' +
+      'DO NOT CONFUSE a "task" TRIGGER with the "task" NODE TYPE. This entry (node_type: "trigger", trigger_type: "task") STARTS a flow when a workspaces task event happens. The separate `task` node type (node_type: "task", see its own entry below) PERFORMS a task operation — create/update/comment/complete-action — as a step inside an already-running flow. Same word, two different fields (trigger_type vs node_type), opposite direction (ingress vs egress).',
+    required: ['id', 'node_type', 'payload'],
+    payload: {
+      required: {},
+      optional: {
+        api_key: 'API key config for embed triggers (and for the "gateway" trigger\'s inbound auth — see gateway_trigger).',
+        embed_type: '"chat" | "form" for embed triggers',
+        theme: '"light" | "dark"',
+        element_props: '{ title, description, initialMessage, height }',
+        record_config_id: 'RECORD triggers only: the record config whose events start this flow. Must match the config id exactly.',
+        event_type:
+          'RECORD triggers only: array of event names to accept, e.g. ["record-created", "record-updated"]. Omit (or leave empty) and hub-service defaults to ["record-created","record-updated"] — NOT every record event; "record-patched" (a partial save) must be named explicitly. TASK triggers use the same field name for a different value set — see task_trigger.',
+      },
+    },
+    nodeLevelProps: {
+      trigger_type:
+        '"manual" | "schedule" | "webhook" | "embed" | "record" | "object-store" | "email" | "gateway" | "task". "manual", "webhook" and "embed" are editor metadata; "schedule" is installed at publish time (publish-workflow.go:58-99); "record" / "object-store" / "email" / "task" are live in hub-service (data.TriggerTypeRecord / TriggerTypeObjectStore / TriggerTypeEmail / TriggerTypeTask) via its hub.trigger.* subscriber; "gateway" is live through a completely different service (trigger-service) that binds a gateway mapping straight to this flow subject and never goes through hub.trigger.* — see gateway_trigger. "gateway" is a real, harvested-in-production value (examples/client-folder-creation.json) that earlier revisions of this doc omitted.',
+      topic: 'topic identifier for scheduled triggers',
+    },
+    example: {
+      id: 'TRIGGER',
+      data: {
+        id: 'TRIGGER',
+        name: 'Manual Trigger',
+        node_type: 'trigger',
+        trigger_type: 'manual',
+        payload: {},
+      },
+    },
+    record_trigger_example: {
+      // The id is NOT free-form here — see record_trigger below.
+      id: 'record:enquiry',
+      position: { x: 0, y: 0 },
+      type: 'custom',
+      data: {
+        id: 'record:enquiry',
+        name: 'On enquiry record',
+        node_type: 'trigger',
+        trigger_type: 'record',
+        payload: {
+          record_config_id: 'enquiry',
+          event_type: ['record-created', 'record-updated'],
+        },
+      },
+    },
+    record_trigger: {
+      what:
+        'Starts the flow when a record is created or updated in a given record config. records-service publishes `hub.trigger.record.<configID>.<recordID>` (RepublishRecord) and hub-service\'s subscriber fans it out to matching trigger nodes.',
+      the_id_rule:
+        'The node id MUST be exactly `record:<record_config_id>` — COLON, not dot. A dotted id splits into two subject tokens and silently disappears from workflow-history\'s single-token node lookup, so colon was adopted deliberately (same reasoning as task_trigger.the_id_rule). hub-service finds trigger nodes by GLOB on the node subject — `ms.hub.config.workflow-node.*.*.record:<configID>` (service/service.go recordTriggerNodeSubject) — and a node subject is the flow subject with ".workflow." replaced by ".workflow-node." plus "." + node.id. Enforced server-side on create AND update: checkRecordTriggerID (hub-service/handler/create-workflow.go) rejects a node whose id disagrees with its record_config_id, so there is no id-mismatch footgun. The editor writes colon too (trigger-record.component.svelte). A handful of pre-colon dotted ids (`record.<config_id>`) still exist from before this was enforced and still DISPATCH — service.go reads a legacy glob (`...record.<configID>`) alongside the colon one — but a dotted id can no longer be CREATED or UPDATED; it is read-only legacy.',
+      validator_consequence:
+        'Colon is legal in the plain node-id pattern (`^[a-zA-Z_][a-zA-Z0-9_:]*$`, hub-service validate.ValidateID), so a `record:<config_id>` id needs no validator exception for its shape — unlike the old dotted form. server_validate=false is still only needed for the unrelated nanoid-with-hyphens case (see the node-id GOTCHA above).',
+      published_only:
+        'The glob has exactly two wildcards for collection and flow, so it matches PUBLISHED node subjects only. A draft node subject carries an extra ".draft." token and never matches — a record trigger on an unpublished flow does nothing. Publish the flow before expecting record events.',
+      event_filter:
+        'payload.event_type is matched against the `x-event-type` header. An array present and non-empty is matched exactly; an ABSENT or empty array defaults to `["record-created", "record-updated"]` (hub-service/service/record_trigger_events.go defaultRecordTriggerEventTypes) — NOT every record event. `record-patched` (a partial save) must be named explicitly to be received.',
+      records_side:
+        'record_create republishes (as record-created) only when the body sets `completed: true` (or passes `test_flow`), and not with suppress_events - a plain create fires nothing. record_update republishes on any write that actually changes the record: the completed false->true transition publishes as record-updated (matching the default event_filter), any OTHER real change (data, folder, etc.) publishes as record-patched regardless of completed, and a no-op write or one with suppress_events publishes nothing. See quiva-records-mcp get_records_reference("flow-triggers").',
+      test_flow:
+        'create_record accepts `test_flow: { subject, run_id }`, which runs ONLY that flow and suppresses every configured trigger — the way to exercise a flow without a record config wired up. hub-service turns run_id into `ms.hub.run.<run_id>.<subject>` when it is not already a run subject.',
+    },
+    task_trigger_example: {
+      // Colon, not dot — see task_trigger.the_id_rule. Like record:<id>, this
+      // id already matches the plain node-id regex, no server_validate escape needed.
+      id: 'task:LEADS',
+      position: { x: 0, y: 0 },
+      type: 'custom',
+      data: {
+        id: 'task:LEADS',
+        name: 'On LEADS task event',
+        node_type: 'trigger',
+        trigger_type: 'task',
+        payload: {
+          space_id: 'LEADS',
+          event_type: ['task-created'],
+          folder: null,
+          status: null,
+          status_from: null,
+          status_to: null,
+          allow_self_trigger: false,
+        },
+      },
+    },
+    task_trigger: {
+      what:
+        'Starts the flow on a workspaces task event (created, updated, status changed, moved, deleted, action added/completed/deleted, comment created/updated/deleted). workspaces-service republishes each write to `hub.trigger.task.<space_id>.<task_id>` and hub-service\'s subscriber fans it out to matching trigger nodes — the same mechanism as record_trigger, mirrored per evari-olympus docs/task-event-trigger-plan.md §0 (the frozen wire contract this doc is sourced from).',
+      NOT_THE_TASK_NODE:
+        'This is the TRIGGER (node_type "trigger", trigger_type "task") that STARTS a flow. It is not the TASK NODE (node_type "task", see the separate `task` entry in this file) that PERFORMS a create/update/comment/complete-action as a step. Check node_type, not trigger_type, to tell them apart in a config you are reading.',
+      NOT_TASK_SCHEDULING:
+        'Also do not confuse this with `task_schedule_create` / `schedule_task_event` (quiva-workspaces-mcp, and the space/task "Automation" UI section) — that is a per-task CRON TIMER with `action_type: "flow"`. It fires a flow at a scheduled time regardless of any event; it never watches task writes. This trigger fires ONLY on an actual task write, with no timer involved. If you want "N hours after this task is created", that is scheduling, not this.',
+      the_id_rule:
+        'The node id MUST be exactly `task:<space_id>` — COLON, not dot (docs/task-event-trigger-plan.md §0 chose colon deliberately: a dotted id like record\'s legacy form splits into two subject tokens and silently breaks workflow-history\'s node lookup). hub-service finds trigger nodes by GLOB on the node subject — `ms.hub.config.workflow-node.*.*.task:<space_id>` — built the same way as the record glob. Enforced server-side on create AND update: a trigger node declaring `payload.space_id` must have id exactly `task:<space_id>` or the create/update is rejected with an explanatory error (checkTaskTriggerID, hub-service/handler/create-workflow.go — the same enforcement record_trigger now has via checkRecordTriggerID).',
+      id_already_valid:
+        'Like `record:<config_id>`, this id needs NO validator exception — colon is already legal in the plain node-id pattern (`^[a-zA-Z_][a-zA-Z0-9_:]*$`), so server_validate=false is not required for the id shape alone.',
+      payload_fields:
+        '{ space_id (required, must equal the id suffix), event_type (array, e.g. ["task-created","task-updated"]; omitted defaults to ["task-created","task-updated"] — everything noisier, e.g. task-action-added, is opt-in by name), folder (matched against the envelope\'s folder), status (matched against the task\'s CURRENT status), status_from / status_to (status ids; BOTH ONLY EVER MATCH A "task-status-changed" EVENT — status_to against the new status, status_from against the prior one; on any other event kind they simply never match, so declaring them alongside e.g. only "task-created" filters everything out), allow_self_trigger (boolean, default false) }. All filters are pre-run and evaluated before starting a run — build anything richer as a condition node instead.',
+      event_kinds:
+        'task-created, task-updated, task-status-changed, task-moved, task-deleted, task-action-added, task-action-completed, task-action-deleted, comment-created, comment-updated, comment-deleted. One write can carry several kinds at once (e.g. a status-changing update is both task-updated and task-status-changed) — hub matches on INTERSECTION with the node\'s declared event_type, so one write always starts exactly one run per matching node, never zero or two.',
+      move_behaviour:
+        'A move (task-moved) is delivered TWICE, differently, because two spaces are affected: to the DESTINATION space with every applicable kind (task-moved plus whatever else the write also is), and to the space the task LEFT carrying only task-moved — so a node bound to the old space asking for task-updated does NOT fire on a move out. In both deliveries $.trigger.space_id is the NEW space and $.trigger.old_space_id / old_folder are the ones it left, so an old-space node can still see where the task went.',
+      fan_out:
+        'Deleting a space publishes NO task events for the tasks in it. Bulk updates, subtask moves, subtask deletes and approval writes each publish one event PER TASK — a 200-task bulk move is 200 separate trigger deliveries (and 200 separate runs per matching node) — and the per-task 60/minute burst limit (see loop_controls) applies per task, not per batch.',
+      trigger_body:
+        '$.trigger is a stable envelope, NOT the raw stream delta: { event_type, occurred_at, space_id, folder, actor, task (the WHOLE task, never a partial delta), changed_fields, status_from (ONLY present on a "task-status-changed" event — the prior status; task.status is already the new one), old_space_id, old_folder (ONLY present on a "task-moved" event — see move_behaviour), action, comment }. This is deliberately unlike record_trigger, where $.trigger is the raw record — a workspaces update event is itself a partial delta, so the flow would otherwise see e.g. {id, updated_at, status} and nothing else.',
+      loop_controls:
+        'A flow that ticks a task action can cause the very status change that re-enters the same flow (updateTaskStatusFromActions runs async, so the two writes can arrive in either order). Four controls guard this: (1) self-trigger suppression, ON BY DEFAULT — a run skips a task write its own run produced; set `allow_self_trigger: true` on the node to opt out. (2) the WRITE ITSELF can request `suppress_events: true` to publish nothing at all — accepted in the body of create task, update task, add/update task action and create/update comment, and as the query param `?suppress_events=true` on deletes. From inside a flow\'s task node, add `suppress_events` to the payload of `create_task`, `update_task`, `set_task_status`, `assign_task` or `comment_task` (the editor form does not surface it — add the key directly in the JSON). `complete_task_action` builds its own request body and cannot carry it, and NO delete operation can. (3) an unchanged write (no real diff) publishes nothing at all, regardless of suppress_events. (4) a per-task burst limit of 60 events/minute/replica, the last-resort backstop — see fan_out for why this matters on a bulk write.',
+      ordering_hazard:
+        'task-action-added and the task-status-changed it can cause are two separate writes and race — do not assume one always arrives before the other.',
+      run_identity:
+        'A run started by a task trigger executes as the Authorization of whoever made the triggering write. A delivered trigger never mints a root token, and only PUBLISHED trigger nodes fire (a draft node never does).',
+      status:
+        'Implemented. hub-service/data/const.go defines TriggerTypeTask, and hub-service/service/service.go dispatches it (dispatchTrigger, taskTriggerNodeSubject). Sourced from the frozen contract in evari-olympus docs/task-event-trigger-plan.md §0/§3.',
+    },
+    gateway_trigger_example: {
+      id: 'GATEWAY_TRIGGER_ID',
+      position: { x: 0, y: 0 },
+      type: 'custom',
+      data: {
+        id: 'GATEWAY_TRIGGER_ID',
+        name: 'https://<gateway>.quiva.ai/client/create',
+        subject: 'ms.gateway.<gateway_id>.mapping.post.client-create',
+        node_type: 'trigger',
+        trigger_type: 'gateway',
+        payload: {
+          api_key: { name: 'http_trigger_...', key: '<redacted>', created_on: '...', expires_on: '...' },
+        },
+      },
+    },
+    gateway_trigger: {
+      what:
+        'Starts the flow on an inbound HTTP call to a Cerberus gateway mapping. This is the ONE trigger_type whose real dispatch does NOT go through hub-service\'s hub.trigger.* subscriber at all — trigger-service (a wholly separate system, built for external ingress) creates the gateway mapping and mapping VERSION with `Resource: <this flow\'s subject>, ResourceType: "flow"` (trigger-service/handler/post-trigger-gateway.go), so the gateway invokes the flow run directly.',
+      harvested_evidence:
+        'Real and live: examples/client-folder-creation.json (a published, harvested workflow) uses trigger_type "gateway" with a `subject` pointing at the created gateway mapping and payload.api_key holding the inbound credential. Earlier revisions of this doc omitted "gateway" from the trigger_type enum entirely despite that.',
+      do_not_confuse_with_stream_or_subject:
+        'trigger-service also has "stream" and "subject" trigger types (unrelated to flow trigger nodes documented here — they wire arbitrary Bellerophon subjects, not workflow starts). Separately, "subject" as a trigger-service TYPE is effectively DEAD: there is no POST handler for it (only post-trigger-{email,gateway,obj,stream}.go exist), and the frontend rewrites a chosen trigger_type of "subject" to "stream" before ever submitting (microstrate trigger.services.svelte.ts). Do not author a "subject" trigger_type.',
+    },
+    notes:
+      'Runtime input arrives via the run request "trigger" field and is referenced as $.trigger — not through this node. For a record trigger, $.trigger is the full record ({ id, data, folder, space_id, completed, created_at, updated_at }). For a task trigger, $.trigger is the stable envelope described in task_trigger.trigger_body — never the raw task.',
+  },
+
+  agent: {
+    summary: 'Invoke an LLM agent. The inline agent definition MUST be nested under payload.agent — flat payloads are silently dropped at runtime.',
+    required: ['id', 'node_type', 'payload'],
+    payload: {
+      required: {
+        agent:
+          'inline agent definition: { name (required), llm_provider (required: "claude" or "anthropic" — the invoke handler rejects others), model (required — use platform catalog aliases: "claude-sonnet-5", "claude-opus-5-5" or "claude-haiku-4-5"; older names such as "claude-sonnet-4-6" are remapped), behaviour, output_schema (flat map field -> short description), has_tools, tools (bit://web_search, mcp://, fun://), timeout (seconds), knowledge }. ALTERNATIVE: pass "subject" (a saved agent subject) or "node_subject" (agent node template) instead of "agent".',
+      },
+      optional: {
+        prompt:
+          'string or object at payload TOP LEVEL (not inside agent); supports JSONPath, e.g. "Summarise |$.trigger.text". Empty prompt falls back to the raw trigger.',
+        await: 'boolean at payload top level — wait for completion',
+        knowledge: 'array of knowledge URIs: kv://bucket/doc, obj://bucket/doc, str://stream/start/end, sid://session_id, dta://data',
+        session_id: 'conversation continuity (usually injected by the run)',
+      },
+    },
+    example: {
+      id: 'SUMMARISER',
+      data: {
+        id: 'SUMMARISER',
+        name: 'Summariser',
+        node_type: 'agent',
+        payload: {
+          agent: {
+            name: 'summariser',
+            llm_provider: 'claude',
+            model: 'claude-haiku-4-5',
+            behaviour: 'You summarise text in one paragraph.',
+            output_schema: { summary: 'the one-paragraph summary' },
+            timeout: 60,
+          },
+          prompt: 'Summarise: |$.trigger.text',
+          await: true,
+        },
+      },
+    },
+    notes:
+      'IMPORTANT: the agent result at $.<ID>.result is a JSON-ENCODED STRING even when output_schema is set — add an eval node after the agent to JSON.parse it before referencing fields (e.g. code: "JSON.parse(String(r).match(/\\\\{[\\\\s\\\\S]*\\\\}/)[0])", params: {r: "$.<ID>.result"}). No api_key field is needed — the platform supplies provider credentials.',
+  },
+
+  function: {
+    summary: 'Invoke a compute (Hydra) function by subject.',
+    required: ['id', 'node_type', 'subject', 'payload'],
+    nodeLevelProps: {
+      subject: 'REQUIRED — function subject, format ms.compute.<...>.function.<id>; must exist (use list_functions)',
+      response_map: 'optional JSONPath mapping applied to the function output',
+      options: '{ flat_map, backoff_ms, timeout (ms), attempts (1-10), ignore_response_codes }',
+    },
+    payload: {
+      required: {
+        payload:
+          'any JSON (object/string/array/number/bool) passed as function input; JSONPath supported throughout, e.g. "$.PREV_NODE"',
+      },
+      optional: {},
+    },
+    example: {
+      id: 'BASE64_ENCODE',
+      data: {
+        id: 'BASE64_ENCODE',
+        name: 'Base64 Encode',
+        node_type: 'function',
+        subject: 'ms.compute.1753641292.function.230114167',
+        payload: '$.CLEAN_UP.result',
+      },
+    },
+  },
+
+  integration: {
+    summary:
+      'HTTP request to a third-party API, optionally through an OAuth connection (slack, github, ...). Same runtime handler as "http".',
+    required: ['id', 'node_type', 'payload'],
+    nodeLevelProps: {
+      integration_id: 'integration identifier, e.g. "slack"',
+      request_type_id: 'request type, e.g. "post_chat_postMessage"',
+      oauth: 'OAuth connection identifier, e.g. "slack.maria"',
+      options: '{ flat_map, backoff_ms, timeout (ms), attempts, ignore_response_codes }',
+    },
+    payload: {
+      required: {
+        url: 'endpoint path or full URL',
+        method: 'HTTP method (GET/POST/... case-insensitive)',
+      },
+      optional: {
+        base_url: 'base URL joined with url — MUST be snake_case "base_url" (NOT baseURL)',
+        data: 'request body object',
+        params: 'path/query params object',
+        query: 'query params object',
+        headers: 'headers map',
+        timeout: 'ms',
+      },
+    },
+    example: {
+      id: 'SLACK_POST',
+      data: {
+        id: 'SLACK_POST',
+        name: 'Post to Slack',
+        node_type: 'integration',
+        integration_id: 'slack',
+        request_type_id: 'post_chat_postMessage',
+        oauth: 'slack.myconnection',
+        payload: {
+          base_url: 'https://slack.com/api',
+          url: '/chat.postMessage',
+          method: 'post',
+          data: { channel: '#engineering', text: '$.SUMMARISER.result' },
+        },
+      },
+    },
+    notes:
+      'Result shape: { status, statusText, headers, data }. 4xx/5xx responses become node errors (use options.ignore_response_codes or attempts to tolerate/retry).',
+  },
+
+  http: {
+    summary: 'Plain HTTP request (no OAuth integration metadata). Same handler and payload as "integration".',
+    required: ['id', 'node_type', 'payload'],
+    payload: {
+      required: {
+        url: 'endpoint path or full URL',
+        method: 'HTTP method',
+      },
+      optional: {
+        base_url: 'base URL joined with url — snake_case',
+        data: 'request body',
+        params: 'params object',
+        query: 'query params',
+        headers: 'headers map',
+        timeout: 'ms',
+      },
+    },
+    example: {
+      id: 'FETCH_USERS',
+      data: {
+        id: 'FETCH_USERS',
+        node_type: 'http',
+        payload: { url: 'https://api.example.com/users', method: 'GET' },
+      },
+    },
+  },
+
+  flow: {
+    summary: 'Invoke another (published) workflow as a sub-flow.',
+    required: ['id', 'node_type', 'subject', 'payload'],
+    nodeLevelProps: {
+      subject: 'REQUIRED — sub-workflow subject (ms.hub.config.workflow.<collection>.<flow>); must exist. There is NO "published" segment — see the gotcha; only drafts carry ".draft.". The two segments are hashes of the collection and flow names (hub-service/data/const.go:233-236), so read them off list_workflows rather than composing them from names.',
+      await: 'boolean — wait for the sub-flow to finish',
+      response_map: 'optional JSONPath mapping over the sub-flow output',
+      options: '{ flat_map, backoff_ms, timeout (ms), attempts, ignore_response_codes }',
+    },
+    payload: {
+      required: {
+        payload: 'any JSON passed as the sub-flow trigger; JSONPath supported',
+      },
+      optional: {},
+    },
+    example: {
+      id: 'ENRICH',
+      data: {
+        id: 'ENRICH',
+        node_type: 'flow',
+        subject: 'ms.hub.config.workflow.2408930879.1009853675',
+        await: true,
+        payload: { record: '$.trigger.record' },
+      },
+    },
+  },
+
+  eval: {
+    summary: 'Run a JavaScript expression over named params.',
+    required: ['id', 'node_type', 'payload'],
+    payload: {
+      required: {
+        code: 'JavaScript expression/function body. Plain JS — JSONPath is NOT resolved inside code.',
+        params:
+          'object of named params usable in code; each VALUE is JSONPath-resolved, e.g. {"c": "$.AGENT.result"}',
+      },
+      optional: {},
+    },
+    example: {
+      id: 'CLEAN_UP',
+      data: {
+        id: 'CLEAN_UP',
+        node_type: 'eval',
+        payload: {
+          code: "c.replace('```javascript\\n','').replace('\\n```','')",
+          params: { c: '$.CODE_EXPERT.result' },
+        },
+      },
+    },
+  },
+
+  condition: {
+    summary:
+      'Branching. The payload IS a conditional chain (rule-engine v2): an ordered array of { condition, outcome } branches; the first truthy one activates its target node(s). Non-selected branches are skipped.',
+    required: ['id', 'node_type', 'payload'],
+    payload: {
+      required: {
+        '<the payload itself>':
+          'an ARRAY of branches, each { condition: { operator, input }, outcome: "NODE_ID" }. The LAST branch may omit "condition" to act as the catch-all (the UI calls these IF / ELSE IF / ELSE). NOT wrapped in a "rules" key — the engine evaluates the whole payload as the rule.',
+      },
+      optional: {
+        outcomeMessage: 'per-branch: a string or expression explaining the decision',
+      },
+    },
+    example: {
+      id: 'CHECK_FOR_DUPLICATES',
+      data: {
+        id: 'CHECK_FOR_DUPLICATES',
+        node_type: 'condition',
+        payload: [
+          {
+            condition: { operator: '=', input: ['$.DEDUPE_CHECK.duplicate_exists', false] },
+            outcome: 'CREATE_FOLDER',
+          },
+          {
+            condition: { operator: '=', input: ['$.DEDUPE_CHECK.duplicate_exists', true] },
+            outcome: 'CONFLICT_RESPONSE',
+          },
+          { outcome: 'RESOLVE_ERROR' },
+        ],
+      },
+    },
+    notes:
+      'DO NOT use { if, then, else } — the engine does not recognise it; the whole payload becomes the outcome and the run fails with "value has to be a string or an array of strings". Each "outcome" must be a node id, an array of node ids, or the reserved RESOLVE_SUCCESS (end flow successfully) / RESOLVE_ERROR (fail flow). Condition nodes get EMPTY facts, so "@fact:" does not work here — reference upstream data with plain JSONPath ("$.NODE.field"), resolved before the rule runs. Also add edges condition -> target for every branch. Full DSL: get_flows_reference("rules-syntax"); real example: get_example("client-folder-creation").',
+  },
+
+  rules: {
+    summary:
+      'Evaluate a MAP of named rules against declared facts; returns { <ruleName>: outcome }. Same rule-engine v2 dialect as condition nodes, but with a facts envelope and chaining. (Not in the OpenAPI spec.)',
+    required: ['id', 'node_type', 'payload'],
+    payload: {
+      required: {
+        rules:
+          'map of rule name -> rule (a conditional chain, expression, or literal). Rules CHAIN: a later rule may reference an earlier rule\'s key with "@fact:<name>".',
+      },
+      optional: {
+        facts: 'map of fact name -> value; values may be JSONPath ("$.NODE.field") and are resolved before evaluation. Referenced in rules as "@fact:<name>".',
+        context: 'context object, e.g. { timezone: <int> }',
+      },
+    },
+    example: {
+      id: 'PRODUCT_SELECTION_RULES',
+      data: {
+        id: 'PRODUCT_SELECTION_RULES',
+        node_type: 'rules',
+        payload: {
+          facts: { 'state.value': '$.GEOCODE_RESPONSE.state', 'limit.value': '$.trigger.valueLimit' },
+          rules: {
+            'productDecision.value': [
+              { condition: { operator: 'in', input: ['@fact:state.value', ['CA', 'FL', 'NY']] }, outcome: 'Product1' },
+              {
+                condition: {
+                  operator: 'and',
+                  input: [
+                    { operator: 'in', input: ['@fact:state.value', ['MA', 'TX']] },
+                    { operator: '>', input: ['@fact:limit.value', 10000000] },
+                  ],
+                },
+                outcome: 'Product2',
+              },
+              { outcome: 'Product3' },
+            ],
+          },
+          context: {},
+        },
+      },
+    },
+    notes:
+      'Returns { <ruleName>: <outcome> } — verified live. Read a single outcome as $.<ID>.<ruleName>, but ONLY if the rule name has no dots: a dotted key like "AvatarUrl.visible" cannot be read with $.<ID>.AvatarUrl.visible (the resolver walks AvatarUrl -> visible instead of matching the literal key, and you get []). Either keep rule names dot-free when a downstream node needs them, or read the whole map with $.<ID> and pick the key in an eval node. NOTE the "rules" NODE unwraps to bare outcomes, whereas the shared rules COMPUTE FUNCTION (a "function" node with an ms.compute.* subject, as used by the harvested "product-selection-rules" example) returns the raw engine output — which is why that flow reads $.NODE..outcome. Same payload, different return shape. Full DSL: get_flows_reference("rules-syntax"); real example: get_example("product-selection-rules").',
+  },
+
+  jsonlogic: {
+    summary:
+      'Evaluate a MAP of named json-logic rules against data — the same rule language the form builder writes, so one rule set can drive both the browser gate and the server decision. Non-short-circuiting: every rule runs. (Not in the OpenAPI spec.)',
+    required: ['id', 'node_type', 'payload'],
+    payload: {
+      required: {
+        rules: 'map of rule id -> json-logic rule expression, evaluated against "data"',
+      },
+      optional: {
+        data: 'object the rules are evaluated against; JSONPath supported',
+        timeout: 'milliseconds; 0 (or omitted) uses the engine default deadline',
+      },
+    },
+    example: {
+      id: 'GATE_CHECK',
+      data: {
+        id: 'GATE_CHECK',
+        node_type: 'jsonlogic',
+        payload: {
+          rules: { over18: { '>=': [{ var: 'age' }, 18] } },
+          data: { age: '$.trigger.age' },
+        },
+      },
+    },
+    notes:
+      'Result is FLAT: $.<ID>.<ruleId>, NOT $.<ID>.result.<ruleId> like an agent node. Every rule is evaluated regardless of earlier results, so a run can assert which rules did NOT fire as well as which did.',
+  },
+
+  map: {
+    summary: 'Transform/reshape data: the payload itself is JSONPath-resolved and becomes the node output.',
+    required: ['id', 'node_type', 'payload'],
+    payload: {
+      required: {
+        payload: 'object or array template; every string value may be a JSONPath reference',
+      },
+      optional: {},
+    },
+    nodeLevelProps: {
+      options: '{ flat_map: true } to flatten array results',
+    },
+    example: {
+      id: 'SHAPE_OUTPUT',
+      data: {
+        id: 'SHAPE_OUTPUT',
+        node_type: 'map',
+        payload: {
+          summary: '$.SUMMARISER.result',
+          source: '$.trigger.url',
+        },
+      },
+    },
+  },
+
+  static: {
+    summary: 'Merge literal values into $.static for downstream nodes. LITERALS ONLY — JSONPath is not resolved here.',
+    required: ['id', 'node_type', 'payload'],
+    payload: {
+      required: {
+        payload: 'object of literal key/values merged into $.static',
+      },
+      optional: {},
+    },
+    example: {
+      id: 'CONSTANTS',
+      data: {
+        id: 'CONSTANTS',
+        node_type: 'static',
+        payload: { region: 'eu-west-2', max_items: 50 },
+      },
+    },
+  },
+
+  delay: {
+    summary: 'Pause the branch for a number of milliseconds. (The OpenAPI spec calls this "wait" — the engine only accepts "delay".)',
+    required: ['id', 'node_type', 'payload'],
+    payload: {
+      required: {
+        time_ms: 'integer milliseconds to wait; supports JSONPath',
+      },
+      optional: {},
+    },
+    example: {
+      id: 'PAUSE_5S',
+      data: {
+        id: 'PAUSE_5S',
+        node_type: 'delay',
+        payload: { time_ms: 5000 },
+      },
+    },
+  },
+
+  schedule: {
+    summary: 'Schedule another workflow run for later (relative delay or cron/ISO date).',
+    required: ['id', 'node_type', 'payload'],
+    payload: {
+      required: {
+        flow_subject: 'workflow subject to schedule; supports JSONPath',
+        trigger: 'trigger data for the scheduled run; supports JSONPath',
+      },
+      optional: {
+        trigger_in: 'delay like "5m", "1h", "2d"',
+        trigger_on: 'cron expression or ISO date',
+        name:
+          'Per-entity timer name, e.g. "invoice-reminder:|$.trigger.invoice_id". Given, the timer topic is derived from it, so each entity keeps its own timer. Omitted, the topic is derived from the node id and the node holds ONE timer: a second run replaces the first run\'s timer (hub-service/model/request.go ScheduleNodePayload, runner/graph.go handleScheduleNode).',
+      },
+    },
+    nodeLevelProps: {
+      options:
+        'Do NOT set options.attempts (> 1): it is refused on write and at run time, because a retry stamps a null topic and leaves an uncancellable timer (hub-service/validate/schedule_attempts.go).',
+    },
+    example: {
+      id: 'FOLLOW_UP',
+      data: {
+        id: 'FOLLOW_UP',
+        node_type: 'schedule',
+        payload: {
+          flow_subject: 'ms.hub.config.workflow.2408930879.1009853675',
+          trigger: { customer: '$.trigger.customer' },
+          trigger_in: '2d',
+          name: 'follow-up:|$.trigger.customer.id',
+        },
+      },
+    },
+    notes:
+      'The node result carries the derived topic, which is the only handle microstrate.hub.delete.unschedule-flow accepts. Store it if the timer may need cancelling. The scheduled run executes as the user whose run armed it; a timer armed by an unattended run replays as root (runner/graph.go handleScheduleNode).',
+  },
+
+  input: {
+    summary:
+      'Pause the flow and wait for human input; creates an escalation task. Resume via run_workflow with run_id + new trigger.',
+    required: ['id', 'node_type', 'payload'],
+    payload: {
+      required: {
+        message: 'prompt shown to the human; supports JSONPath',
+      },
+      optional: {
+        title: 'escalation task title',
+        description: 'escalation task description',
+        priority: 'task priority',
+        assignees: 'comma-separated user ids; each is emailed a task + flow link',
+      },
+    },
+    example: {
+      id: 'CONFIRM_DETAILS',
+      data: {
+        id: 'CONFIRM_DETAILS',
+        node_type: 'input',
+        payload: {
+          message: 'Please confirm the extracted invoice details: $.EXTRACTOR.result',
+          title: 'Confirm invoice details',
+          assignees: 'user_123',
+        },
+      },
+    },
+    notes:
+      'The value supplied on resume becomes this node\'s output. The OpenAPI spec\'s "notify" email/slack block is NOT read by the current engine — use title/assignees instead.',
+  },
+
+  'human-in-the-loop': {
+    summary: 'Alias of "input": pause for human approval/input via an escalation task.',
+    required: ['id', 'node_type', 'payload'],
+    payload: {
+      required: {
+        message: 'prompt for the approver; supports JSONPath',
+      },
+      optional: {
+        title: 'escalation task title',
+        description: 'escalation task description',
+        priority: 'task priority',
+        assignees: 'comma-separated user ids',
+      },
+    },
+    example: {
+      id: 'APPROVAL',
+      data: {
+        id: 'APPROVAL',
+        node_type: 'human-in-the-loop',
+        payload: {
+          message: 'Approve expense of $.trigger.amount?',
+          title: 'Expense approval',
+          assignees: 'manager_456',
+        },
+      },
+    },
+  },
+
+  'quiva-endpoint': {
+    summary: 'Invoke a Quiva endpoint by subject. (Not in the OpenAPI spec; use list_quiva_endpoints to discover subjects.)',
+    required: ['id', 'node_type', 'subject', 'payload'],
+    subject_is_allowlisted:
+      'THE SUBJECT IS A CLOSED ALLOWLIST, not an arbitrary bus subject. providers.InvokeEndpoint (hub-service/providers/endpoint.go) checks the subject against data.AllowedEndpoints and returns "endpoint not allowed: <subject>"; publish refuses the same subjects up front (hub-service/validate/workflow.go). list_quiva_endpoints returns the list (hub-service/data/endpoints.go): microstrate.storage.* KV/object/stream operations, file-generator template-trigger, hub schedule-flow / unschedule-flow / scheduled-flows, email send/status, numbergen get.counter / put.increment / post.counter, accounts distribution-message and hub workflow-run, plus the entries the task and email nodes use. A flow cannot reach any other platform service this way. For a gap-free reference number use microstrate.numbergen.put.increment, which is compare-and-swap guarded; read back the counter name it returns, because the service normalises hyphens away.',
+    header_lift:
+      'Prefer the task node\'s list_tasks operation over this node on microstrate.workspaces.get.tasks (or any other subject whose declared fields are header-mapped) for a FILTERED lookup — see get_node_type_reference("task").operations.list_tasks. The lift moves a declared header field out of the payload onto its x-param-* (or x-param-query-*) header; a field the payload does not carry is simply not sent, and every other payload field passes through untouched. Only the task node performs this lift. A quiva-endpoint node strips every x-param-* header and adds none (hub-service/providers/endpoint.go endpointHeaders), so on microstrate.workspaces.get.tasks space_id and every filter in the payload are ignored: workspaces-service falls back to the \"default\" space and returns up to 300 of its tasks, unfiltered - the wrong space, silently. Use list_tasks.',
+    nodeLevelProps: {
+      subject: 'REQUIRED — endpoint subject, and it MUST be one of the allowlisted subjects from list_quiva_endpoints',
+      options:
+        '{ flat_map, backoff_ms, timeout (ms), attempts, ignore_response_codes }. attempts (> 1) is refused when the subject is schedule-flow or unschedule-flow (hub-service/validate/schedule_attempts.go).',
+    },
+    payload: {
+      required: {
+        payload: 'any JSON passed to the endpoint; JSONPath supported',
+      },
+      optional: {},
+    },
+    example: {
+      id: 'CALL_ENDPOINT',
+      data: {
+        id: 'CALL_ENDPOINT',
+        node_type: 'quiva-endpoint',
+        subject: 'ms.gateway.endpoint.example',
+        payload: { input: '$.trigger' },
+      },
+    },
+  },
+
+  task: {
+    summary:
+      'Act on workspace tasks: create, update, set status, assign, comment, complete an action, find, delete, and book or cancel scheduled task events. (Not in the OpenAPI spec.) The operation — NOT a subject — selects the endpoint, so unlike quiva-endpoint there is nothing to look up. ' +
+      'DO NOT CONFUSE with the "task" TRIGGER (node_type: "trigger", trigger_type: "task" — see NODE_TYPES.trigger.task_trigger). This node_type performs a task operation as a step INSIDE a running flow (egress); a task trigger STARTS a flow when a task event happens (ingress). Same word "task", two different fields.',
+    required: ['id', 'node_type', 'operation', 'payload'],
+    nodeLevelProps: {
+      operation:
+        'REQUIRED, and it sits on data.operation, NOT in the payload. The server refuses payload.operation, a missing operation and an unknown one (hub-service/validate/workflow.go checkTaskNode). One of the 13 in `operations` below (hub-service/data/task_endpoints.go).',
+    },
+    operations: {
+      create_task: 'Required: title. Optional: space_id, description, status, priority, assignees, reporter, due_date, scheduled_at, tags, folder, contact, parent, attachments.',
+      update_task: 'Required: task_id. Optional: title, description, status, priority, assignees, reporter, space_id, due_date, scheduled_at, tags, folder, parent, archived.',
+      set_task_status: 'Required: task_id, status.',
+      assign_task: 'Required: task_id, assignees.',
+      comment_task: 'Required: task_id, body. Optional: internal, mentions, reply_id, attachments.',
+      complete_task_action: 'Required: task_id, action_id. Optional: done (default true; false unticks).',
+      list_tasks:
+        'Required: space_id. Optional filters: folder and source (exact match), currency (exact, case-sensitive), value ("min,max"), expected_close ("from,to"), status, title (word search, not exact), archived, limit (default 300), offset. Filter on folder to find a task this flow created, so a replay updates it instead of creating a duplicate. Prefer this over a quiva-endpoint node on the same subject for a filtered lookup — see get_node_type_reference("quiva-endpoint").header_lift.',
+      delete_task: 'Required: task_id. Optional: delete_subtasks (subtasks are NOT deleted with their parent unless set). Deletes permanently; archiving only hides.',
+      delete_tasks_in_folder:
+        'Required: space_id, plus folder OR contact (a blank pair is refused, not read as "every folder"). Deletes every task with that exact folder, archived ones included.',
+      schedule_task_event:
+        'Required: task_id, action_type ("notification" | "flow" | "agent"), payload. Also trigger_on (ISO 8601) OR cron (with optional timezone, trigger_end); action_subject for flow/agent. Fires as whoever armed it, so a run with no caller leaves it unattributed and it does not fire.',
+      reschedule_task_event: 'Required: task_id, schedule_id, action_type, payload. Replaces the whole schedule, so send every field, not just the change.',
+      unschedule_task_event: 'Required: task_id, schedule_id.',
+      list_task_schedules: 'Optional: task_id, space_id. Without task_id it reads every schedule in the account.',
+    },
+    payload: {
+      required: {
+        '<per operation>': 'See `operations`. task_id is a task reference such as LEADS-7, usually mapped from an earlier node.',
+      },
+      optional: {
+        space_id:
+          'Space the task belongs to. OMITTING THIS IS NOT NEUTRAL — it falls back to ESCALATE, so name the space you mean.',
+        contact:
+          'create_task and delete_tasks_in_folder: { email, phone, name | first_name + last_name, organisation }. Matched on the space\'s identifying fields, so an existing contact is reused; it REPLACES folder. A space with no base record ignores it and says so in base_record_skipped.',
+        assignees: 'Array of user ids. Absent = unchanged; an empty list CLEARS them (see notes).',
+        suppress_events:
+          'create_task, update_task, set_task_status, assign_task, comment_task: true publishes no task events for this write (see the trigger\'s loop_controls). Not available on complete_task_action or any delete.',
+      },
+    },
+    example: {
+      id: 'RAISE_TASK',
+      data: {
+        id: 'RAISE_TASK',
+        node_type: 'task',
+        operation: 'create_task',
+        payload: {
+          space_id: 'LEADS',
+          title: 'New enquiry from |$.trigger.company',
+          description: '$.trigger.message',
+          tags: ['web-form'],
+        },
+      },
+    },
+    notes:
+      'STATUS, PRIORITY AND TAGS ARE FREE STRINGS SERVER-SIDE. A value the space does not define is accepted, stored, and then matches no filter — the task effectively disappears from every board. Read the space first rather than guessing a status name. ' +
+      'An empty assignees list CLEARS the task assignees — only an ABSENT field leaves them unchanged. Assignees is *[]string with omitempty (workspaces-service/model/api.go), so an explicit [] survives encoding, and DeepMerge (workspaces-service/transform/transform.go) replaces the whole value. A mapped "$.X.users" that resolves to nothing sends exactly that empty list. ' +
+      'task_id is authored in the payload for every operation; the node moves it onto a header or renames it to "id" as each operation needs (hub-service/runner/task_node.go). ' +
+      'complete_task_action reads the action back before writing it, because the underlying endpoint replaces the stored action wholesale: a blind write drops the action\'s resources, and is refused outright without a description. That means it costs two calls, and it fails with "task has no action <id>" if the id is wrong. ' +
+      'The node reaches nothing the quiva-endpoint node could not — the same allowlist and secrets guard applies.',
+  },
+
+  'verify-challenge': {
+    summary:
+      'Check a Cloudflare Turnstile token with Cloudflare, so a flow started by a form or chat embedded on a website can tell a person from a bot. (Not in the OpenAPI spec; added 2026-08.)',
+    required: ['id', 'node_type', 'payload'],
+    payload: {
+      required: {
+        token:
+          'The token the widget put in the submission. Map it from the trigger, usually "$.trigger.turnstile_token".',
+        secret:
+          'The account\'s Cloudflare Turnstile SECRET key. Use a secret reference — "SECRET::TURNSTILE_SECRET::" — never the literal key: a flow config is readable by anyone who can read the flow.',
+      },
+      optional: {
+        remote_ip: "The submitter's IP, if the trigger carries one. Cloudflare uses it as a further signal.",
+      },
+    },
+    example: {
+      id: 'VERIFY_HUMAN',
+      data: {
+        id: 'VERIFY_HUMAN',
+        node_type: 'verify-challenge',
+        payload: {
+          token: '$.trigger.turnstile_token',
+          secret: 'SECRET::TURNSTILE_SECRET::',
+        },
+      },
+    },
+    notes:
+      'A FAILED CHALLENGE IS A RESULT, NOT AN ERROR. The node succeeds and returns { success: false, ... }; the run carries on to whatever is downstream. You MUST branch on $.VERIFY_HUMAN.success or every bot submission proceeds exactly as a person\'s would. Only being unable to ask fails the node: no token, no secret, an unresolved SECRET:: reference, or Cloudflare unreachable. ' +
+      'Result fields: success, hostname, action, cdata, challenge_ts, error_codes. Note error_codes is snake_case on the node result even though Cloudflare sends "error-codes". ' +
+      'CHECK hostname AS WELL AS success. One widget can allow several domains, and a token solved on any of them verifies on all of them — so success alone does not tell you the submission came from the site you meant. ' +
+      'Each account supplies its own Turnstile secret; there is no platform-wide key, because Cloudflare requires a hostname allowlist per widget and a shared widget would make tokens interchangeable between customers. Create the secret in the account first — an unresolved reference is refused with instructions rather than sent to Cloudflare as literal text. ' +
+      'The token is redacted in the run log: enough to correlate a run with a submission, not enough to replay one.',
+  },
+
+  email: {
+    summary:
+      'Send one email from the account\'s own verified sending domain, through the sanctioned send endpoint (microstrate.accounts.post.send-commercial-email), so suppression, consent and the sender-domain check always apply. (Not in the OpenAPI spec.)',
+    required: ['id', 'node_type', 'payload'],
+    nodeLevelProps: {
+      operation: 'Optional; the only value is "send_email", which is also the default (hub-service/data/email_endpoints.go).',
+    },
+    payload: {
+      required: {
+        to: 'ONE recipient address. A list is refused: consent is decided per person, so send one email per recipient.',
+        subject: 'Subject line.',
+        'html | text': 'At least one body. Give text as well for clients that will not render HTML.',
+      },
+      optional: {
+        from_address: 'Must be in the account\'s verified sending domain. Empty uses the account\'s own from address.',
+        reply_to: 'Same domain rule as from_address.',
+        contact_folder: 'Files the email against a person in the activity log. Defaults from the task a scheduled run was fired from.',
+        task_id: 'Joins the email to its task. Defaults the same way.',
+        enrolment_id: 'The sequence enrolment this step belongs to.',
+      },
+    },
+    example: {
+      id: 'SEND_CONFIRMATION',
+      data: {
+        id: 'SEND_CONFIRMATION',
+        node_type: 'email',
+        operation: 'send_email',
+        payload: {
+          to: '$.trigger.email',
+          subject: 'We received your request',
+          text: 'Hi |$.trigger.first_name|, thanks for getting in touch. We will reply within one working day.',
+        },
+      },
+    },
+    notes:
+      'Result: { msg_id, accepted: true, status: "queued" }. Queued is not delivered: suppression, consent and the domain check run later, and the outcome is only in the activity log, keyed on msg_id. ' +
+      'Blank fields are dropped before sending, so a mapping that resolves to nothing is treated as absent; a missing to/subject/body fails the node. ' +
+      'No retry: the endpoint has no idempotency key, so a second attempt is a second email. Do not set options.attempts. ' +
+      'Do not send mail with an http node straight to a relay: that skips suppression and consent (hub-service/runner/email_node.go).',
+  },
+
+  'verify-signature': {
+    summary:
+      'Verify a signed account-to-account request (the x-quiva-signed / x-quiva-signature envelope) as the first node of a receiving flow. A failed check REFUSES the run. (Not in the OpenAPI spec.)',
+    required: ['id', 'node_type', 'payload'],
+    payload: {
+      required: {
+        expected_kind: 'String or list of the envelope kinds this route accepts, e.g. "order" or ["update", "cancellation"].',
+        nonce_bucket: 'KV bucket the node claims each nonce in, exactly once. Missing is a configuration error, never a silent downgrade.',
+      },
+      optional: {
+        headers: 'The request header map. Use "$.env.headers" with NO leading pipe.',
+        body: 'The parsed request body. Use "$.trigger" with NO leading pipe.',
+        path: 'The request path, e.g. "$.env.headers[\'x-url\']". The distribution id is read from x-param-distribution_id, else from a /d/<id>/ path segment.',
+        keyring: 'Secret-name PREFIX (default "distribution-verify-"); the id from the path is appended. Not a SECRET:: reference, which is refused.',
+        max_skew_seconds: 'Allowed clock skew for the envelope timestamp (default 300).',
+      },
+    },
+    example: {
+      id: 'VERIFY',
+      data: {
+        id: 'VERIFY',
+        node_type: 'verify-signature',
+        payload: {
+          headers: '$.env.headers',
+          body: '$.trigger',
+          path: "$.env.headers['x-url']",
+          expected_kind: ['order'],
+          nonce_bucket: 'distribution-nonces',
+        },
+      },
+    },
+    notes:
+      'Opposite of verify-challenge: any failure the CALLER controls ends the run with 401 "unauthorized" and run status "refused", and the message never says which check failed. A misconfigured node (no expected_kind, no nonce_bucket, a SECRET:: keyring) fails as an ordinary error instead. ' +
+      'A leading pipe ("|$.env.headers") turns the object into a string and every call fails with "the payload must be an object". ' +
+      'Result: { claims: { v, kid, distribution_id, sender_account_id, kind, quote_id, version, seq, ts, nonce, body_hash }, replay_protection: "nonce-store" | "timestamp-window-only" }. Read the sender and sequence from $.<ID>.claims, never from the body. ' +
+      'The body is omitted from the run log (hub-service/runner/verify_signature_node.go, hub-service/model/distribution_nodes.go).',
+  },
+
+  'sign-envelope': {
+    summary:
+      'Sign an outbound account-to-account request: returns { headers, body } to spread into the following http node\'s headers and data. The counterpart of verify-signature. (Not in the OpenAPI spec.)',
+    required: ['id', 'node_type', 'payload'],
+    payload: {
+      required: {
+        kind: 'Envelope kind; the receiver binds it to the route.',
+        sender_account_id: 'This account\'s id, e.g. "$.static.account_id".',
+        body: 'The request body to send. Its canonical hash is signed.',
+        'seed | distribution_id':
+          'Either seed (a SECRET:: reference holding "<kid>:<seed>") or distribution_id, which loads the secret "<seed_secret_prefix><distribution_id>" at run time.',
+      },
+      optional: {
+        seed_secret_prefix: 'Default "distribution-sign-".',
+        quote_id: 'Carried in the claims.',
+        version: 'Whole number; a quoted number is accepted.',
+        seq: 'Whole number; a quoted number is accepted.',
+      },
+    },
+    example: {
+      id: 'SIGN',
+      data: {
+        id: 'SIGN',
+        node_type: 'sign-envelope',
+        payload: {
+          distribution_id: '$.trigger.distribution_id',
+          sender_account_id: '$.static.account_id',
+          kind: 'order',
+          body: '$.BUILD_REQUEST',
+        },
+      },
+    },
+    notes:
+      'Wire the next http node as headers: "$.SIGN.headers", data: "$.SIGN.body". The seed never appears in a result, error or log. An unresolved SECRET:: seed fails the node rather than signing with literal text. distribution_id must match ^[A-Za-z0-9_-]+$ (hub-service/runner/sign_envelope_node.go).',
+  },
+
+  error: {
+    summary: 'Terminate the flow with an error status code and message. (Not in the OpenAPI spec.)',
+    required: ['id', 'node_type', 'payload'],
+    payload: {
+      required: {
+        status_code: 'integer status code surfaced on the run result',
+      },
+      optional: {
+        message: 'error message (defaults to "flow terminated with error (status N)")',
+      },
+    },
+    example: {
+      id: 'FAIL_VALIDATION',
+      data: {
+        id: 'FAIL_VALIDATION',
+        node_type: 'error',
+        payload: { status_code: 422, message: 'Missing required order number' },
+      },
+    },
+  },
+};
+
+export function listNodeTypes() {
+  return Object.entries(NODE_TYPES).map(([type, doc]) => ({
+    node_type: type,
+    summary: doc.summary,
+  }));
+}
+
+export function getNodeTypeReference(type) {
+  const doc = NODE_TYPES[type];
+  if (!doc) {
+    return {
+      error: `Unknown node_type "${type}". Valid types: ${Object.keys(NODE_TYPES).join(', ')}`,
+    };
+  }
+  return { node_type: type, ...doc };
+}

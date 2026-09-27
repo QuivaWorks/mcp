@@ -1,0 +1,186 @@
+{
+  "id": "Product",
+  "name": "Product / Service",
+  "description": "The products and services catalogue. Deal line items reference entries here.",
+  "schema": {
+    "type": "object",
+    "required": ["product_name", "product_type", "unit_price", "is_active"],
+    "properties": {
+      "product_name": { "type": "string", "title": "Name" },
+      "product_code": { "type": "string", "title": "Code" },
+      "product_type": {
+        "type": "string",
+        "title": "Type",
+        "enum": ["Product", "Service", "Subscription", "Support"]
+      },
+      "description": { "type": "string", "title": "Description" },
+      "unit_price": { "type": "number", "title": "Unit price", "minimum": 0 },
+      "currency": {
+        "type": "string",
+        "title": "Currency",
+        "enum": ["USD", "EUR", "GBP", "AUD"]
+      },
+      "billing_period": {
+        "type": "string",
+        "title": "Billing period",
+        "enum": ["One-off", "Monthly", "Quarterly", "Annual"]
+      },
+      "is_active": { "type": "boolean", "title": "Active" },
+      "notes": { "type": "string", "title": "Notes" }
+    }
+  },
+  "views": {
+    "forms": [
+      {
+        "id": "default",
+        "title": "Product / Service",
+        "description": "Add or edit a catalogue entry.",
+        "layout": {
+          "type": "grid",
+          "props": { "gridTemplateColumns": "1fr", "gap": 16 },
+          "children": [
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "2fr 1fr 1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "product_name",
+                  "inputType": "text",
+                  "props": { "label": "Name", "placeholder": "Enterprise Plan" }
+                },
+                {
+                  "type": "field",
+                  "field": "product_code",
+                  "inputType": "text",
+                  "props": { "label": "Code", "placeholder": "ENT-001" }
+                },
+                {
+                  "type": "field",
+                  "field": "product_type",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "Type",
+                    "options": [
+                      { "value": "Product", "text": "Product" },
+                      { "value": "Service", "text": "Service" },
+                      { "value": "Subscription", "text": "Subscription" },
+                      { "value": "Support", "text": "Support" }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr 1fr 1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "unit_price",
+                  "inputType": "currency",
+                  "props": { "label": "Unit price", "min": 0, "decimalPlace": 2 }
+                },
+                {
+                  "type": "field",
+                  "field": "currency",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "Currency",
+                    "options": [
+                      { "value": "USD", "text": "USD" },
+                      { "value": "EUR", "text": "EUR" },
+                      { "value": "GBP", "text": "GBP" },
+                      { "value": "AUD", "text": "AUD" }
+                    ],
+                    "defaultValue": "USD"
+                  }
+                },
+                {
+                  "type": "field",
+                  "field": "billing_period",
+                  "inputType": "dropdown",
+                  "props": {
+                    "label": "Billing period",
+                    "options": [
+                      { "value": "One-off", "text": "One-off" },
+                      { "value": "Monthly", "text": "Monthly" },
+                      { "value": "Quarterly", "text": "Quarterly" },
+                      { "value": "Annual", "text": "Annual" }
+                    ]
+                  },
+                  "rules": [
+                    {
+                      "id": "billing_period.visible",
+                      "property": "visible",
+                      "logic": { "in": [{ "var": "product_type" }, ["Subscription", "Support"]] },
+                      "description": "Billing period is shown only when Type is Subscription or Support."
+                    },
+                    {
+                      "id": "billing_period.required",
+                      "property": "required",
+                      "logic": { "in": [{ "var": "product_type" }, ["Subscription", "Support"]] },
+                      "description": "Billing period is required when Type is Subscription or Support."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "description",
+                  "inputType": "textarea",
+                  "props": { "label": "Description", "placeholder": "What this product or service includes." }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "notes",
+                  "inputType": "textarea",
+                  "props": { "label": "Notes" }
+                }
+              ]
+            },
+            {
+              "type": "grid",
+              "props": { "gridTemplateColumns": "1fr" },
+              "children": [
+                {
+                  "type": "field",
+                  "field": "is_active",
+                  "inputType": "toggle",
+                  "props": {
+                    "label": "Active",
+                    "defaultValue": true,
+                    "helpText": { "markdown": "Inactive entries stay in the catalogue so historical deals keep resolving." }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "table": {
+      "type": "table",
+      "columns": [
+        { "field": "product_name", "order": 1 },
+        { "field": "product_code", "order": 2 },
+        { "field": "product_type", "order": 3 },
+        { "field": "unit_price", "order": 4 },
+        { "field": "currency", "order": 5 },
+        { "field": "billing_period", "order": 6 },
+        { "field": "is_active", "order": 7 }
+      ]
+    }
+  }
+}

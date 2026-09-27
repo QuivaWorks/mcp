@@ -1,0 +1,128 @@
+{
+  "name": "Deal Health Check",
+  "description": "Daily. Reads every open deal, finds the stalled ones, and raises ONE digest task listing them. A digest rather than per-deal flags because a flow cannot write to more than one record.",
+  "config": {
+    "nodes": [
+      {
+        "id": "SCHEDULE",
+        "data": {
+          "id": "SCHEDULE",
+          "node_type": "trigger",
+          "payload": {
+            "trigger_on": "2026-08-05T06:00:00Z",
+            "trigger_every": "24h",
+            "trigger": {}
+          },
+          "name": "Daily deal health check",
+          "trigger_type": "schedule"
+        }
+      },
+      {
+        "id": "LIST_DEALS",
+        "data": {
+          "id": "LIST_DEALS",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/records/Deal",
+            "method": "GET",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "query": {
+              "limit": 500
+            }
+          }
+        }
+      },
+      {
+        "id": "FIND_STALLED",
+        "data": {
+          "id": "FIND_STALLED",
+          "node_type": "eval",
+          "payload": {
+            "code": "(function(){var rows=(list&&list.results)||list||[];var out=[],now=Date.now();for(var i=0;i<rows.length;i++){var d=rows[i].data||{};var s=String(d.deal_stage||'');if(s==='Closed Won'||s==='Closed Lost')continue;var last=d.last_activity_date?Date.parse(d.last_activity_date):0;var days=last?Math.floor((now-last)/86400000):999;if(days>14)out.push('- '+(d.deal_name||rows[i].id)+' ('+(d.deal_value||0)+') last activity '+(last?days+' days ago':'never'));}return{count:out.length,body:out.join('\\n')||'None.'};})();",
+            "params": {
+              "list": "$.LIST_DEALS.data"
+            }
+          }
+        }
+      },
+      {
+        "id": "CHECK_ANY",
+        "data": {
+          "id": "CHECK_ANY",
+          "node_type": "condition",
+          "payload": [
+            {
+              "condition": {
+                "operator": ">",
+                "input": [
+                  "$.FIND_STALLED.count",
+                  0
+                ]
+              },
+              "outcome": "CREATE_DIGEST"
+            },
+            {
+              "outcome": "RESOLVE_SUCCESS"
+            }
+          ]
+        }
+      },
+      {
+        "id": "CREATE_DIGEST",
+        "data": {
+          "id": "CREATE_DIGEST",
+          "node_type": "http",
+          "payload": {
+            "base_url": "https://api.microstrate.io",
+            "url": "/workspaces/task",
+            "method": "POST",
+            "headers": {
+              "Authorization": "Bearer |$.env.auth_token"
+            },
+            "data": {
+              "space_id": "CRM_ACTIVITIES",
+              "title": "Stalled deals to chase",
+              "description": "Deals with no activity in over 14 days:\n\n|$.FIND_STALLED.body",
+              "status": "to_do",
+              "priority": "high",
+              "tags": [
+                "crm",
+                "digest",
+                "deal-health"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e_SCHEDULE_LIST_DEALS",
+        "source": "SCHEDULE",
+        "target": "LIST_DEALS"
+      },
+      {
+        "id": "e_LIST_DEALS_FIND_STALLED",
+        "source": "LIST_DEALS",
+        "target": "FIND_STALLED"
+      },
+      {
+        "id": "e_FIND_STALLED_CHECK_ANY",
+        "source": "FIND_STALLED",
+        "target": "CHECK_ANY"
+      },
+      {
+        "id": "e_CHECK_ANY_CREATE_DIGEST",
+        "source": "CHECK_ANY",
+        "target": "CREATE_DIGEST"
+      }
+    ],
+    "result": {
+      "status": "success",
+      "stalled": "$.FIND_STALLED.count"
+    }
+  }
+}

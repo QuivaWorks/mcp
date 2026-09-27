@@ -1,0 +1,86 @@
+{
+  "slug": "tasks-MCP_VERIFICATION_RENEWALS",
+  "kind": "tasks",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "space_id": "MCP_VERIFICATION_RENEWALS",
+    "harvested_from": "GET /workspaces/space/MCP_VERIFICATION_RENEWALS/tasks (2 of 2 kept)"
+  },
+  "teaches": [
+    "2 real tasks with server-generated ids ({SPACEID}-{n})",
+    "task fields in live use: priority, status, time_tracking, due_date, description, reporter",
+    "status values reference the SPACE's status ids: in_review, awaiting_info",
+    "priority values reference the SPACE's priority ids: urgent, routine",
+    "url is server-built: /en/hub/spaces/{SPACE}/tasks?task={TASK-ID}"
+  ],
+  "tasks": [
+    {
+      "assignees": [
+        "<<REDACTED:user-id>>"
+      ],
+      "created_at": "2026-07-29T10:31:33Z",
+      "created_by": "<<REDACTED:user-id>>",
+      "description": "Expiring 2027-08-01. Confirm sum insured and re-rate before issuing terms.",
+      "due_date": "2026-08-15T00:00:00Z",
+      "id": "MCP_VERIFICATION_RENEWALS-1",
+      "priority": "urgent",
+      "reporter": "<<REDACTED:user-id>>",
+      "space_id": "MCP_VERIFICATION_RENEWALS",
+      "status": "in_review",
+      "tags": [
+        "large_risk"
+      ],
+      "time_tracking": {
+        "estimate": {
+          "time_in_seconds": 14400
+        },
+        "logs": [
+          {
+            "created_at": "2026-07-30T09:05:00Z",
+            "description": "probe A",
+            "id": "tl_x1",
+            "started_at": "2026-07-30T09:00:00Z",
+            "time_spent": {
+              "time_in_seconds": 3600
+            },
+            "user": {
+              "id": "<<REDACTED:user-id>>",
+              "name": "<<REDACTED:person-name>>"
+            }
+          },
+          {
+            "created_at": "2026-07-30T09:35:00Z",
+            "description": "probe B",
+            "id": "tl_x2",
+            "started_at": "2026-07-30T09:30:00Z",
+            "time_spent": {
+              "time_in_seconds": 1800
+            },
+            "user": {
+              "id": "<<REDACTED:user-id>>",
+              "name": "<<REDACTED:person-name>>"
+            }
+          }
+        ],
+        "spent": {
+          "time_in_seconds": 5400
+        }
+      },
+      "title": "Renewal review — Ridgeline Constructions (POL-2026-0087)",
+      "updated_at": "2026-07-30T10:25:15Z",
+      "url": "https://app.microstrate.io/en/hub/spaces/MCP_VERIFICATION_RENEWALS/tasks?task=MCP_VERIFICATION_RENEWALS-1"
+    },
+    {
+      "created_at": "2026-07-29T15:09:40Z",
+      "created_by": "<<REDACTED:user-id>>",
+      "description": "Created with NO `status` field. createTask now reads the space and fills in default_status, so this lands in Awaiting Info instead of outside every column.",
+      "id": "MCP_VERIFICATION_RENEWALS-3",
+      "priority": "routine",
+      "space_id": "MCP_VERIFICATION_RENEWALS",
+      "status": "awaiting_info",
+      "title": "Renewal review — status inherited from the space default",
+      "updated_at": "2026-07-29T15:09:40Z",
+      "url": "https://app.microstrate.io/en/hub/spaces/MCP_VERIFICATION_RENEWALS/tasks?task=MCP_VERIFICATION_RENEWALS-3"
+    }
+  ]
+}

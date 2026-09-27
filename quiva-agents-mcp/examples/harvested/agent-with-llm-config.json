@@ -1,0 +1,44 @@
+{
+  "slug": "agent-with-llm-config",
+  "source": {
+    "environment": "https://api.microstrate.io",
+    "subject": "ms.hub.config.agent.f97be555-7932-371b-8a03-5f4784a8aaea",
+    "path_id": "f97be555-7932-371b-8a03-5f4784a8aaea",
+    "name": "Summarize",
+    "harvested_from": "GET /hub/agent"
+  },
+  "teaches": [
+    "llm_config { temperature, max_tokens, max_turns } as actually stored"
+  ],
+  "facts": [
+    "llm_provider \"anthropic\" / model \"claude-haiku-4-5\"",
+    "shared: \"\"",
+    "llm_config: {\"temperature\":0.7,\"max_tokens\":20000,\"max_turns\":6}"
+  ],
+  "config": {
+    "name": "Summarize",
+    "description": "This agent will summarise any input into one paragraph.",
+    "behaviour": "Take your input and summarise its purpose into one short succinct paragraph.",
+    "llm_provider": "anthropic",
+    "model": "claude-haiku-4-5",
+    "has_tools": true,
+    "timeout": 30,
+    "context_limit": 50000,
+    "message_history_limit": 200,
+    "prompt": "",
+    "llm_config": {
+      "temperature": 0.7,
+      "max_tokens": 20000,
+      "max_turns": 6
+    },
+    "ai_smart_context": true,
+    "ai_summary_threshold": 0.7,
+    "ai_summary_model": "claude-3-5-sonnet-20241022",
+    "preserve_most_recent": 5,
+    "ai_prompt": false,
+    "api_key": "CLAUDE_API_KEY",
+    "await": true,
+    "shared": "",
+    "owner": ""
+  }
+}

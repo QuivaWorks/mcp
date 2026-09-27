@@ -1,0 +1,12 @@
+# Allowlist: never ship .env files, tests, tools, harvest scripts or node_modules.
+*
+!package.json
+!package-lock.json
+!quiva-*-mcp/package.json
+!quiva-*-mcp/src/**
+!quiva-*-mcp/examples/**
+!quiva-mcp-remote/package.json
+!quiva-mcp-remote/src/**
+**/.env
+**/.env.*
+**/node_modules
