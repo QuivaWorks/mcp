@@ -82,7 +82,7 @@ const config = {
 };
 
 async function main() {
-  const client = new QuivaClient();
+  const client = QuivaClient.fromEnv();
   if (!client.hasCredentials()) {
     console.error('No credentials — set QUIVA_API_KEY / QUIVA_BEARER_TOKEN / QUIVA_EMAIL+QUIVA_PASSWORD.');
     process.exit(1);
@@ -221,10 +221,10 @@ async function main() {
   }
 
   console.log('\nCheck it in the UI:');
-  console.log(`  Collection : https://app.microstrate.io/en/hub/flows?collection=${COLLECTION}`);
+  console.log(`  Collection : https://app.quiva.ai/en/hub/flows?collection=${COLLECTION}`);
   console.log(`  Flow name  : ${FLOW_NAME}`);
-  console.log(`  Published  : https://app.microstrate.io/en/hub/flows/${String(publishedSubject).split('.').join('+')}`);
-  console.log(`  Draft      : https://app.microstrate.io/en/hub/flows/${String(draftSubject).split('.').join('+')}`);
+  console.log(`  Published  : https://app.quiva.ai/en/hub/flows/${String(publishedSubject).split('.').join('+')}`);
+  console.log(`  Draft      : https://app.quiva.ai/en/hub/flows/${String(draftSubject).split('.').join('+')}`);
   console.log('  What to look for: the entry node is a Record trigger bound to');
   console.log(`  "${RECORD_CONFIG}" with event types record-created / record-updated, wired`);
   console.log('  into an eval node that echoes the triggering record.');

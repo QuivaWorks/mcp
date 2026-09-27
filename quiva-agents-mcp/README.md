@@ -38,13 +38,14 @@ Auth options (checked in this order):
 | `QUIVA_BEARER_TOKEN` | `Authorization: Bearer` |
 | `QUIVA_EMAIL` + `QUIVA_PASSWORD` (+ optional `QUIVA_ACCOUNT`) | Logs in via `/accounts/auth-with-password`, caches the JWT, re-logs-in on 401 |
 
-`QUIVA_API_URL` selects the environment (default: staging
-`https://api.microstrate.io`; production: `https://api.quiva.ai`).
+`QUIVA_API_URL` selects the environment (default: production
+`https://api.quiva.ai`).
 
-> **Important:** hub-service derives the user/account from a **Bearer JWT** on
-> *every* agent endpoint (create/get/update/delete/invoke). An API key alone is
-> resolved by the gateway but does not carry those claims, so it will 401 on
-> most tools. Prefer the bearer token or email/password options.
+> **Note:** an API key works on every agent endpoint — cerberus swaps
+> `X-Api-Key` for a user JWT before it reaches hub-service, so `create`/`get`/
+> `update`/`delete`/`invoke` all see the same claims a password login would
+> produce. A **restricted** key must be scoped to allow `/hub/agent*`, or it
+> 401s at the gateway.
 
 ### Register with Claude Code
 
@@ -57,7 +58,7 @@ Alternatively register it manually:
 
 ```bash
 claude mcp add quiva-agents \
-  -e QUIVA_API_URL=https://api.microstrate.io \
+  -e QUIVA_API_URL=https://api.quiva.ai \
   -e QUIVA_BEARER_TOKEN=$QUIVA_BEARER_TOKEN \
   -- sh /path/to/evari-olympus/quiva-agents-mcp/bin/run.sh
 ```
@@ -66,14 +67,20 @@ claude mcp add quiva-agents \
 
 **Reference / validation** (no API call)
 - `list_reference_topics` — topics + gotchas
-- `get_agents_reference` — agent-config / providers / invoke / cancel / identifiers / auth / endpoints
+- `get_agents_reference` — agent-config / providers / invoke / cancel / identifiers / auth / endpoints / mcp-servers
 - `validate_agent_config` — required fields, provider restriction, id/enum/URI-scheme lint
 
-**Agent CRUD**: `list_agents`, `get_agent`, `create_agent`, `update_agent`,
+**Agent CRUD**: `list_agents` (paged: `limit`, `offset`, `search`, `sort` — see
+the staging caveat under Gotchas), `get_agent`, `create_agent`, `update_agent`,
 `delete_agent`
 
-**Invoke / cancel**: `invoke_agent` (runs the agent — spends LLM tokens),
+**Invoke / cancel**: `invoke_agent` (runs the agent — spends LLM tokens;
+validates `response_subject` against `session_id` before sending),
 `cancel_agent`
+
+**Registered MCP servers**: `list_mcp_servers` (browses the official MCP
+registry, `GET /hub/mcp/registry`), `register_mcp_server` (registers a native
+MCP server into this account's own catalog, `POST /hub/mcp/register`)
 
 ## Typical session
 
@@ -93,8 +100,9 @@ and the engine disagree:
   **server-generated** identifier — a hash of the config. The `{id}` path param
   is just that uuid suffix. `config.id` is a label, **not** the identifier.
   Re-creating an identical config → **409 "agent exists"**.
-- **Auth needs a Bearer JWT** on every endpoint — an API key alone is
-  insufficient.
+- **An API key works on every endpoint.** Cerberus swaps `X-Api-Key` for a user
+  JWT before hub-service sees the request. A restricted key just needs to allow
+  `/hub/agent*`.
 - **Provider restriction**: `invoke` accepts only **`claude`** or
   **`anthropic`**; anything else → 400 "unsupported provider" (the spec's enum
   lists only `claude`).
@@ -104,6 +112,25 @@ and the engine disagree:
   a complete definition, not a partial patch. The spec's
   `x-resource: ...patch.agent` is wrong; it's a `put` route.
 - **Invoke** takes `subject` **or** an inline `agent` — the spec's
-  `agent_subject` example field is ignored (use `subject`).
+  `agent_subject` example field is ignored (use `subject`). `response_subject`,
+  when set, must equal `session_id` (hub-service rejects a mismatch with 400);
+  this tool checks that before sending.
 - The invoke-time **`x-cancel-id` / `cancel_token`** knobs in the spec are not
   read by hub-service; cancel via `cancel_agent` (`POST /hub/agent/cancel`).
+- **Models**: use `claude-opus-5-5`, `claude-sonnet-5`, `claude-fable-5-1`, or
+  `claude-haiku-4-5`. Older dated ids (e.g. `claude-sonnet-4-6`,
+  `claude-opus-4-5`) are silently remapped to these by
+  `bellerophon-workforce/model/internal/model/model_info.go`.
+- **`agent_type: "coworker"`** targets Abbie's own cognition pipeline; a
+  generic create/update/delete naming her subject is refused with 400 (use
+  `PUT /hub/coworker/personality` instead).
+- **`list_agents` paging is designed but not confirmed live everywhere.**
+  Verified live on staging 2026-09-27: `limit`/`offset`/`search`/`sort` had no
+  effect — every call returned the full unfiltered list with no `metadata`
+  block. Staging is likely running a build that predates the paging feature
+  (`hub-service/handler/agent-list.go`); re-verify against whichever
+  environment you're pointed at.
+- **`list_mcp_servers`'s response disagrees with its own OpenAPI spec.**
+  Verified live 2026-09-27: it returns `{ servers, next_cursor, received,
+  total }`, not the spec's `{ servers, cursor, received, skipped }` — page with
+  `next_cursor`, not `cursor`.

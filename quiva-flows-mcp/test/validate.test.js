@@ -2,8 +2,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { applyGeometry } from '../src/geometry.js';
-import { validate } from '../src/validate.js';
-import { NODE_TYPES } from '../src/node-docs.js';
+import { validate, validateFlowConfig } from '../src/validate.js';
+import { GOTCHAS, NODE_TYPES } from '../src/node-docs.js';
+import { VISUAL_BUILDER_ONLY } from '../src/rules-docs.js';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -225,7 +226,7 @@ check('condition payload that is not a chain is rejected', () => {
   assert.ok(result.errors.some((e) => e.includes('must be an ARRAY')), JSON.stringify(result.errors));
 });
 
-check('unknown rule operator is a hard error (engine silently yields undefined)', () => {
+check('unknown rule operator is a hard error (engine refuses it in rules_validate.go)', () => {
   const result = validate({
     nodes: [
       agentNode('A'),
@@ -241,6 +242,16 @@ check('unknown rule operator is a hard error (engine silently yields undefined)'
     result.errors.some((e) => e.includes('not implemented by the rules engine') && e.includes('visual builder')),
     JSON.stringify(result.errors)
   );
+});
+
+check('operator lists track hub-service/jseval/rules_validate.go', () => {
+  for (const op of ['string-contains', 'boolean', ' !']) assert.equal(VISUAL_BUILDER_ONLY.has(op), false, op);
+  assert.deepEqual([...VISUAL_BUILDER_ONLY].sort(), ['condition', 'doesNotContain', 'stringFormat']);
+  const result = validate({
+    nodes: [agentNode('A'), conditionNode('C', [{ condition: { operator: 'not-empty', input: ['$.A.result'] }, outcome: 'A' }, { outcome: 'RESOLVE_ERROR' }])],
+    edges: [{ id: 'e', source: 'A', target: 'C' }],
+  });
+  assert.ok(!result.errors.some((e) => e.includes('"not-empty"')), JSON.stringify(result.errors));
 });
 
 check('engine-only operator (jPath) is allowed but warns about the editor schema', () => {
@@ -314,7 +325,7 @@ check('rules node requires a rules MAP, not an array', () => {
           payload: {
             facts: { 'score.value': '$.trigger.score' },
             rules: {
-              'high_risk.value': [
+              'high_priority.value': [
                 { condition: { operator: '>', input: ['@fact:score.value', 80] }, outcome: true },
                 { outcome: false },
               ],
@@ -539,7 +550,7 @@ check('golden: the condition example really uses the v2 branch shape', () => {
 // exactly `record:<configID>`; it refuses the legacy dotted form and a mismatch on
 // create and update (create-workflow.go checkRecordTriggerID).
 
-const recordTriggerFlow = (overrides = {}, id = 'record:risk_programme') => ({
+const recordTriggerFlow = (overrides = {}, id = 'record:enquiry') => ({
   name: 'record trigger flow',
   nodes: [
     {
@@ -548,10 +559,10 @@ const recordTriggerFlow = (overrides = {}, id = 'record:risk_programme') => ({
       type: 'custom',
       data: {
         id,
-        name: 'On risk programme record',
+        name: 'On enquiry record',
         node_type: 'trigger',
         trigger_type: 'record',
-        payload: { record_config_id: 'risk_programme', event_type: ['record-created'] },
+        payload: { record_config_id: 'enquiry', event_type: ['record-created'] },
         ...overrides,
       },
     },
@@ -566,7 +577,7 @@ check('a record trigger id of record:<record_config_id> is valid', () => {
 });
 
 check('a legacy dotted record trigger id is refused', () => {
-  const r = validate(recordTriggerFlow({}, 'record.risk_programme'));
+  const r = validate(recordTriggerFlow({}, 'record.enquiry'));
   assert.equal(r.valid, false, 'hub refuses the dotted form on create and update');
   assert.ok(r.errors.some((e) => e.includes('legacy dot')), JSON.stringify(r.errors));
 });
@@ -574,7 +585,7 @@ check('a legacy dotted record trigger id is refused', () => {
 check('a record trigger id that does not address its record_config_id is refused', () => {
   const r = validate(recordTriggerFlow({}, 'record:other_config'));
   assert.equal(r.valid, false, 'a mismatched id is a trigger that never fires');
-  assert.ok(r.errors.some((e) => e.includes('record:risk_programme')), JSON.stringify(r.errors));
+  assert.ok(r.errors.some((e) => e.includes('record:enquiry')), JSON.stringify(r.errors));
 });
 
 check('a dotted id on a NON-record node is still an error', () => {
@@ -595,7 +606,7 @@ check('a dotted id on a NON-record node is still an error', () => {
 });
 
 check('a dotted id on a trigger that is not trigger_type record is an invalid id', () => {
-  const r = validate(recordTriggerFlow({ trigger_type: 'manual' }, 'record.risk_programme'));
+  const r = validate(recordTriggerFlow({ trigger_type: 'manual' }, 'record.enquiry'));
   assert.equal(r.valid, false);
   assert.ok(r.errors.some((e) => e.includes('invalid id')));
 });
@@ -625,6 +636,176 @@ check('the trigger reference documents the live hub trigger types and the id rul
   );
 });
 
+// --- node types and rules added 2026-09-27 ------------------------------------
+// Engine truth: hub-service/model/request.go KnownNodeTypes, data/task_endpoints.go,
+// validate/workflow.go checkTaskNode, validate/schedule_attempts.go.
+
+const one = (data, extra = {}) => ({ nodes: [{ id: data.id, data, ...extra }], edges: [] });
+const errs = (config) => validateFlowConfig(config).errors;
+const hasError = (config, needle) => {
+  const e = errs(config);
+  assert.ok(e.some((x) => x.includes(needle)), `expected an error containing "${needle}", got ${JSON.stringify(e)}`);
+};
+const noErrors = (config) => assert.deepEqual(errs(config), []);
+
+check('every node-type reference example passes the per-node validator', () => {
+  for (const [type, doc] of Object.entries(NODE_TYPES)) {
+    const examples = Object.entries(doc).filter(([k, v]) => k.endsWith('example') && v?.data);
+    assert.ok(examples.length > 0, `${type} has no example`);
+    for (const [key, example] of examples) {
+      const e = errs({ nodes: [example], edges: [] });
+      assert.deepEqual(e, [], `${type}.${key}: ${JSON.stringify(e)}`);
+    }
+  }
+});
+
+check('email, verify-signature and sign-envelope are known node types', () => {
+  for (const type of ['email', 'verify-signature', 'sign-envelope']) {
+    assert.ok(NODE_TYPES[type], `${type} missing from node-docs`);
+  }
+});
+
+check('email: a list in "to" is refused (one email per recipient)', () => {
+  hasError(one({ id: 'E', node_type: 'email', payload: { to: ['a@example.com'], subject: 's', text: 't' } }), 'ONE address');
+});
+
+check('email: missing body and missing subject are refused; html alone is enough', () => {
+  hasError(one({ id: 'E', node_type: 'email', payload: { to: '$.trigger.email', subject: 's' } }), 'no body');
+  hasError(one({ id: 'E', node_type: 'email', payload: { to: '$.trigger.email', html: '<p>x</p>' } }), 'requires "subject"');
+  noErrors(one({ id: 'E', node_type: 'email', payload: { to: '$.trigger.email', subject: 's', html: '<p>x</p>' } }));
+});
+
+check('email: an operation other than send_email is refused', () => {
+  hasError(one({ id: 'E', node_type: 'email', operation: 'send_bulk', payload: { to: 'a@example.com', subject: 's', text: 't' } }), 'unknown email operation');
+});
+
+check('verify-signature: expected_kind and nonce_bucket are required', () => {
+  hasError(one({ id: 'V', node_type: 'verify-signature', payload: { headers: '$.env.headers', nonce_bucket: 'n' } }), 'expected_kind');
+  hasError(one({ id: 'V', node_type: 'verify-signature', payload: { headers: '$.env.headers', expected_kind: [] , nonce_bucket: 'n' } }), 'expected_kind');
+  hasError(one({ id: 'V', node_type: 'verify-signature', payload: { expected_kind: 'order' } }), 'nonce_bucket');
+});
+
+check('verify-signature: a leading pipe on headers/body and a SECRET:: keyring are refused', () => {
+  const base = { expected_kind: 'order', nonce_bucket: 'n' };
+  hasError(one({ id: 'V', node_type: 'verify-signature', payload: { ...base, headers: '|$.env.headers' } }), 'starts with a pipe');
+  hasError(one({ id: 'V', node_type: 'verify-signature', payload: { ...base, body: '|$.trigger' } }), 'starts with a pipe');
+  hasError(one({ id: 'V', node_type: 'verify-signature', payload: { ...base, keyring: 'SECRET::RING::' } }), 'PREFIX');
+});
+
+check('sign-envelope: kind, sender_account_id, body and a seed source are required', () => {
+  hasError(one({ id: 'S', node_type: 'sign-envelope', payload: { kind: 'order', sender_account_id: '$.static.account_id', body: '$.X' } }), '"seed"');
+  hasError(one({ id: 'S', node_type: 'sign-envelope', payload: { distribution_id: 'd1', sender_account_id: 'a', body: {} } }), 'requires "kind"');
+  hasError(one({ id: 'S', node_type: 'sign-envelope', payload: { distribution_id: 'bad id!', kind: 'k', sender_account_id: 'a', body: {} } }), '^[A-Za-z0-9_-]+$');
+  noErrors(one({ id: 'S', node_type: 'sign-envelope', payload: { seed: 'SECRET::SIGNING::', kind: 'k', sender_account_id: 'a', body: {} } }));
+});
+
+const ENGINE_TASK_OPERATIONS = [
+  'create_task', 'update_task', 'set_task_status', 'assign_task', 'comment_task', 'complete_task_action',
+  'list_tasks', 'delete_tasks_in_folder', 'delete_task', 'schedule_task_event', 'reschedule_task_event',
+  'unschedule_task_event', 'list_task_schedules',
+];
+
+check('task node documents exactly the 13 visible engine operations', () => {
+  assert.deepEqual(Object.keys(NODE_TYPES.task.operations).sort(), [...ENGINE_TASK_OPERATIONS].sort());
+});
+
+check('task node: every engine operation is accepted on data.operation', () => {
+  for (const op of ENGINE_TASK_OPERATIONS) {
+    noErrors(one({ id: 'T', node_type: 'task', operation: op, payload: { task_id: 'LEADS-1' } }));
+  }
+});
+
+check('task node: payload.operation, a missing operation and an unknown one are refused', () => {
+  hasError(one({ id: 'T', node_type: 'task', payload: { operation: 'create_task', title: 'x' } }), 'reads data.operation, not payload.operation');
+  hasError(one({ id: 'T', node_type: 'task', payload: { title: 'x' } }), 'needs data.operation');
+  hasError(one({ id: 'T', node_type: 'task', operation: 'list_task_actions', payload: {} }), 'unknown task operation');
+});
+
+const scheduleNode = (extra = {}) => ({
+  id: 'SCHED',
+  node_type: 'schedule',
+  payload: { flow_subject: 'ms.hub.config.workflow.1.2', trigger: {}, trigger_in: '1h', name: 'reminder:|$.trigger.id' },
+  ...extra,
+});
+
+check('schedule node: payload.name is accepted, a non-string name is refused', () => {
+  noErrors(one(scheduleNode()));
+  hasError(one(scheduleNode({ payload: { flow_subject: 'x', trigger: {}, trigger_in: '1h', name: 42 } })), '"name" must be a string');
+});
+
+check('schedule node: options.attempts > 1 is refused; attempts 1 is allowed', () => {
+  hasError(one(scheduleNode({ options: { attempts: 3 } })), 'options.attempts is not allowed');
+  noErrors(one(scheduleNode({ options: { attempts: 1 } })));
+});
+
+check('quiva-endpoint calling schedule-flow / unschedule-flow refuses attempts; other subjects do not', () => {
+  for (const subject of ['microstrate.hub.post.schedule-flow', 'microstrate.hub.delete.unschedule-flow']) {
+    hasError(one({ id: 'Q', node_type: 'quiva-endpoint', subject, options: { attempts: 2 }, payload: {} }), 'options.attempts is not allowed');
+  }
+  noErrors(one({ id: 'Q', node_type: 'quiva-endpoint', subject: 'microstrate.storage.get.kv-entry', options: { attempts: 3 }, payload: {} }));
+});
+
+check('graph ids: an edge or top-level node id with . * > @ or whitespace is refused', () => {
+  const config = {
+    nodes: [
+      { id: 'A', data: { id: 'A', node_type: 'static', payload: {} } },
+      { id: 'B', data: { id: 'B', node_type: 'static', payload: {} } },
+    ],
+    edges: [{ id: 'A.B', source: 'A', target: 'B' }],
+  };
+  hasError(config, 'cannot contain');
+  hasError(one({ id: 'N', node_type: 'static', payload: {} }, { id: 'N@1' }), 'cannot contain');
+  for (const bad of ['a b', 'a\tb', 'a\nb', 'a*', 'a>']) hasError(one({ id: 'N', node_type: 'static', payload: {} }, { id: bad }), 'cannot contain');
+});
+
+check('graph ids: whitespace the server does not list (\\r, non-breaking space) is accepted, as on the server', () => {
+  for (const id of ['a\rb', 'a\u00a0b', 'a-b']) {
+    const r = validateFlowConfig({ nodes: [{ id, data: { id, node_type: 'static', payload: {} } }], edges: [] });
+    assert.ok(!r.errors.some((e) => e.includes('cannot contain')), JSON.stringify(r.errors));
+  }
+});
+
+check('the server-accepted editor types (chat, agent_* sub-nodes, empty node_type) are not errors', () => {
+  const r = validateFlowConfig({
+    nodes: [
+      { id: 'C', data: { id: 'C', node_type: 'chat', payload: {} } },
+      { id: 'agent_tools_1', data: { id: 'agent_tools_1', node_type: 'agent_tools', payload: {} } },
+      { id: 'NEW', data: { id: 'NEW', payload: {} } },
+    ],
+    edges: [],
+  });
+  assert.deepEqual(r.errors, []);
+  assert.ok(r.warnings.some((w) => w.includes('"chat"')), JSON.stringify(r.warnings));
+  assert.ok(r.warnings.some((w) => w.includes('no node_type')), JSON.stringify(r.warnings));
+});
+
+check('docs recommend current model aliases and name the remap', () => {
+  const agentGotcha = GOTCHAS.find((g) => g.startsWith('Agent nodes'));
+  for (const alias of ['claude-sonnet-5', 'claude-opus-5-5', 'claude-haiku-4-5']) {
+    assert.ok(agentGotcha.includes(alias), `agent gotcha does not recommend ${alias}`);
+  }
+  assert.ok(/remapped/.test(agentGotcha));
+});
+
+check('docs cover the flow-author role 403 and the run-queue statuses', () => {
+  const text = GOTCHAS.join('\n');
+  assert.ok(text.includes('root, admin or developer'), 'role gotcha missing');
+  for (const code of ['429', '504', '409', 'Retry-After']) assert.ok(text.includes(code), `run-queue ${code} missing`);
+});
+
+check('integration node bound to an integration_id needs no url/method in the payload', () => {
+  noErrors(one({ id: 'I', node_type: 'integration', integration_id: 'slack', payload: { data: { text: 'hi' } } }));
+  hasError(one({ id: 'H', node_type: 'http', payload: {} }), 'requires "url"');
+});
+
+check('no staging host in shipped source', () => {
+  const srcDir = new URL('../src/', import.meta.url);
+  for (const f of readdirSync(srcDir)) {
+    const text = readFileSync(new URL(f, srcDir), 'utf8');
+    assert.ok(!text.includes('microstrate.io'), `${f} mentions microstrate.io`);
+  }
+});
+
 // --- every src module parses -------------------------------------------------
 // A syntax error in src/index.js used to be INVISIBLE to this suite: nothing here
 // imports the entry point (it would start the server on stdio), so the tests all
@@ -646,6 +827,32 @@ check('every file in src/ is syntactically valid', () => {
     }
   }
 });
+
+// --- tool handlers against a fake client -------------------------------------
+{
+  const { registerTools } = await import('../src/index.js');
+  const tools = {};
+  const calls = [];
+  const fake = (method) => async (path, a) => { calls.push({ method, path, query: a }); return { message: 'success' }; };
+  registerTools({ registerTool: (n, meta, fn) => (tools[n] = { meta, fn }) }, { get: fake('GET'), post: fake('POST'), put: fake('PUT'), delete: fake('DELETE') });
+  const subject = 'ms.hub.config.workflow.draft.abc.def';
+
+  const refused = await tools.delete_workflow.fn({ subject, keep_draft: false });
+  check('delete_workflow refuses without confirm: true and sends nothing', () => {
+    assert.equal(refused.isError, true);
+    assert.match(refused.content[0].text, /confirm: true/);
+    assert.equal(calls.length, 0);
+  });
+  const done = await tools.delete_workflow.fn({ subject, keep_draft: false, confirm: true });
+  check('delete_workflow with confirm: true deletes both versions', () => {
+    assert.equal(done.isError, undefined, JSON.stringify(done));
+    assert.equal(calls[0].method, 'DELETE');
+    assert.equal(calls[0].query.draft, 'true');
+  });
+  check('run_workflow states that it runs every node for real', () => {
+    assert.match(tools.run_workflow.meta.description, /spend LLM tokens/);
+  });
+}
 
 if (failures > 0) {
   console.error(`\n${failures} failure(s)`);

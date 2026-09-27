@@ -1,0 +1,11 @@
+{
+  "slug": "amend-suspend",
+  "of": "amend",
+  "teaches": "An amend_distribution body that changes status. Status changes need confirm: true in this MCP. suspended can go back to active; revoked is terminal.",
+  "payload": {
+    "distributor_account_id": "<<ACCOUNT_2>>",
+    "status": "suspended",
+    "reason": "Paused pending a contract review"
+  },
+  "tool_arguments": { "confirm": true }
+}

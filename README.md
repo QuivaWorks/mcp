@@ -1,8 +1,9 @@
 # Quiva MCP servers
 
-Five MCP servers over one platform, so that an agent can build real Quiva
-configuration — flows, records, document templates, workspaces and agents —
-without guessing at payload shapes.
+Seven MCP servers over one platform, so that an agent can build real Quiva
+configuration — flows, records, document templates, workspaces, assistants,
+distribution and the Abbie coworker — without guessing at payload shapes. A
+remote, hosted variant is also available; see below.
 
 | Server | Builds | Backing service |
 | --- | --- | --- |
@@ -10,7 +11,9 @@ without guessing at payload shapes.
 | [quiva-records-mcp](quiva-records-mcp/) | record configs (JSON Schema + form UI), records | records-service |
 | [quiva-documents-mcp](quiva-documents-mcp/) | DOCX templates, generated documents, e-signature | file-generator-service |
 | [quiva-workspaces-mcp](quiva-workspaces-mcp/) | spaces, tasks, comments, time tracking | workspaces-service |
-| [quiva-agents-mcp](quiva-agents-mcp/) | agent definitions, invocation | hub-service |
+| [quiva-agents-mcp](quiva-agents-mcp/) | assistant definitions, invocation | hub-service |
+| [quiva-distribution-mcp](quiva-distribution-mcp/) | distribution products, invites, messages | accounts-service |
+| [quiva-coworker-mcp](quiva-coworker-mcp/) | Abbie's skills, todos, org memory, profile, corrections | hub-service |
 
 ## Why these exist
 
@@ -37,23 +40,45 @@ So each server carries three things beyond a thin API wrapper:
 
 ```sh
 npm install
-cp quiva-flows-mcp/.env.example quiva-flows-mcp/.env   # and the other four
+cp quiva-flows-mcp/.env.example quiva-flows-mcp/.env   # and the other servers
 ```
 
 Fill in **one** auth option per `.env`. Precedence is `QUIVA_API_KEY`, then
-`QUIVA_BEARER_TOKEN`, then email + password.
+`QUIVA_BEARER_TOKEN`, then email + password. An API key works on every server,
+including `quiva-agents-mcp` — cerberus swaps it for a user JWT at the gateway
+before the request reaches hub-service (verified live 2026-09-27).
 
-> `quiva-agents-mcp` is the exception: leave `QUIVA_API_KEY` **empty** there. The
-> agent endpoints read claims out of the JWT, so an API key shadowing the bearer
-> token makes every agent write fail with 401.
-
-`.mcp.json` registers all five servers, so Claude Code picks them up on open.
+`.mcp.json` registers every stdio server, so Claude Code picks them up on open.
 Verify with `claude mcp list`.
 
 ```sh
-npm test                # 356 local checks, no network
+npm test                # local checks, no network
 npm run engine:check    # is our engine documentation still current?
 ```
+
+`npm test` at the root runs every workspace's own suite (`node:test` for
+`quiva-mcp-remote`, a dependency-free `check()` harness everywhere else), all
+passing and none needing network, as of 2026-09-27:
+
+| Package | Checks |
+| --- | --- |
+| quiva-flows-mcp | 63 |
+| quiva-records-mcp | 119 |
+| quiva-documents-mcp | 45 |
+| quiva-workspaces-mcp | 183 |
+| quiva-agents-mcp | 53 |
+| quiva-distribution-mcp | 71 |
+| quiva-coworker-mcp | 75 |
+| quiva-mcp-remote | 35 |
+| **Total** | **644** |
+
+## Remote (hosted) server
+
+Prefer not to run anything locally? [quiva-mcp-remote](quiva-mcp-remote/) is one
+hosted MCP endpoint, `https://api.quiva.ai/mcp`, that composes every server above
+behind a single connection, authenticated with a Quiva API key. See
+[quiva-mcp-remote/README.md](quiva-mcp-remote/README.md) for client setup
+(Claude Code, Cursor, VS Code, Claude Desktop) and how to run it yourself.
 
 ## Keeping the docs honest
 
@@ -70,14 +95,22 @@ engine/fetch.sh <path-in-repo>    # read one engine file, no clone needed
 
 This needs the `gh` CLI authenticated as someone with read access to
 `myevari/evari-olympus` — any member of that org. There is no submodule and no
-vendored copy: 27 files are fetched over the API on demand.
+vendored copy: files are fetched over the API on demand.
+
+Without `gh`, point the script at a local checkout instead — same three modes,
+blob shas read via `git ls-tree`/`git rev-parse` rather than the GitHub API:
+
+```sh
+node engine/sync.mjs --local /path/to/evari-olympus [--pin|--list]
+```
 
 A changed file does not mean a claim is wrong, only that it is no longer
-verified. Re-read it, fix what moved, then `npm run engine:pin`.
+verified. Re-read it, fix what moved, then `npm run engine:pin` (or the
+`--local` equivalent).
 
 ## Reading order
 
-- [docs/quiva-mcp-architecture.md](docs/quiva-mcp-architecture.md) — how the five
+- [docs/quiva-mcp-architecture.md](docs/quiva-mcp-architecture.md) — how the
   servers and the platform fit together.
 - [docs/lessons.md](docs/lessons.md) — the failure modes that shaped all of this.
   Short, and the single most useful thing to read first.
@@ -107,7 +140,10 @@ whose `name` comes back empty is invisible to both the deployer and the UI. See
 
 ## Known stale
 
-`quiva-workspaces-mcp` still documents the superseded inline `time_tracking.logs[]`
-shape. Staging has moved to a `PUT/GET /workspaces/task/{id}/time-log` subresource
-that generates log ids server-side; `add_time_log` and `list_time_logs` are not
-implemented yet. See the handoff for detail.
+Nothing repo-wide as of 2026-09-27. The inline `time_tracking.logs[]` shape this
+section used to flag is gone: `quiva-workspaces-mcp` now wraps the real
+`PUT/GET /workspaces/task/{id}/time-log` subresource with `add_time_log` /
+`list_time_logs` (server-minted ids, hydrated totals) — see that package's
+README. Per-package caveats that depend on which environment you're pointed at
+(e.g. `list_agents` paging, confirmed designed but not yet live on staging) live
+in that server's own tool descriptions, not here.

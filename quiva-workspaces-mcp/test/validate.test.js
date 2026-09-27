@@ -3,9 +3,12 @@
 import assert from 'node:assert/strict';
 import { validate, verticalRouting } from '../src/validate.js';
 import { harvestedPayloads, getExample } from '../src/examples.js';
-import { TIME_LOG_EXAMPLE, TIME_TRACKING_EXAMPLE, TASK_ACTION_EXAMPLE, VERTICAL_CONFIG_TYPES, VERTICAL_NON_DEPLOYING_FOLDERS } from '../src/workspaces-docs.js';
+import {
+  TIME_LOG_EXAMPLE, TIME_TRACKING_EXAMPLE, TASK_ACTION_EXAMPLE, CREATE_SPACE_EXAMPLE, CREATE_CONTACT_EXAMPLE,
+  TASK_TEMPLATE_EXAMPLE, SPACE_UPDATE_FIELDS, VERTICAL_CONFIG_TYPES, VERTICAL_NON_DEPLOYING_FOLDERS,
+} from '../src/workspaces-docs.js';
 import { decodeFileKey, fileKeyOf, digestMatches, sha256OfContent } from '../src/client.js';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -185,7 +188,7 @@ check('removing a reaction still requires a real emoji key', () => {
 });
 
 check('the authored example uses a real emoji reaction key', () => {
-  const example = getExample('renewal-review-board');
+  const example = getExample('review-board');
   const r = validate('reaction', example.reaction, { requireRequired: true });
   assert.equal(r.valid, true, `the shipped example must not teach the shortcode form: ${r.errors.join('; ')}`);
   assert.ok(
@@ -194,11 +197,12 @@ check('the authored example uses a real emoji reaction key', () => {
   );
 });
 
-// --- time tracking (workspaces-service #1281) ---------------------------------
+// --- time tracking: the time-log subresource (workspaces-service #1292) -------
 
-check('valid time_tracking passes', () => {
-  const r = validate('task', { title: 'x', time_tracking: TIME_TRACKING_EXAMPLE }, { requireRequired: true });
+check('a task write carrying only the estimate passes cleanly', () => {
+  const r = validate('task', { title: 'x', space_id: 'Q2_MKTG', time_tracking: TIME_TRACKING_EXAMPLE }, { requireRequired: true });
   assert.equal(r.valid, true, JSON.stringify(r.errors));
+  assert.equal(r.warnings.length, 0, JSON.stringify(r.warnings));
 });
 
 check('time_tracking must be an object', () => {
@@ -207,69 +211,62 @@ check('time_tracking must be an object', () => {
   assert.ok(r.errors.some((e) => e.includes('time_tracking must be an object')));
 });
 
-check('a time log without an id is an error (the backend never generates one)', () => {
-  const { id, ...noId } = TIME_LOG_EXAMPLE;
-  const r = validate('task', { title: 'x', time_tracking: { logs: [noId] } });
-  assert.equal(r.valid, false);
-  assert.ok(r.errors.some((e) => e.includes('logs[0].id is required')), JSON.stringify(r.errors));
-});
-
-check('duplicate time log ids are an error', () => {
-  const r = validate('task', { title: 'x', time_tracking: { logs: [TIME_LOG_EXAMPLE, TIME_LOG_EXAMPLE] } });
-  assert.equal(r.valid, false);
-  assert.ok(r.errors.some((e) => e.includes('duplicated')), JSON.stringify(r.errors));
-});
-
-check('time_spent must carry a numeric time_in_seconds', () => {
-  const r = validate('task', {
-    title: 'x',
-    time_tracking: { logs: [{ ...TIME_LOG_EXAMPLE, time_spent: { time_in_seconds: '90m' } }] },
-  });
-  assert.equal(r.valid, false);
-  assert.ok(r.errors.some((e) => e.includes('SECONDS')), JSON.stringify(r.errors));
-});
-
 check('a negative estimate is an error', () => {
-  const r = validate('task', { title: 'x', time_tracking: { estimate: { time_in_seconds: -1 }, logs: [] } });
+  const r = validate('task', { title: 'x', time_tracking: { estimate: { time_in_seconds: -1 } } });
   assert.equal(r.valid, false);
   assert.ok(r.errors.some((e) => e.includes('must not be negative')));
 });
 
-// The four merge cases below are what the live probe established. The validator
-// cannot change them, but it must WARN in the two that silently lose data.
-check('a non-empty logs[] warns that it replaces rather than appends', () => {
-  const r = validate('task', { title: 'x', time_tracking: { logs: [TIME_LOG_EXAMPLE] } }, { requireRequired: false });
-  assert.equal(r.valid, true, JSON.stringify(r.errors));
-  assert.ok(r.warnings.some((w) => w.includes('REPLACES')), JSON.stringify(r.warnings));
+check('time_tracking.logs on a task write warns that it is never read', () => {
+  const r = validate('task', { time_tracking: { logs: [{ id: 'tl_x' }] } }, { requireRequired: false });
+  assert.equal(r.valid, true, 'harvested reads carry logs, so this must stay a warning');
+  assert.ok(r.warnings.some((w) => w.includes('NEVER READ') && w.includes('add_time_log')), JSON.stringify(r.warnings));
 });
 
-check('time_tracking without logs warns that existing logs are preserved, not cleared', () => {
-  const r = validate('task', { time_tracking: { estimate: { time_in_seconds: 3600 } } }, { requireRequired: false });
+check('hydrated totals sent back warn as server-computed', () => {
+  const r = validate('task', { time_tracking: { estimate: { time_in_seconds: 60 }, spent: { time_in_seconds: 30 }, progress_percent: 50 } }, { requireRequired: false });
   assert.equal(r.valid, true, JSON.stringify(r.errors));
-  assert.ok(r.warnings.some((w) => w.includes('PRESERVES')), JSON.stringify(r.warnings));
+  assert.ok(r.warnings.some((w) => w.includes('spent') && w.includes('computed server-side')), JSON.stringify(r.warnings));
 });
 
-check('a derived total sent back is flagged as not part of the model', () => {
-  const r = validate('task', {
-    title: 'x',
-    time_tracking: { estimate: { time_in_seconds: 3600 }, logs: [], total_spent: 1800 },
-  });
-  assert.equal(r.valid, true, JSON.stringify(r.errors));
+check('an unknown time_tracking key warns', () => {
+  const r = validate('task', { time_tracking: { total_spent: 1800 } }, { requireRequired: false });
   assert.ok(r.warnings.some((w) => w.includes('total_spent')), JSON.stringify(r.warnings));
 });
 
-check('a time log missing its user snapshot warns', () => {
-  const { user, ...noUser } = TIME_LOG_EXAMPLE;
-  const r = validate('task', { title: 'x', time_tracking: { logs: [noUser] } });
+check('valid add_time_log body passes with no warnings', () => {
+  const r = validate('time_log', TIME_LOG_EXAMPLE);
   assert.equal(r.valid, true, JSON.stringify(r.errors));
-  assert.ok(r.warnings.some((w) => w.includes('user is missing')), JSON.stringify(r.warnings));
+  assert.equal(r.warnings.length, 0, JSON.stringify(r.warnings));
 });
 
-check('a non-RFC3339 started_at warns', () => {
-  const r = validate('task', {
-    title: 'x',
-    time_tracking: { logs: [{ ...TIME_LOG_EXAMPLE, started_at: '2026-07-29' }] },
-  });
+check('time_log needs time_spent and started_at (the handler 400s without them)', () => {
+  const r = validate('time_log', { description: 'x' });
+  assert.equal(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes('time_spent is required')));
+  assert.ok(r.errors.some((e) => e.includes('started_at is required')));
+});
+
+check('time_log with zero seconds is an error (> 0 required)', () => {
+  const r = validate('time_log', { ...TIME_LOG_EXAMPLE, time_spent: { time_in_seconds: 0 } });
+  assert.equal(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes('greater than zero')), JSON.stringify(r.errors));
+});
+
+check('time_log time_spent must be numeric seconds', () => {
+  const r = validate('time_log', { ...TIME_LOG_EXAMPLE, time_spent: { time_in_seconds: '90m' } });
+  assert.equal(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes('SECONDS')));
+});
+
+check('time_log client-minted id/user/created_at warn as server-owned', () => {
+  const r = validate('time_log', { ...TIME_LOG_EXAMPLE, id: 'time_log_x', user: { id: 'u', name: 'n' }, created_at: '2026-01-01T00:00:00Z' });
+  assert.equal(r.valid, true, JSON.stringify(r.errors));
+  assert.ok(r.warnings.some((w) => w.includes('server-owned')), JSON.stringify(r.warnings));
+});
+
+check('time_log non-RFC3339 started_at warns', () => {
+  const r = validate('time_log', { ...TIME_LOG_EXAMPLE, started_at: '2026-07-29' });
   assert.ok(r.warnings.some((w) => w.includes('RFC3339')), JSON.stringify(r.warnings));
 });
 
@@ -304,12 +301,199 @@ check('task_action resources need both resource_id and resource_type', () => {
   assert.ok(r.errors.some((e) => e.includes('resource_type')));
 });
 
-check('every task_action write warns that it cannot be read back', () => {
+check('every task_action write warns that it moves the status by role', () => {
   const r = validate('task_action', TASK_ACTION_EXAMPLE, { requireRequired: true });
-  assert.ok(
-    r.warnings.some((w) => w.includes('CANNOT BE READ BACK')),
-    'the missing GET route is the single most important thing to say about a task action'
-  );
+  assert.ok(r.warnings.some((w) => w.includes('status role') && w.includes('never writes an id')), JSON.stringify(r.warnings));
+  assert.ok(!r.warnings.some((w) => w.includes('CANNOT BE READ BACK')), 'get_task returns task_actions[]; the old warning is stale');
+});
+
+// --- space fields -------------------------------------------------------------
+
+check('a status role outside the known set warns', () => {
+  const r = validate('space', { id: 'X', name: 'X', statuses: [{ id: 'a', name: 'A', role: 'finished' }] });
+  assert.equal(r.valid, true, JSON.stringify(r.errors));
+  assert.ok(r.warnings.some((w) => w.includes('not a known status role')));
+});
+
+check('a duplicate status role warns (automation resolves the first)', () => {
+  const r = validate('space', { id: 'X', name: 'X', statuses: [{ id: 'a', name: 'A', role: 'working' }, { id: 'b', name: 'B', role: 'working' }] });
+  assert.ok(r.warnings.some((w) => w.includes('repeats role "working"')), JSON.stringify(r.warnings));
+});
+
+check('a terminal role on a non-complete status warns', () => {
+  const r = validate('space', { id: 'X', name: 'X', statuses: [{ id: 'd', name: 'Done', role: 'done', complete: false }] });
+  assert.ok(r.warnings.some((w) => w.includes('complete: true')), JSON.stringify(r.warnings));
+});
+
+check('the example space with roles passes cleanly', () => {
+  const r = validate('space', CREATE_SPACE_EXAMPLE);
+  assert.equal(r.valid, true, JSON.stringify(r.errors));
+  assert.equal(r.warnings.length, 0, JSON.stringify(r.warnings));
+});
+
+check('upsert_statuses needs ids but not names', () => {
+  const ok = validate('space', { upsert_statuses: [{ id: 'blocked', role: 'working' }] }, { requireRequired: false });
+  assert.equal(ok.valid, true, JSON.stringify(ok.errors));
+  const bad = validate('space', { upsert_statuses: [{ name: 'Blocked' }] }, { requireRequired: false });
+  assert.ok(bad.errors.some((e) => e.includes('upsert_statuses[0].id')));
+});
+
+check('remove_* must be arrays of ids', () => {
+  const r = validate('space', { remove_tags: 'old' }, { requireRequired: false });
+  assert.equal(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes('remove_tags')));
+});
+
+check('list edits on create warn that create ignores them', () => {
+  const r = validate('space', { id: 'X', name: 'X', upsert_tags: [{ id: 't' }] });
+  assert.ok(r.warnings.some((w) => w.includes('update-only')), JSON.stringify(r.warnings));
+});
+
+check('a full statuses list on update warns that it replaces', () => {
+  const r = validate('space', { statuses: [{ id: 'a', name: 'A' }] }, { requireRequired: false });
+  assert.ok(r.warnings.some((w) => w.includes('REPLACES') && w.includes('upsert_statuses')), JSON.stringify(r.warnings));
+});
+
+check('base_record needs a config_id', () => {
+  const r = validate('space', { base_record: { identity_fields: ['email'] } }, { requireRequired: false });
+  assert.equal(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes('base_record.config_id')));
+});
+
+check('base_record create_login_on_create warns about sign-ins', () => {
+  const r = validate('space', { base_record: { config_id: 'contact', identity_fields: ['email'], create_login_on_create: true } }, { requireRequired: false });
+  assert.equal(r.valid, true, JSON.stringify(r.errors));
+  assert.ok(r.warnings.some((w) => w.includes('PORTAL') || w.includes('portal sign-in')), JSON.stringify(r.warnings));
+});
+
+check('flags on the wrong record warn', () => {
+  const r = validate('space', {
+    base_record: { config_id: 'contact', identity_fields: ['email'], enable_distribution: true },
+    organisation_record: { config_id: 'firm', identity_fields: ['registration_number'], create_login_on_create: true },
+  }, { requireRequired: false });
+  assert.ok(r.warnings.some((w) => w.includes('enable_distribution belongs on organisation_record')));
+  assert.ok(r.warnings.some((w) => w.includes('create_login_on_create belongs on base_record')));
+});
+
+check('base_record and organisation_record on one config is an error', () => {
+  const r = validate('space', { base_record: { config_id: 'c', identity_fields: ['email'] }, organisation_record: { config_id: 'c', identity_fields: ['name'] } }, { requireRequired: false });
+  assert.equal(r.valid, false);
+});
+
+check('hidden_tabs cannot hold overview; unknown tabs warn', () => {
+  const r = validate('space', { hidden_tabs: ['overview', 'charts', 'files'] }, { requireRequired: false });
+  assert.ok(r.errors.some((e) => e.includes('overview')));
+  assert.ok(r.warnings.some((w) => w.includes('"charts"')));
+});
+
+check('modules must be booleans', () => {
+  const r = validate('space', { modules: { files: 'yes', widgets: true } }, { requireRequired: false });
+  assert.ok(r.errors.some((e) => e.includes('modules.files')));
+  assert.ok(r.warnings.some((w) => w.includes('modules.widgets')));
+});
+
+check('custom_tab mirrors ValidateDisplay', () => {
+  const r = validate('space', {
+    record_configs: [{ id: 'quote' }],
+    custom_tab: { cards: [
+      { config_id: 'quote', action: 'create', view: 'open' },
+      { config_id: 'quote', action: 'list' },
+      { config_id: 'quote', action: 'list' },
+      { action: 'list' },
+      { config_id: 'other', action: 'open' },
+    ] },
+  }, { requireRequired: false });
+  assert.ok(r.errors.some((e) => e.includes('cards[0].view')));
+  assert.ok(r.errors.some((e) => e.includes('cards[2] repeats card 1')));
+  assert.ok(r.errors.some((e) => e.includes('cards[3].config_id is required')));
+  assert.ok(r.errors.some((e) => e.includes('cards[4].action "open"')));
+  assert.ok(r.warnings.some((w) => w.includes('"other" is not in this payload')));
+});
+
+check('editing_disabled warns: irreversible on create, ignored on update', () => {
+  const c = validate('space', { id: 'X', name: 'X', editing_disabled: true });
+  assert.ok(c.warnings.some((w) => w.includes('IRREVERSIBLE')));
+  const u = validate('space', { editing_disabled: true }, { requireRequired: false });
+  assert.ok(u.warnings.some((w) => w.includes('CREATE-ONLY')));
+});
+
+check('SPACE_UPDATE_FIELDS lists the new space fields', () => {
+  for (const f of ['base_record', 'organisation_record', 'modules', 'custom_tab', 'hidden_tabs', 'view', 'upsert_statuses', 'remove_statuses', 'upsert_priorities', 'remove_priorities', 'upsert_tags', 'remove_tags']) {
+    assert.ok(SPACE_UPDATE_FIELDS.includes(f), f);
+  }
+  assert.ok(!SPACE_UPDATE_FIELDS.includes('editing_disabled'), 'editing_disabled is create-only');
+});
+
+// --- task fields ---------------------------------------------------------------
+
+check('a task cannot be its own parent; parent must be an id', () => {
+  const r = validate('task', { id: 'A-1', parent: 'A-1' }, { requireRequired: false });
+  assert.ok(r.errors.some((e) => e.includes('own parent')));
+  const d = validate('task', { parent: 'spaces.A.x' }, { requireRequired: false });
+  assert.ok(d.errors.some((e) => e.includes('not a task id')));
+});
+
+check('move_subtasks without a space/folder change warns', () => {
+  const r = validate('task', { move_subtasks: true }, { requireRequired: false });
+  assert.ok(r.warnings.some((w) => w.includes('does nothing')));
+  const ok = validate('task', { move_subtasks: true, space_id: 'OTHER' }, { requireRequired: false });
+  assert.ok(!ok.warnings.some((w) => w.includes('does nothing')));
+});
+
+check('pipeline value must be a number and wants a currency', () => {
+  const bad = validate('task', { value: '5000' }, { requireRequired: false });
+  assert.ok(bad.errors.some((e) => e.includes('value must be a number')));
+  const warn = validate('task', { value: 5000 }, { requireRequired: false });
+  assert.ok(warn.warnings.some((w) => w.includes('currency')));
+});
+
+check('identity on create warns to check base_record_skipped; on update it is ignored', () => {
+  const c = validate('task', { title: 'x', space_id: 'LEADS', identity: { email: 'sam@example.com' } });
+  assert.ok(c.warnings.some((w) => w.includes('base_record_skipped')));
+  const u = validate('task', { identity: { email: 'sam@example.com' } }, { requireRequired: false });
+  assert.ok(u.warnings.some((w) => w.includes('create-only')));
+});
+
+check('create_task with no space_id warns about ESCALATE', () => {
+  const r = validate('task', { title: 'x' });
+  assert.ok(r.warnings.some((w) => w.includes('ESCALATE')));
+});
+
+// --- contacts ------------------------------------------------------------------
+
+check('valid contact passes and warns about a possible sign-in', () => {
+  const r = validate('contact', CREATE_CONTACT_EXAMPLE);
+  assert.equal(r.valid, true, JSON.stringify(r.errors));
+  assert.ok(r.warnings.some((w) => w.includes('PORTAL SIGN-IN')));
+});
+
+check('contact needs space_id, a valid email and a single-segment parent_folder', () => {
+  const r = validate('contact', { email: 'not-an-email', parent_folder: 'a.b' });
+  assert.ok(r.errors.some((e) => e.includes('space_id is required')));
+  assert.ok(r.errors.some((e) => e.includes('not a valid email')));
+  assert.ok(r.errors.some((e) => e.includes('single folder')));
+});
+
+// --- task templates --------------------------------------------------------------
+
+check('valid task template passes', () => {
+  const r = validate('task_template', TASK_TEMPLATE_EXAMPLE);
+  assert.equal(r.valid, true, JSON.stringify(r.errors));
+});
+
+check('task template action kinds mirror validateTaskTemplateActions', () => {
+  const r = validate('task_template', { name: 't', task_actions: [
+    { kind: 'form', description: 'a' },
+    { kind: 'document', description: 'b', document_source: 'knowledge' },
+    { kind: 'chat', description: 'c' },
+    { kind: 'video', description: 'd' },
+    { kind: 'form', configs: [{ id: 'x' }] },
+  ] });
+  assert.ok(r.errors.some((e) => e.includes('[0]: config_id or configs')));
+  assert.ok(r.errors.some((e) => e.includes('[1]: knowledge_key')));
+  assert.ok(r.errors.some((e) => e.includes('[2]: agent_subject')));
+  assert.ok(r.errors.some((e) => e.includes('[3]: kind')));
+  assert.ok(r.errors.some((e) => e.includes('[4].description')));
 });
 
 // --- kind guard ---
@@ -362,7 +546,7 @@ check('golden: harvested reads trip the read-only-field warning (that is the poi
 // space that omits them renders unlike every other space — the same class of
 // defect as the flows MCP's missing node geometry.
 check('the authored space example sets the presentation fields the board reads', () => {
-  const example = getExample('renewal-review-board');
+  const example = getExample('review-board');
   for (const status of example.space.statuses) {
     for (const field of ['color', 'order', 'complete', 'is_visible']) {
       assert.ok(status[field] !== undefined, `status "${status.id}" is missing ${field}`);
@@ -382,7 +566,7 @@ check('the authored space example sets the presentation fields the board reads',
 });
 
 check('the authored write payloads pass the validator in create mode', () => {
-  const example = getExample('renewal-review-board');
+  const example = getExample('review-board');
   for (const [kind, payload] of [
     ['space', example.space],
     ['task', example.task],
@@ -395,7 +579,7 @@ check('the authored write payloads pass the validator in create mode', () => {
 });
 
 check('the authored write payloads carry no server-set fields', () => {
-  const example = getExample('renewal-review-board');
+  const example = getExample('review-board');
   for (const [kind, payload] of [
     ['space', example.space],
     ['task', example.task],
@@ -410,25 +594,28 @@ check('the authored write payloads carry no server-set fields', () => {
 });
 
 check('the authored example covers the new task surface and passes the validator', () => {
-  const example = getExample('renewal-review-board');
+  const example = getExample('review-board');
+  for (const log of example.time_logs) {
+    const r = validate('time_log', log);
+    assert.equal(r.valid, true, `time_log: ${r.errors.join('; ')}`);
+    assert.equal(r.warnings.length, 0, `time_log carries server-owned fields: ${r.warnings.join('; ')}`);
+  }
+  assert.ok(!example.task.time_tracking.logs, 'the task write must carry only the estimate');
+  for (const [kind, payload] of [['task_action', example.task_action], ['contact', example.contact], ['task', example.identity_task], ['task', example.subtask]]) {
+    const r = validate(kind, payload, { requireRequired: true });
+    assert.equal(r.valid, true, `${kind}: ${r.errors.join('; ')}`);
+  }
+  const roles = example.space.statuses.map((s) => s.role).filter(Boolean);
+  for (const role of ['todo', 'working', 'done']) assert.ok(roles.includes(role), `the board needs a ${role} role for task actions to move it`);
+  assert.equal(example.space.base_record.create_login_on_create, false, 'the shipped example must not enrol contacts');
+  assert.ok(/@example\.com$/.test(example.contact.email), 'test contacts use example.com');
+});
 
-  const tt = validate('task', { title: example.task.title, time_tracking: example.time_tracking }, { requireRequired: true });
-  assert.equal(tt.valid, true, `time_tracking: ${tt.errors.join('; ')}`);
-  assert.ok(example.time_tracking.logs.length >= 2, 'one log does not demonstrate that logs[] replaces the whole array');
-
-  const action = validate('task_action', example.task_action, { requireRequired: true });
-  assert.equal(action.valid, true, `task_action: ${action.errors.join('; ')}`);
-
-  // The example must keep saying the write is unverifiable, or the next reader
-  // will assume a 200 means the action is stored.
-  assert.ok(
-    example.task_action_cannot_be_verified?.cause?.includes('put.task-action'),
-    'the example must name the misrouted GET as the reason a task action cannot be read back'
-  );
-  assert.ok(
-    example.time_tracking_merge_semantics_verified_live?.['logs: [one entry]']?.includes('REPLACED'),
-    'the example must record that logs[] replaces rather than appends'
-  );
+check('authored examples carry no insurance vocabulary', () => {
+  const text = JSON.stringify(getExample('review-board')).toLowerCase();
+  for (const word of ['broker', 'underwrit', 'insur', 'premium', 'policy', 'renewal', 'mga']) {
+    assert.ok(!text.includes(word), `"${word}" in an authored example`);
+  }
 });
 
 // --- folders ---------------------------------------------------------------
@@ -815,6 +1002,53 @@ check('every file in src/ is syntactically valid', () => {
       throw new Error(`${f} does not parse:\n${String(err.stderr || err.message).trim()}`);
     }
   }
+});
+
+// --- tool handlers against a fake client -------------------------------------
+{
+  const { registerTools } = await import('../src/index.js');
+  const tools = {};
+  const calls = [];
+  let reply = () => ({ message: 'success' });
+  const fake = (method) => async (path, a, b) => { calls.push({ method, path, a, b }); return reply(method, path, a); };
+  const client = { get: fake('GET'), post: fake('POST'), put: fake('PUT'), patch: fake('PATCH'), delete: fake('DELETE'), readObject: async () => { throw new Error('no file'); } };
+  registerTools({ registerTool: (n, meta, fn) => (tools[n] = { meta, fn }) }, client);
+  const text = (r) => r.content[0].text;
+
+  const refused = await tools.delete_space.fn({ id: 'OPS' });
+  check('delete_space refuses without confirm: true and sends nothing', () => {
+    assert.equal(refused.isError, true);
+    assert.match(text(refused), /confirm: true/);
+    assert.equal(calls.length, 0);
+  });
+  await tools.delete_space.fn({ id: 'OPS', confirm: true });
+  check('delete_space with confirm: true sends the DELETE', () => assert.deepEqual([calls[0].method, calls[0].path], ['DELETE', '/workspaces/space/OPS']));
+
+  calls.length = 0;
+  await tools.update_task_template.fn({ id: 'tt_path', template: { id: 'tt_other', name: 'Weekly review' }, skip_local_validation: false });
+  check('update_task_template strips a body id so the path id wins', () => {
+    assert.equal(calls[0].path, '/workspaces/task-template/tt_path');
+    assert.equal('id' in calls[0].a, false);
+    assert.equal(calls[0].a.name, 'Weekly review');
+  });
+  check('the task_template validator refuses an id in update mode only', () => {
+    assert.ok(validate('task_template', { id: 'tt_other', name: 'x' }, { requireRequired: false }).errors.some((e) => /overrides the id in the path/.test(e)));
+    assert.equal(validate('task_template', { name: 'x' }, { requireRequired: false }).valid, true);
+  });
+
+  calls.length = 0;
+  reply = (method, path) => (path === '/workspaces/meetings' ? { results: [], results_total: 0 } : (() => { throw new Error('400 key not found'); })());
+  const missing = await tools.get_meeting_transcript.fn({ space_id: 'OPS', recording_id: 'rec_1' });
+  check('get_meeting_transcript says an empty index may be an index failure', () => {
+    assert.equal(missing.isError, true);
+    assert.match(text(missing), /not indexed, or the meetings index did not answer/);
+  });
+  check('list_meetings says an empty list is not proof', () => assert.match(tools.list_meetings.meta.description, /meetings index fails/));
+}
+
+check('push-example.mjs header comment is at most 3 lines', () => {
+  const src = readFileSync(fileURLToPath(new URL('../tools/push-example.mjs', import.meta.url)), 'utf8').split('\n').slice(1);
+  assert.ok(src.findIndex((l) => !l.startsWith('//')) <= 3);
 });
 
 if (failures) {

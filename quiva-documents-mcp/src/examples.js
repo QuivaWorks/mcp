@@ -64,7 +64,7 @@ export function listExamples() {
     examples: [...harvested.map((e) => ({ ...describe(e), kind: 'harvested' })), ...authored.map((e) => ({ ...describe(e), kind: 'authored' }))],
     note:
       'harvested = REAL templates/documents from the platform (known to work); authored = hand-written illustrations (not evidence). ' +
-      'For the full template surface (output.name expressions, filters, sub_template conditions) start with the authored "certificate-of-currency" — and read its conditions_warning, because this MCP\'s own docs describe the wrong conditions syntax. Fetch one with get_example(slug).',
+      'For the full template surface (output.name expressions, filters, sub_template conditions) start with the authored "document-verification-example" — and read its conditions_warning, because this MCP\'s own docs describe the wrong conditions syntax. Fetch one with get_example(slug).',
   };
 }
 

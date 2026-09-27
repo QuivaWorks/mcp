@@ -19,8 +19,8 @@ knowledge, silent footgun.
 
 | # | Sev | Defect | Evidence | Status |
 |---|-----|--------|----------|--------|
-| 1 | P0 | `condition` node docs + validator require `{ rules: [{ if, then, else }] }`. The engine feeds the payload straight into rule-engine v2, which knows `{ condition, outcome }` cells. `{if,then,else}` falls through `resolveRuleV2` to `{outcome: <whole payload>}` and `RawToStringArray` rejects it. | `runner/graph.go:1133` `handleConditionNode` → `evaluateRules` (`:1518`) → `jseval.ResolveRules`; `transform/transform.go:225`; `quiva-flows-mcp/src/validate.js:272` + `checkConditionTargets`; `quiva-flows-mcp/src/node-docs.js:269` | Source-confirmed; exact working payload to be locked by live A/B (Phase 1) |
-| 2 | P0 | `rules` node doc has the right envelope (`{rules, facts, context}`) but wrong cell shape in its example (`{ if, then, else }` again). | `runner/graph.go:1182` `handleRulesNode`; `model/request.go:72` `RulesPayload`; `node-docs.js:300` | Source-confirmed |
+| 1 | P0 | `condition` node docs + validator require `{ rules: [{ if, then, else }] }`. The engine feeds the payload straight into rule-engine v2, which knows `{ condition, outcome }` cells. `{if,then,else}` falls through `resolveRuleV2` to `{outcome: <whole payload>}` and `RawToStringArray` rejects it. | `runner/graph.go:1513` `handleConditionNode` → `evaluateRules` (`:2037`) → `jseval.ResolveRules`; `transform/transform.go:225`; `quiva-flows-mcp/src/validate.js:272` + `checkConditionTargets`; `quiva-flows-mcp/src/node-docs.js:269` | Source-confirmed; exact working payload to be locked by live A/B (Phase 1) |
+| 2 | P0 | `rules` node doc has the right envelope (`{rules, facts, context}`) but wrong cell shape in its example (`{ if, then, else }` again). | `runner/graph.go:1562` `handleRulesNode`; `model/request.go:85` `RulesPayload`; `node-docs.js:300` | Source-confirmed |
 | 3 | P1 | No node UI geometry. Real nodes carry `position`, `type: "custom"`, `origin`, `measured`; the flows MCP never emits them, so MCP-built flows render stacked/misplaced in the editor. | Harvested `Builders Risk Product Selection` nodes vs. `quiva-flows-mcp/src/index.js:76` | Confirmed absent; UI impact to be screenshotted (Phase 1) |
 | 4 | P2 | Rule operator vocabulary is undocumented anywhere in the MCPs. ~80 operators/aliases exist. | decoded `hub-service/jseval/rules.go` const `R` → `expressionOperators` + `calculatingOperations` | Confirmed |
 | 5 | P2 | `SECRET::NAME::` interpolation in payloads is undocumented. | harvested Builders Risk / Geocode nodes | Confirmed |
@@ -76,7 +76,7 @@ passed as `{}`, so `@fact:` is useless — inputs are literal JSONPath
 reserved `RESOLVE_SUCCESS` / `RESOLVE_ERROR`.
 
 Leading hypothesis for the correct shape (`NodeData.Payload` is `any`, so an
-array is legal — `model/request.go:63`):
+array is legal — `model/request.go:75`):
 
 ```json
 {

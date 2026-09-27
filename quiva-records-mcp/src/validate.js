@@ -8,6 +8,7 @@ import {
   ELEMENT_CONTAINERS,
   ELEMENT_KINDS,
   ELEMENT_VALUE_TOKENS,
+  INDEX_FIELD_TYPES,
   INPUT_PROPS,
   INPUT_TYPES,
   INPUT_TYPES_AVOID,
@@ -17,6 +18,18 @@ import {
 } from './records-docs.js';
 
 const ID_REGEX = /^[a-zA-Z0-9_-]+$/;
+// records-service/handler/record_query.go queryFieldRe: columns, filter and sort fields.
+const QUERY_FIELD_RE = /^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)*$/;
+// record_query.go recordIndexFieldNames: queryable without an index_fields entry.
+const RECORD_INDEX_FIELDS = new Set(['folder', 'parent_folder', 'space_id', 'created_at', 'updated_at', 'config_id']);
+// record_query.go maxFilterDepth / maxFilterConditions.
+const MAX_FILTER_DEPTH = 4;
+const MAX_FILTER_CONDITIONS = 50;
+// model/api.go RecordViews; handler/config.go validViewKeys (unset_views).
+const VIEW_KEYS = ['form', 'table', 'forms', 'tables', 'flow'];
+// model/distribution.go safeSubjectSegment (config `source` ids).
+const SUBJECT_SEGMENT_RE = /^[A-Za-z0-9_-]{1,64}$/;
+const UNBOUND_PREFIX = '__unbound:';
 
 // Every InputType the renderer accepts on a node (builder-offered + union-only).
 const KNOWN_INPUT_TYPES = new Set([...INPUT_TYPES, ...INPUT_TYPES_EXTENDED]);
@@ -156,12 +169,116 @@ export function validateRecordConfig(config, { requireId = true } = {}) {
     warnings.push('no schema provided — an empty schema is accepted by the server but records will not be validated against any fields');
   }
 
+  // --- index_fields (optional) ---
+  const indexed = config.index_fields !== undefined ? validateIndexFields(config.index_fields, errors, warnings) : undefined;
+
+  // --- source / unset_* ---
+  validateSourceAndUnset(config, requireId, errors, warnings);
+
   // --- views (optional) ---
   if (config.views !== undefined && config.views !== null) {
-    validateViews(config.views, config.schema, errors, warnings);
+    validateViews(config.views, config.schema, indexed, errors, warnings);
   }
 
   return { valid: errors.length === 0, errors, warnings };
+}
+
+// Mirrors records-service/indexer/payload-fields.go ValidateIndexFields. Returns a
+// Map of declared path -> { type, sortable } for the view cross-checks.
+function validateIndexFields(fields, errors, warnings) {
+  const declared = new Map();
+  if (!Array.isArray(fields)) {
+    errors.push('index_fields must be an array of { field (or key), type?, sortable? }');
+    return declared;
+  }
+  const seen = new Map();
+  fields.forEach((f, i) => {
+    const at = `index_fields[${i}]`;
+    if (!f || typeof f !== 'object' || Array.isArray(f)) {
+      errors.push(`${at} must be an object { field (or key), type?, sortable? }`);
+      return;
+    }
+    const path = f.field || f.key;
+    if (typeof path !== 'string' || path === '') {
+      errors.push(`${at}: field is required (also accepted as "key")`);
+      return;
+    }
+    if (!path.split('.').every((s) => /^[a-zA-Z0-9_]+$/.test(s))) {
+      errors.push(`${at}: "${path}" is not a usable path — each segment must be letters, digits or underscores`);
+      return;
+    }
+    const type = f.type ?? '';
+    const spec = INDEX_FIELD_TYPES[type];
+    if (!spec) {
+      errors.push(`${at}: unknown type ${JSON.stringify(type)} — accepted: ${Object.keys(INDEX_FIELD_TYPES).filter(Boolean).join(', ')}`);
+      return;
+    }
+    if (f.sortable !== undefined && typeof f.sortable !== 'boolean') {
+      errors.push(`${at}.sortable must be a boolean`);
+    }
+    if (f.opts !== undefined) {
+      warnings.push(`${at}.opts is derived by the service and is not part of the API payload — drop it`);
+    }
+    const indexName = path.replaceAll('.', '_');
+    if (seen.has(indexName)) {
+      errors.push(`${at}: "${seen.get(indexName)}" and "${path}" both index as "data_${indexName}" — dots and underscores are the same character here`);
+      return;
+    }
+    seen.set(indexName, path);
+    declared.set(path, { type: spec.type, sortable: spec.sortable || f.sortable === true });
+  });
+  return declared;
+}
+
+// source (catalogue reference) and the update-only unset flags. records-service/
+// handler/config.go CreateRecordConfigHandler, UpdateRecordConfigHandler.
+function validateSourceAndUnset(config, requireId, errors, warnings) {
+  const { source } = config;
+  if (source !== undefined && source !== null) {
+    if (typeof source !== 'object' || Array.isArray(source)) {
+      errors.push('source must be an object { publisher_account_id, config_id, version? }');
+    } else {
+      for (const key of ['publisher_account_id', 'config_id']) {
+        if (typeof source[key] !== 'string' || !SUBJECT_SEGMENT_RE.test(source[key])) {
+          errors.push(`source.${key} is required and must be letters, digits, '_' or '-' (max 64)`);
+        }
+      }
+      if (source.version !== undefined && typeof source.version !== 'string') {
+        errors.push('source.version must be a string: a version number or "latest"');
+      }
+      const ignored = ['schema', 'index_fields', 'description', 'label'].filter((k) => config[k] !== undefined);
+      const views = config.views && typeof config.views === 'object' ? Object.keys(config.views).filter((k) => k !== 'tables') : [];
+      if (ignored.length || views.length) {
+        warnings.push(
+          `source makes this config a reference: every read resolves the publisher's definition and only name and views.tables stay local. ${[...ignored, ...views.map((v) => `views.${v}`)].join(', ')} ${requireId ? 'will be shadowed on read' : 'are discarded — an update carrying source replaces the stored document with the stub'}.`
+        );
+      }
+    }
+  }
+
+  if (config.unset_views !== undefined) {
+    if (!Array.isArray(config.unset_views)) {
+      errors.push(`unset_views must be an array of view keys (${VIEW_KEYS.join(', ')})`);
+    } else {
+      for (const key of config.unset_views) {
+        if (!VIEW_KEYS.includes(key)) errors.push(`unset_views: unknown view key ${JSON.stringify(key)} — allowed: ${VIEW_KEYS.join(', ')}`);
+      }
+    }
+    if (requireId) warnings.push('unset_views is update-only; create ignores it');
+  }
+  if (config.unset_source !== undefined) {
+    if (typeof config.unset_source !== 'boolean') {
+      errors.push('unset_source must be a boolean');
+    } else if (config.unset_source) {
+      if (config.schema === undefined) {
+        errors.push('unset_source needs a schema in the same body — the publisher\'s definition leaves with the reference, so the service refuses it without one');
+      }
+      if (source) {
+        warnings.push('source and unset_source together: source wins (the config is repointed), so unset_source has no effect');
+      }
+    }
+    if (requireId) warnings.push('unset_source is update-only; create ignores it');
+  }
 }
 
 function validateSchema(schema, errors, warnings) {
@@ -234,10 +351,14 @@ function validateField(path, field, errors, warnings) {
   }
 }
 
-function validateViews(views, schema, errors, warnings) {
+function validateViews(views, schema, indexed, errors, warnings) {
   if (typeof views !== 'object' || Array.isArray(views)) {
-    errors.push('views must be an object with optional `forms`, `form`, and `table` keys');
+    errors.push(`views must be an object with optional keys ${VIEW_KEYS.join(', ')}`);
     return;
+  }
+  const unknownKeys = Object.keys(views).filter((k) => !VIEW_KEYS.includes(k));
+  if (unknownKeys.length) {
+    warnings.push(`views has ${unknownKeys.map((k) => `"${k}"`).join(', ')} which the service drops silently — known keys: ${VIEW_KEYS.join(', ')}`);
   }
   const known = collectFieldPaths(schema);
   const schemaContext = schema && typeof schema === 'object' ? schema : undefined;
@@ -248,12 +369,298 @@ function validateViews(views, schema, errors, warnings) {
     warnings.push('views.form is the deprecated legacy single form — the server still accepts it, but new/updated configs should use views.forms[] (an array of { id, title, description?, layout }) instead.');
     validateViewNode(views.form, 'views.form', known, schemaContext, errors, warnings, true);
   }
-  if (views.table !== undefined) {
-    validateTableNode(views.table, known, errors, warnings);
+  if (views.table !== undefined && views.table !== null) {
+    validateTableNode(views.table, 'views.table', known, indexed, errors, warnings);
+  }
+  if (views.tables !== undefined && views.tables !== null) {
+    validateTableViews(views.tables, known, indexed, errors, warnings);
+  }
+  if (views.flow !== undefined && views.flow !== null) {
+    validateFlow(views.flow, views.forms, schemaContext, errors, warnings);
   }
 }
 
-// Validate `views.forms`: an array of named forms, each `{ id, title, description?, layout }`
+// views.tables: named saved queues (model/api.go RecordTableView; handler/config.go
+// validateTableViews).
+function validateTableViews(tables, known, indexed, errors, warnings) {
+  if (!Array.isArray(tables)) {
+    errors.push('views.tables must be an array of { id, title, description?, columns, filter?, sort? }');
+    return;
+  }
+  const seen = new Set();
+  tables.forEach((view, i) => {
+    const at = `views.tables[${i}]`;
+    if (!view || typeof view !== 'object' || Array.isArray(view)) {
+      errors.push(`${at} must be an object { id, title, description?, columns, filter?, sort? }`);
+      return;
+    }
+    if (typeof view.id !== 'string' || !ID_REGEX.test(view.id)) {
+      errors.push(`${at}: id must contain only letters, numbers, underscores, and hyphens`);
+    } else if (seen.has(view.id)) {
+      errors.push(`${at}: duplicate view id "${view.id}" — the picker addresses a view by id`);
+    } else {
+      seen.add(view.id);
+    }
+    if (typeof view.title !== 'string' || view.title === '') {
+      errors.push(`${at}: title is required — it is what the view picker shows`);
+    }
+    validateTableNode(view, at, known, indexed, errors, warnings);
+  });
+}
+
+// One table node: columns, filter, sort (handler/config.go validateTableNode,
+// checkStoredBounds; handler/record_query.go resolveConditions, checkFilterLeaf).
+function validateTableNode(node, at, known, indexed, errors, warnings) {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) {
+    errors.push(`${at} must be a table node object`);
+    return;
+  }
+  // The service never reads a table's type; the seeded `contact` config stores "".
+  if (node.type !== undefined && node.type !== '' && node.type !== 'table') {
+    errors.push(`${at}.type must be "table"; got ${JSON.stringify(node.type)}`);
+  }
+  if (!Array.isArray(node.columns)) {
+    errors.push(`${at}.columns must be an array of { field, order, sortable?, filterable? }`);
+  } else {
+    node.columns.forEach((col, i) => {
+      const cp = `${at}.columns[${i}]`;
+      if (!col || typeof col !== 'object') {
+        errors.push(`${cp} must be an object { field, order }`);
+        return;
+      }
+      if (typeof col.field !== 'string' || col.field === '') {
+        errors.push(`${cp}.field must be a non-empty field name`);
+      } else if (!QUERY_FIELD_RE.test(col.field)) {
+        errors.push(`${cp}.field "${col.field}" is not a usable field name — letters, digits, underscores, dot-separated`);
+      } else if (known.size && !fieldKnown(col.field, known) && !RECORD_INDEX_FIELDS.has(col.field)) {
+        warnings.push(`${cp} references "${col.field}" which is not defined in schema.properties`);
+      }
+      if (col.order !== undefined && typeof col.order !== 'number') {
+        errors.push(`${cp}.order must be a number`);
+      }
+      for (const flag of ['sortable', 'filterable']) {
+        if (col[flag] !== undefined && typeof col[flag] !== 'boolean') errors.push(`${cp}.${flag} must be a boolean`);
+      }
+    });
+  }
+  if (node.filter !== undefined && node.filter !== null) {
+    if (!Array.isArray(node.filter)) {
+      errors.push(`${at}.filter must be an array of conditions`);
+    } else {
+      validateConditions(node.filter, `${at}.filter`, 1, { n: 0 }, indexed, errors, warnings);
+    }
+  }
+  if (node.sort !== undefined && node.sort !== '') {
+    const field = typeof node.sort === 'string' ? node.sort.replace(/^-/, '') : '';
+    if (!QUERY_FIELD_RE.test(field)) {
+      errors.push(`${at}.sort ${JSON.stringify(node.sort)} is not a usable field name ("field" or "-field")`);
+    } else {
+      checkIndexed(field, `${at}.sort`, indexed, warnings, true);
+    }
+  }
+}
+
+// A stored filter is held to the query path's rules; the index answers anything
+// else with an empty page that looks like "nothing matched".
+function validateConditions(conditions, at, depth, counter, indexed, errors, warnings) {
+  if (depth > MAX_FILTER_DEPTH) {
+    errors.push(`${at}: filter is nested more than ${MAX_FILTER_DEPTH} groups deep`);
+    return;
+  }
+  conditions.forEach((c, i) => {
+    const cp = `${at}[${i}]`;
+    counter.n++;
+    if (counter.n === MAX_FILTER_CONDITIONS + 1) errors.push(`${cp}: filter carries more than ${MAX_FILTER_CONDITIONS} conditions`);
+    if (!c || typeof c !== 'object' || Array.isArray(c)) {
+      errors.push(`${cp} must be a condition object`);
+      return;
+    }
+    const isGroup = Array.isArray(c.conditions) && c.conditions.length > 0;
+    const isLeaf = typeof c.field === 'string' && c.field !== '';
+    if (isGroup && isLeaf) {
+      errors.push(`${cp}: a condition names a field or holds conditions, never both`);
+      return;
+    }
+    if (isGroup) {
+      if (c.operator !== undefined && !['', 'AND', 'OR'].includes(String(c.operator).toUpperCase())) {
+        errors.push(`${cp}.operator must be AND or OR, got ${JSON.stringify(c.operator)} — there is no NOT`);
+      }
+      validateConditions(c.conditions, `${cp}.conditions`, depth + 1, counter, indexed, errors, warnings);
+      return;
+    }
+    if (!isLeaf) {
+      errors.push(`${cp}: a condition needs a field or nested conditions`);
+      return;
+    }
+    if (!QUERY_FIELD_RE.test(c.field)) {
+      errors.push(`${cp}: "${c.field}" is not a usable field name`);
+      return;
+    }
+    const isNum = (v) => v !== undefined && v !== null;
+    if ((isNum(c.min) && c.min === 0) || (isNum(c.max) && c.max === 0)) {
+      errors.push(`${cp}: a min or max of 0 is read as no bound at all — use exact to name zero`);
+    }
+    const hasDate = Boolean(c.date_start || c.date_end);
+    const hasNumeric = isNum(c.min) || isNum(c.max);
+    const hasExact = isNum(c.exact);
+    const hasText = Boolean(c.keyword || c.term || c.prefix);
+    if (!hasDate && !hasNumeric && !hasExact && !hasText) {
+      errors.push(`${cp}: needs one of keyword, term, prefix, min, max, exact, date_start or date_end — the index has no fuzzy, wildcard, phrase or negated match`);
+    }
+    if (hasDate && hasNumeric) errors.push(`${cp}: a date window and a numeric range cannot be combined on one field`);
+    if (hasExact && hasNumeric) errors.push(`${cp}: exact cannot be combined with min or max`);
+    // Stored views refuse it (records-service/handler/config.go checkStoredBounds); queries accept it.
+    if (isNum(c.min) && !isNum(c.max) && c.min !== 0) {
+      errors.push(`${cp}: a min with no max is read as the range [min, 0) and matches nothing — give it an upper bound`);
+    }
+    checkIndexed(c.field, cp, indexed, warnings, false);
+  });
+}
+
+// Only checkable when the same payload declares index_fields.
+function checkIndexed(field, at, indexed, warnings, forSort) {
+  if (!indexed || RECORD_INDEX_FIELDS.has(field)) return;
+  const decl = indexed.get(field);
+  if (!decl) {
+    warnings.push(`${at}: "${field}" is not declared in index_fields, so the index cannot answer it and the view returns nothing`);
+  } else if (forSort && !decl.sortable && (decl.type === 'keyword' || decl.type === 'text')) {
+    warnings.push(`${at}: "${field}" is a ${decl.type} index field without sortable: true (or type text_sortable), so it cannot be sorted on`);
+  }
+}
+
+// views.flow: the multi-step wizard over one form (validate/validate.go
+// ValidateFlow + ValidateFlowSections). The cross-checks need views.forms in the
+// same payload; the service runs them against the merged config either way.
+const FLOW_KEYS = new Set(['id', 'title', 'intro', 'form', 'header', 'sections']);
+const FLOW_SECTION_KEYS = new Set(['title', 'say', 'start_field', 'rules']);
+
+function validateFlow(flow, forms, schema, errors, warnings) {
+  if (typeof flow !== 'object' || Array.isArray(flow)) {
+    errors.push('views.flow must be an object { id, title, intro?, form, header?, sections }');
+    return;
+  }
+  for (const key of Object.keys(flow)) {
+    if (!FLOW_KEYS.has(key)) warnings.push(`views.flow.${key} is not a flow key and is dropped — known: ${[...FLOW_KEYS].join(', ')}`);
+  }
+  for (const key of ['id', 'title', 'form']) {
+    if (typeof flow[key] !== 'string' || flow[key] === '') errors.push(`views.flow.${key} is required`);
+  }
+  if (flow.header !== undefined && !Array.isArray(flow.header)) {
+    errors.push('views.flow.header must be an array of view nodes (presentational rows shown above every section)');
+  }
+  if (!Array.isArray(flow.sections) || flow.sections.length === 0) {
+    errors.push('views.flow.sections must contain at least one section');
+    return;
+  }
+  flow.sections.forEach((s, i) => {
+    const at = `views.flow.sections[${i}]`;
+    if (!s || typeof s !== 'object' || Array.isArray(s)) {
+      errors.push(`${at} must be an object { title, say?, start_field?, rules? }`);
+      return;
+    }
+    if (typeof s.title !== 'string' || s.title === '') errors.push(`${at}.title is required`);
+    for (const key of Object.keys(s)) {
+      if (!FLOW_SECTION_KEYS.has(key)) {
+        warnings.push(`${at}.${key} is not a section key and is dropped${key === 'startField' ? ' — use start_field (snake case)' : ''}`);
+      }
+    }
+    if (s.rules !== undefined && !Array.isArray(s.rules)) errors.push(`${at}.rules must be an array`);
+  });
+
+  if (!Array.isArray(forms)) {
+    warnings.push('views.flow cannot be checked against its form here (views.forms is not in this payload); the service checks it against the stored forms');
+    return;
+  }
+  const form = forms.find((f) => f && f.id === flow.form);
+  if (!form) {
+    errors.push(`views.flow.form "${flow.form}" does not match any views.forms[].id`);
+    return;
+  }
+  if (!form.layout || typeof form.layout !== 'object') {
+    errors.push(`views.flow.form "${flow.form}" has no layout; a flow cannot decompose a form with no rows`);
+    return;
+  }
+  const rows = form.layout.type === 'grid' ? (Array.isArray(form.layout.children) ? form.layout.children : []) : [form.layout];
+  const rowBound = rows.map((r) => boundFields(r).size > 0);
+  const bound = boundFields(form.layout);
+  const starts = new Map();
+  let prevStart = 0;
+  flow.sections.forEach((s, i) => {
+    if (!s || typeof s !== 'object') return;
+    const at = `views.flow.sections[${i}].start_field`;
+    const sf = s.start_field;
+    if (i === 0) {
+      if (sf) errors.push(`${at} must be empty: the first section always starts at the top of "${flow.form}"`);
+      return;
+    }
+    if (!sf) {
+      errors.push(`${at} is required: every section after the first must name where it starts`);
+      return;
+    }
+    if (!bound.has(sf)) {
+      errors.push(`${at} "${sf}" is not a bound field on form "${flow.form}"`);
+      return;
+    }
+    if (starts.has(sf)) {
+      errors.push(`${at} "${sf}" is already used by sections[${starts.get(sf)}]`);
+      return;
+    }
+    starts.set(sf, i);
+    const row = rows.findIndex((r) => boundFields(r).has(sf));
+    if (row < 0) {
+      errors.push(`${at} "${sf}" could not be located among "${flow.form}"'s rows`);
+      return;
+    }
+    let start = row;
+    while (start > 0 && !rowBound[start - 1]) start--;
+    if (start === 0) {
+      errors.push(`${at} "${sf}" opens at the form's first row once presentational rows above it are counted, leaving section 0 empty`);
+    } else if (start <= prevStart) {
+      errors.push(`${at} "${sf}" does not come after the previous section's start; sections must follow the form's row order`);
+    } else {
+      prevStart = start;
+    }
+  });
+  if (schema) {
+    const missing = uncoveredRequired(schema, '', bound);
+    if (missing.length) {
+      errors.push(`required schema property "${missing[0]}" is not bound by any section of "${flow.form}"; the record could never be completed`);
+    }
+  }
+}
+
+// validate.go boundFields: a repeater counts as its own ref and is not entered.
+function boundFields(node) {
+  const out = new Set();
+  const add = (f) => {
+    if (typeof f === 'string' && f !== '' && !f.startsWith(UNBOUND_PREFIX)) out.add(f);
+  };
+  const visit = (n) => {
+    if (!n || typeof n !== 'object') return;
+    if (n.type === 'table') (n.columns ?? []).forEach((c) => add(c?.field));
+    else if (n.type === 'grid' || n.type === 'element') (n.children ?? []).forEach(visit);
+    else add(n.field);
+  };
+  visit(node);
+  return out;
+}
+
+function uncoveredRequired(schema, prefix, bound) {
+  if (!schema || !Array.isArray(schema.required)) return [];
+  const out = [];
+  for (const name of schema.required) {
+    const path = prefix ? `${prefix}.${name}` : name;
+    const covered =
+      bound.has(path) ||
+      [...bound].some((f) => f.startsWith(`${path}.`)) ||
+      path.split('.').some((_, i, parts) => i > 0 && bound.has(parts.slice(0, i).join('.')));
+    if (!covered) out.push(path);
+    out.push(...uncoveredRequired(schema.properties?.[name], path, bound));
+  }
+  return out;
+}
+
+// Validate `views.forms`: an array of named forms, each `{ id, title, description?, layout, effects? }`
 // (records.types.ts RecordForm). `id` must be unique within the config and is used in the
 // app URL; `layout` is a grid node, same shape as legacy `views.form`.
 function validateRecordForms(forms, known, schemaContext, errors, warnings) {
@@ -531,14 +938,22 @@ function validateElementNode(node, path, known, schemaContext, errors, warnings,
   validateElementRules(node.rules, path, kind, errors, warnings);
 }
 
-// Element rules are evaluated by view-element itself (it receives the whole node),
-// which is why they work where the repeater's do not. The allowed property set is
-// per-kind, and `visible` is honoured at runtime for every kind including the two
-// containers the builder catalog omits it from.
+// Multi-property form (microstrate/src/types/records.types.ts ElementRule): `logic` gates
+// `set`/`otherwise` maps and `property` is omitted. Returns [isMulti, properties driven].
+const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+function ruleTargets(rule) {
+  if (isPlainObject(rule.set) || isPlainObject(rule.otherwise)) {
+    return [true, [...new Set([...Object.keys(rule.set ?? {}), ...Object.keys(rule.otherwise ?? {})])]];
+  }
+  return [false, [rule.property]];
+}
+
+// Element rules are evaluated by view-element (it receives the whole node). The allowed
+// property set is per-kind; `visible` works for every kind, including the two containers the builder omits it from.
 function validateElementRules(rules, path, kind, errors, warnings) {
   if (rules === undefined) return;
   if (!Array.isArray(rules)) {
-    errors.push(`${path}.rules must be an array of { id, property, logic, description? }`);
+    errors.push(`${path}.rules must be an array of { id, property, logic, description? } or { id, logic, set, otherwise? }`);
     return;
   }
   const allowed = ELEMENT_RULE_PROPS.get(kind) ?? new Set(['visible']);
@@ -548,12 +963,15 @@ function validateElementRules(rules, path, kind, errors, warnings) {
       errors.push(`${rulePath} must be an object { id, property, logic, description? }`);
       return;
     }
-    if (typeof rule.property !== 'string' || rule.property === '') {
-      errors.push(`${rulePath}.property is required`);
-    } else if (!allowed.has(rule.property)) {
-      warnings.push(
-        `${rulePath}.property ${JSON.stringify(rule.property)} is not honoured by a ${kind} — it is stored but never applied. ${kind} supports: ${[...allowed].join(', ')}.`
-      );
+    const [multi, props] = ruleTargets(rule);
+    if (!multi && (typeof rule.property !== 'string' || rule.property === '')) {
+      errors.push(`${rulePath}.property is required (or use the multi-property form with set/otherwise)`);
+    } else {
+      for (const prop of props.filter((p) => !allowed.has(p))) {
+        warnings.push(
+          `${rulePath}${multi ? '.set/otherwise' : '.property'} ${JSON.stringify(prop)} is not honoured by a ${kind} — it is stored but never applied. ${kind} supports: ${[...allowed].join(', ')}.`
+        );
+      }
     }
     if (rule.logic === undefined) {
       errors.push(`${rulePath}.logic is required (a JsonLogic expression, or a bare true/false for an unconditional state)`);
@@ -595,8 +1013,14 @@ function validateArrayFieldNode(node, path, known, schemaContext, errors, warnin
   if (node.props !== undefined && (typeof node.props !== 'object' || Array.isArray(node.props))) {
     errors.push(`${path}.props must be an object (label, itemLabel, required, minItems, maxItems, collapsible, defaultCollapsed)`);
   }
-  if (Array.isArray(node.rules) && node.rules.length) {
-    warnings.push(`${path}.rules are reserved on array-field (repeater) nodes and are NOT evaluated in v1 — put rules on the child field nodes instead`);
+  // record-view-renderer evaluates only `visible` on an array-field; ViewRepeater never gets `rules`.
+  if (Array.isArray(node.rules)) {
+    node.rules.forEach((r, i) => {
+      if (!isPlainObject(r)) return;
+      for (const prop of ruleTargets(r)[1].filter((p) => p !== undefined && p !== 'visible')) {
+        warnings.push(`${path}.rules[${i}] property "${prop}" is not applied on an array-field (repeater) node: only visible is — put it on the child field nodes instead`);
+      }
+    });
   }
 
   let itemContext;
@@ -809,10 +1233,8 @@ function validateKnownProps(props, path, effective, warnings) {
   }
 }
 
-// Validate a node's `rules` array against the node kind. Each rule is
-// `{ id, property, logic, description? }`. `property` must be honoured by the
-// node kind (field: all five; grid/array-field container: visible only) and
-// `logic` must be a json-logic object or a bare boolean.
+// A node rule is `{ id, property, logic, description? }` or the multi-property `{ id, logic, set, otherwise? }`;
+// each property driven must be honoured by the node kind, and `logic` is json-logic or a bare boolean.
 function validateRules(rules, path, kind, errors, warnings) {
   if (rules === undefined || rules === null) return;
   if (!Array.isArray(rules)) {
@@ -831,11 +1253,15 @@ function validateRules(rules, path, kind, errors, warnings) {
     } else if (rule.id === undefined) {
       warnings.push(`${rp}.id is missing — stored node rules should carry an id like "<FieldPath>.<property>"`);
     }
-    if (typeof rule.property !== 'string' || !KNOWN_RULE_PROPERTIES.has(rule.property)) {
-      errors.push(`${rp}.property must be one of ${[...KNOWN_RULE_PROPERTIES].join(', ')}; got ${JSON.stringify(rule.property)}`);
-    } else if (!allowed.has(rule.property)) {
-      const honoured = RULE_PROPERTIES_BY_NODE[kind] ?? RULE_PROPERTIES_BY_NODE.field;
-      warnings.push(`${rp}.property "${rule.property}" is not honoured on a ${kind} node (supports: ${honoured.join(', ')})`);
+    const [multi, props] = ruleTargets(rule);
+    const where = multi ? `${rp}.set/otherwise` : `${rp}.property`;
+    for (const prop of props) {
+      if (typeof prop !== 'string' || !KNOWN_RULE_PROPERTIES.has(prop)) {
+        errors.push(`${where} must be one of ${[...KNOWN_RULE_PROPERTIES].join(', ')}; got ${JSON.stringify(prop)}`);
+      } else if (!allowed.has(prop)) {
+        const honoured = RULE_PROPERTIES_BY_NODE[kind] ?? RULE_PROPERTIES_BY_NODE.field;
+        warnings.push(`${where} "${prop}" is not honoured on a ${kind} node (supports: ${honoured.join(', ')})`);
+      }
     }
     if (rule.logic === undefined) {
       errors.push(`${rp}.logic is required (a json-logic expression object, or a bare boolean)`);
@@ -858,34 +1284,6 @@ function getSchemaFieldAtPath(schemaContext, path) {
     node = node.properties ? node.properties[parts[i]] : undefined;
   }
   return node;
-}
-
-function validateTableNode(node, known, errors, warnings) {
-  if (!node || typeof node !== 'object' || Array.isArray(node)) {
-    errors.push('views.table must be a table node object');
-    return;
-  }
-  if (node.type !== undefined && node.type !== 'table') {
-    errors.push(`views.table.type must be "table"; got ${JSON.stringify(node.type)}`);
-  }
-  if (!Array.isArray(node.columns)) {
-    errors.push('views.table.columns must be an array of { field, order }');
-    return;
-  }
-  node.columns.forEach((col, i) => {
-    if (!col || typeof col !== 'object') {
-      errors.push(`views.table.columns[${i}] must be an object { field, order }`);
-      return;
-    }
-    if (typeof col.field !== 'string' || col.field === '') {
-      errors.push(`views.table.columns[${i}].field must be a non-empty field name`);
-    } else if (known.size && !fieldKnown(col.field, known)) {
-      warnings.push(`views.table.columns[${i}] references "${col.field}" which is not defined in schema.properties`);
-    }
-    if (col.order !== undefined && typeof col.order !== 'number') {
-      errors.push(`views.table.columns[${i}].order must be a number`);
-    }
-  });
 }
 
 // Collect dotted paths of every field defined in the schema, so view nodes can
@@ -918,4 +1316,22 @@ function fieldKnown(field, known) {
 // Public entrypoint (mirrors quiva-flows-mcp validate()).
 export function validate(config, opts) {
   return validateRecordConfig(config, opts);
+}
+
+// Ad-hoc query filters: records-service/handler/record_query.go checkFilterLeaf accepts a min
+// with no max, and the indexer then matches nothing. Warned, not refused.
+export function queryFilterWarnings(filter) {
+  const warnings = [];
+  const walk = (conds, at) => {
+    if (!Array.isArray(conds)) return;
+    conds.forEach((c, i) => {
+      const cp = `${at}[${i}]`;
+      if (Array.isArray(c?.conditions)) walk(c.conditions, `${cp}.conditions`);
+      else if (c && c.min !== undefined && c.min !== null && c.min !== 0 && (c.max === undefined || c.max === null)) {
+        warnings.push(`${cp}: a min with no max is read as the range [min, 0) and matches nothing — give it an upper bound`);
+      }
+    });
+  };
+  walk(Array.isArray(filter) ? filter : filter?.conditions, 'filter');
+  return warnings;
 }

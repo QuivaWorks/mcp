@@ -79,7 +79,8 @@ clone as current and documented a filename that had been renamed that morning.
 Read `deployVerticals` in `accounts-service/accounts/updateaccount.go` before
 designing anything. It defines what a vertical actually is:
 
-- Adding an id to an account's `verticals` list **is** the deploy. There is no
+- Adding an id to an account's `verticals` list (or having it set at account
+  activation) **is** the deploy. There is no
   deploy endpoint.
 - It is **delta-only** — re-sending an unchanged list does nothing.
 - `SHARED` is always appended, so the `Client` contact record comes free.
@@ -287,14 +288,14 @@ with a measured difference. Always prefer the second.
 ### 16. Diagnose precisely enough to hand over
 
 When you find a platform fault, write it up with file and line numbers, the
-call chain, and what makes it silent. Ours went:
+call chain, and what makes it silent. Ours went (at the time; since fixed, as
+`microstrate/src/stores/records.store.ts` `addRecord` and `patchRecord` now send
+`completed`):
 
-> `RepublishRecord` (`records-service/handler/records.go:386`) is the only
-> publisher of record events; both call sites are gated on `completed == true`
-> (lines 74, 327). The frontend never sends it —
-> `microstrate/src/stores/records.store.ts:277` sends `{data, space_id, folder}`
-> and `:309` sends `{data}`. So record automations are unreachable through normal
-> use, silently.
+> `RepublishRecord` is the only publisher of record events; both call sites are
+> gated on `completed == true`. The frontend never sends it — the store's create
+> sends `{data, space_id, folder}` and its update sends `{data}`. So record
+> automations are unreachable through normal use, silently.
 
 Also say what it would break to fix it. Turning that flag on switches automations
 on **platform-wide**, including for the two live verticals, possibly for the first

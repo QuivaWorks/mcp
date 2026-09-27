@@ -5,7 +5,7 @@ documents, e-signatures (HelloSign), and AI file generation. Built for Claude
 Code, mirroring `quiva-records-mcp/` and `quiva-flows-mcp/`.
 
 Plain JavaScript (ESM), `@modelcontextprotocol/sdk` + `zod`, Node ≥ 18 (global
-`fetch`). Defaults to staging `https://api.microstrate.io`.
+`fetch`). Defaults to production `https://api.quiva.ai`.
 
 ## What it talks to
 
@@ -54,23 +54,42 @@ Already wired in the repo `.mcp.json` as `quiva-documents`:
 MCP servers connect at session start — restart Claude Code after registering to
 use the tools natively.
 
-## Tools (18)
+## Tools (22)
 
 **Reference & validation (no API call)**
 - `list_reference_topics`, `get_documents_reference` — expression syntax,
-  filters, template/output/signatory/sub-template shapes, trigger, document,
-  ai-generation, endpoints, and spec-vs-engine gotchas.
+  filters, template/output/signatory/sub-template/pdf-template shapes, trigger,
+  document, endpoints, and spec-vs-engine gotchas.
+- `list_examples`, `get_example` — bundled harvested (real) and authored
+  (illustrative) template/document examples.
 - `validate_template_config` — local lint (key, source/output shapes,
-  content-type enum, PDF→DOCX guard, signatory shape, angular-tag balance).
+  content-type enum, PDF→DOCX guard, signatory shape, `pdf` fields/boxes shape,
+  angular-tag balance).
 
 **Templates**
-- `list_templates`, `get_template`, `create_template`, `update_template`,
-  `publish_template`, `validate_docx` (server, base64 DOCX), `unset_template_paths`,
+- `list_templates`, `get_template`, `create_template`, `update_template`
+  (both accept an optional `pdf` config for a PDF-sourced template),
+  `publish_template`, `validate_docx` (server; DOCX/DOC/XML or PDF — a PDF
+  returns its real field list and page geometry), `unset_template_paths`,
   `delete_template`, `trigger_templates`.
 
 **Documents**
 - `list_documents`, `get_document`, `update_document`, `unset_document_paths`,
   `delete_document`, `get_document_signature_url`.
+
+**Account**
+- `list_assigned_files`, `extract_brand` — confirmed gateway-mapped on
+  production 2026-09-27, though absent from the published OpenAPI spec.
+
+## PDF templates
+
+A template whose `source.content_type` is `application/pdf` fills its own
+AcroForm fields instead of substituting DOCX placeholders. Set `pdf: {
+fields?, boxes?, flatten? }` on `create_template`/`update_template`; see
+`get_documents_reference("pdf-templates")` for the full shape, and the
+"gotchas" topic for what fails silently (an unmapped, untagged field is left
+exactly as the source PDF had it) versus what does not (a loop tag in a field
+expression, or an out-of-range choice value, both fail the trigger outright).
 
 ## Engine-truth gotchas (the short list)
 
@@ -86,6 +105,10 @@ use the tools natively.
 - Expressions are **single-brace** angular syntax; missing fields render empty;
   filter args are positional and all required; validate a DOCX with
   `validate_docx` before storing it.
+- A **PDF** field with no `pdf.fields` mapping and no `{tag}` in its own
+  value/default/tooltip is left exactly as the source PDF had it — no error, no
+  warning. Loop tags and out-of-range choice values, by contrast, fail the
+  trigger outright.
 
 ## Not exposed
 

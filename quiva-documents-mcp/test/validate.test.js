@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { validate, lintExpression } from '../src/validate.js';
 import { readHarvestedTemplates, getExample } from '../src/examples.js';
-import { GOTCHAS } from '../src/documents-docs.js';
+import { GOTCHAS, VALIDATE_CONTENT_TYPES } from '../src/documents-docs.js';
 import { readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -111,6 +111,84 @@ check('non-object conditions is an error naming the v2 shape', () => {
   const r = validate({ key: 't', sub_templates: [{ key: 'terms', conditions: [{ operator: '=' }] }] });
   assert.equal(r.valid, false);
   assert.ok(r.errors.some((e) => e.includes('v2 expression OBJECT')));
+});
+
+// --- pdf config (PdfTemplateConfigCodec) ------------------------------------
+
+check('a valid pdf config on a PDF source passes', () => {
+  const r = validate({
+    key: 't',
+    source: { key: 'form.pdf', content_type: PDF },
+    output: { content_type: PDF },
+    signatories: [{ name: '{signer_name}', email: '{signer_email}', validity: { week: 1 } }],
+    pdf: {
+      fields: [{ name: 'RoleTitle', expression: '{role_title}' }],
+      boxes: [{ id: 'sig-1', kind: 'signature', signatory: 0, page: 0, x: 0, y: 0, width: 10, height: 10 }],
+      flatten: true,
+    },
+  });
+  assert.equal(r.valid, true, JSON.stringify(r.errors));
+});
+
+check('pdf config on a DOCX source errors', () => {
+  const r = validate({ key: 't', source: { key: 'a.docx', content_type: DOCX }, pdf: { flatten: true } });
+  assert.equal(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes('only valid when source.content_type is application/pdf')));
+});
+
+check('pdf.boxes with an unknown kind errors', () => {
+  const r = validate({ key: 't', source: { key: 'a.pdf', content_type: PDF }, pdf: { boxes: [{ id: 'b1', kind: 'bogus', page: 0, x: 0, y: 0, width: 1, height: 1 }] } });
+  assert.equal(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes('pdf.boxes[0].kind must be one of')));
+});
+
+check('pdf.boxes with a duplicate id errors', () => {
+  const r = validate({
+    key: 't',
+    source: { key: 'a.pdf', content_type: PDF },
+    pdf: {
+      boxes: [
+        { id: 'dup', kind: 'text', expression: '{x}', page: 0, x: 0, y: 0, width: 1, height: 1 },
+        { id: 'dup', kind: 'text', expression: '{y}', page: 0, x: 0, y: 0, width: 1, height: 1 },
+      ],
+    },
+  });
+  assert.equal(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes('used by more than one box')));
+});
+
+check('pdf.boxes with non-numeric geometry errors', () => {
+  const r = validate({ key: 't', source: { key: 'a.pdf', content_type: PDF }, pdf: { boxes: [{ id: 'b1', kind: 'text', expression: '{x}', page: '0', x: 0, y: 0, width: 1, height: 1 }] } });
+  assert.equal(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes('pdf.boxes[0].page must be a number')));
+});
+
+check('a loop tag in a pdf field expression errors (a PDF field holds one value)', () => {
+  const r = validate({ key: 't', source: { key: 'a.pdf', content_type: PDF }, pdf: { fields: [{ name: 'Items', expression: '{#items}{name}{/items}' }] } });
+  assert.equal(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes('loop/section tag') && e.includes('one value')));
+  assert.ok(r.errors.some((e) => e.includes('{items[0].name}')), 'hint uses render.ts rejectLoops wording');
+});
+
+check('a signature box index must be a non-negative number', () => {
+  const r = validate({ key: 't', source: { key: 'a.pdf', content_type: PDF }, pdf: { boxes: [{ id: 'b1', kind: 'signature', signatory: -1, page: 0, x: 0, y: 0, width: 1, height: 1 }] } });
+  assert.equal(r.valid, false);
+  assert.ok(r.errors.some((e) => e.includes('signatory must be >= 0')));
+});
+
+check('signatories on a PDF source with no signature box warns (publish will refuse it)', () => {
+  const r = validate({
+    key: 't',
+    source: { key: 'a.pdf', content_type: PDF },
+    signatories: [{ name: '{signer_name}', email: '{signer_email}', validity: { week: 1 } }],
+    pdf: { boxes: [{ id: 'b1', kind: 'text', expression: '{x}', page: 0, x: 0, y: 0, width: 1, height: 1 }] },
+  });
+  assert.equal(r.valid, true, JSON.stringify(r.errors));
+  assert.ok(r.warnings.some((w) => w.includes('publish will refuse this')));
+});
+
+check('validate_docx now accepts application/pdf', () => {
+  assert.ok(VALIDATE_CONTENT_TYPES.includes(PDF));
 });
 
 check('signatory missing validity errors', () => {
@@ -234,7 +312,7 @@ check('golden: no live template uses sub_templates[].conditions (checked 2026-07
 });
 
 check('the authored example teaches the v2 conditions form, not the json-rules-engine one', () => {
-  const example = getExample('certificate-of-currency');
+  const example = getExample('document-verification-example');
   const conditions = example.config.sub_templates[0].conditions;
   assert.ok(conditions.operator !== undefined, 'authored example must use { operator, input } (rule-engine v2)');
   assert.ok(conditions.all === undefined, 'authored example must NOT use the { all: [...] } form');
@@ -244,13 +322,13 @@ check('the authored example teaches the v2 conditions form, not the json-rules-e
   );
 });
 
-// --- payload must match the DOCX placeholders (the blank-certificate bug) -------
-// The first version of the certificate example sent invented keys against a DOCX
-// expecting camelCase ones, and shipped a completely blank PDF. Nothing errored.
-// These checks keep the corrected mapping and the explanation from drifting back.
+// --- payload must match the DOCX placeholders (the blank-document bug) ----------
+// The first version of this example sent invented keys against a DOCX expecting
+// camelCase ones, and shipped a completely blank PDF. Nothing errored. These
+// checks keep the corrected mapping and the explanation from drifting back.
 
-check('the certificate example payload covers every placeholder in the DOCX', () => {
-  const example = getExample('certificate-of-currency');
+check('the example payload covers every placeholder in the DOCX', () => {
+  const example = getExample('document-verification-example');
   const declared = example.placeholders_actually_in_this_docx?.names ?? [];
   assert.ok(declared.length > 0, 'the example must record which placeholders the DOCX actually has');
   const payloadKeys = new Set(Object.keys(example.trigger_payload ?? {}));
@@ -258,22 +336,22 @@ check('the certificate example payload covers every placeholder in the DOCX', ()
   assert.deepEqual(
     missing,
     [],
-    `payload is missing DOCX placeholder(s) ${missing.join(', ')} — each merges to an empty string with NO error, which is how a blank certificate shipped`
+    `payload is missing DOCX placeholder(s) ${missing.join(', ')} — each merges to an empty string with NO error, which is how a blank document shipped`
   );
 });
 
 check('the example keeps the extra keys the config itself needs', () => {
-  const example = getExample('certificate-of-currency');
+  const example = getExample('document-verification-example');
   const payloadKeys = new Set(Object.keys(example.trigger_payload ?? {}));
-  // output.name is "certificate-{policy_number}" and the sub-template condition
-  // reads @fact:risk_state.value. Neither is a DOCX placeholder, so neither is
+  // output.name is "document-{reference_number}" and the sub-template condition
+  // reads @fact:client_region.value. Neither is a DOCX placeholder, so neither is
   // covered by the check above.
-  assert.ok(payloadKeys.has('policy_number'), 'output.name interpolates {policy_number} into the filename');
-  assert.ok(payloadKeys.has('risk_state'), 'the sub-template condition reads @fact:risk_state.value');
+  assert.ok(payloadKeys.has('reference_number'), 'output.name interpolates {reference_number} into the filename');
+  assert.ok(payloadKeys.has('client_region'), 'the sub-template condition reads @fact:client_region.value');
 });
 
 check('the example does not claim DOCX contents it cannot back up', () => {
-  const example = getExample('certificate-of-currency');
+  const example = getExample('document-verification-example');
   assert.equal(
     example.expressions_used_in_the_docx,
     undefined,
@@ -294,6 +372,14 @@ check('the gotchas warn that an unmatched placeholder fails silently', () => {
   assert.ok(
     GOTCHAS.some((g) => g.includes('HelloSign anchor')),
     'a leftover [sig|...] anchor in the output is expected when no signature request is created — say so'
+  );
+  assert.ok(
+    GOTCHAS.some((g) => g.includes('left EXACTLY as the source PDF had it')),
+    'an unmapped, untagged PDF field silently keeping its original value is a distinct silent-failure mode from the DOCX case and must be documented'
+  );
+  assert.ok(
+    GOTCHAS.some((g) => g.includes('REJECTED outright at fill time')),
+    'a loop tag in a PDF field expression is the one placeholder mistake that is NOT silent — say so'
   );
 });
 
@@ -319,6 +405,16 @@ check('every file in src/ is syntactically valid', () => {
     }
   }
 });
+
+{
+  const { registerTools } = await import('../src/index.js');
+  const tools = {};
+  registerTools({ registerTool: (n, meta) => (tools[n] = meta) }, {});
+  check('trigger_templates states that it makes real documents and sends signature requests', () => {
+    assert.match(tools.trigger_templates.description, /real stored document/);
+    assert.match(tools.trigger_templates.description, /signature request/);
+  });
+}
 
 if (failures) {
   console.error(`\n${failures} check(s) failed`);

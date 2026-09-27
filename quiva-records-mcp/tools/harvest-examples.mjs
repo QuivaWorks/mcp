@@ -85,7 +85,7 @@ function describeSchema(config) {
 }
 
 async function main() {
-  const client = new QuivaClient();
+  const client = QuivaClient.fromEnv();
   if (!client.hasCredentials()) {
     console.error('No credentials configured.');
     process.exit(1);

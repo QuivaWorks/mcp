@@ -1,13 +1,15 @@
 // Local validator for document templates — no API call. Encodes the rules the
 // file-generator service enforces (file-generator-service/src/type/template.ts
-// TemplateCodec, template-trigger.ts, utils/docx) plus the angular-expression
-// tag rules from the spec's x-agent-syntax-rules, so mistakes are caught before
-// a POST/PATCH/trigger.
+// TemplateCodec, template-trigger.ts, utils/docx, handler/template-publish.ts
+// validateForPublish, utils/pdf/fill.ts) plus the angular-expression tag rules
+// from the spec's x-agent-syntax-rules, so mistakes are caught before a
+// POST/PATCH/trigger.
 
 export const DOCX_CONTENT_TYPE =
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 export const PDF_CONTENT_TYPE = 'application/pdf';
 const OUTPUT_CONTENT_TYPES = new Set([PDF_CONTENT_TYPE, DOCX_CONTENT_TYPE]);
+const PDF_BOX_KINDS = new Set(['text', 'signature', 'initials', 'date_signed']);
 
 // Validate a template: { key, label?, source?, output?, signatories?, sub_templates? }.
 // Returns { valid, errors, warnings }. `key` is required for create (POST) and
@@ -102,6 +104,102 @@ export function validateTemplate(template, { requireKey = true } = {}) {
     }
   }
 
+  // --- pdf (PdfTemplateConfigCodec: file-generator-service/src/type/template.ts) ---
+  if (template.pdf !== undefined) {
+    const pdf = template.pdf;
+    if (!pdf || typeof pdf !== 'object' || Array.isArray(pdf)) {
+      errors.push('pdf must be an object { fields?, boxes?, flatten? }');
+    } else {
+      if (sourceType !== undefined && sourceType !== PDF_CONTENT_TYPE) {
+        errors.push(
+          '`pdf` config is only valid when source.content_type is application/pdf — publish refuses it otherwise (template-publish.ts validateForPublish)'
+        );
+      }
+      if (pdf.flatten !== undefined && typeof pdf.flatten !== 'boolean') {
+        errors.push('pdf.flatten must be a boolean (default true — the filled form is baked to non-editable content unless set to false)');
+      }
+      if (pdf.fields !== undefined) {
+        if (!Array.isArray(pdf.fields)) {
+          errors.push('pdf.fields must be an array of { name, expression }');
+        } else {
+          pdf.fields.forEach((f, i) => {
+            const p = `pdf.fields[${i}]`;
+            if (!f || typeof f !== 'object' || Array.isArray(f)) {
+              errors.push(`${p} must be an object { name, expression }`);
+              return;
+            }
+            if (typeof f.name !== 'string' || f.name === '') {
+              errors.push(`${p}.name is required — must match a real field name in the PDF's AcroForm (get the list from validate_docx, don't guess)`);
+            }
+            if (typeof f.expression !== 'string' || f.expression === '') {
+              errors.push(`${p}.expression is required`);
+            } else {
+              lintPdfExpressionInto(f.expression, `${p}.expression`, errors, warnings);
+            }
+          });
+        }
+      }
+      let hasSignatureBox = false;
+      if (pdf.boxes !== undefined) {
+        if (!Array.isArray(pdf.boxes)) {
+          errors.push('pdf.boxes must be an array');
+        } else {
+          const idCounts = new Map();
+          pdf.boxes.forEach((box, i) => {
+            const p = `pdf.boxes[${i}]`;
+            if (!box || typeof box !== 'object' || Array.isArray(box)) {
+              errors.push(`${p} must be an object`);
+              return;
+            }
+            if (typeof box.id !== 'string' || box.id === '') {
+              errors.push(`${p}.id is required`);
+            } else {
+              idCounts.set(box.id, (idCounts.get(box.id) ?? 0) + 1);
+            }
+            for (const n of ['page', 'x', 'y', 'width', 'height']) {
+              if (typeof box[n] !== 'number') {
+                errors.push(`${p}.${n} must be a number — PDF points, origin bottom-left, absolute and unrotated (see pdf-templates reference)`);
+              }
+            }
+            if (!PDF_BOX_KINDS.has(box.kind)) {
+              errors.push(`${p}.kind must be one of ${[...PDF_BOX_KINDS].join(', ')}`);
+            } else if (box.kind === 'text') {
+              if (typeof box.expression !== 'string' || box.expression === '') {
+                errors.push(`${p}.expression is required for a text box`);
+              } else {
+                lintPdfExpressionInto(box.expression, `${p}.expression`, errors, warnings);
+              }
+              if (box.align !== undefined && !['left', 'center', 'right'].includes(box.align)) {
+                errors.push(`${p}.align must be "left", "center" or "right"`);
+              }
+              if (box.multiline !== undefined && typeof box.multiline !== 'boolean') {
+                errors.push(`${p}.multiline must be a boolean`);
+              }
+              if (box.font_size !== undefined && typeof box.font_size !== 'number') {
+                errors.push(`${p}.font_size must be a number`);
+              }
+            } else {
+              hasSignatureBox = hasSignatureBox || box.kind === 'signature';
+              if (typeof box.signatory !== 'number') {
+                errors.push(`${p}.signatory is required for a ${box.kind} box — the index into signatories AFTER sorting by order`);
+              } else if (box.signatory < 0) {
+                errors.push(`${p}.signatory must be >= 0`);
+              }
+            }
+          });
+          for (const [id, count] of idCounts) {
+            if (count > 1) errors.push(`pdf.boxes: id "${id}" is used by more than one box`);
+          }
+        }
+      }
+      if (sourceType === PDF_CONTENT_TYPE && (template.signatories?.length ?? 0) > 0 && !hasSignatureBox) {
+        warnings.push(
+          'publish will refuse this: a PDF source with signatories needs at least one pdf.boxes[] entry with kind "signature" — a PDF carries no text tag to place a signature (template-publish.ts)'
+        );
+      }
+    }
+  }
+
   // --- sub_templates ---
   if (template.sub_templates !== undefined) {
     if (!Array.isArray(template.sub_templates)) {
@@ -149,7 +247,7 @@ export function validateTemplate(template, { requireKey = true } = {}) {
 // sub-template when true (46551 bytes) and omitted it when false (44582). The
 // { all: [...] } form with a condition that was MET produced 44582 bytes —
 // byte-identical to the excluded case. See
-// examples/authored/certificate-of-currency.json -> conditions_proven_live.
+// examples/authored/document-verification-example.json -> conditions_proven_live.
 // ---------------------------------------------------------------------------
 
 // Operator vocabulary of rule-engine v2, transcribed from
@@ -278,6 +376,23 @@ function lintExpressionInto(text, label, errors, warnings) {
   if (stack.length > 0) {
     errors.push(`${label}: unclosed section/loop tag(s): ${stack.map((s) => `{#${s}}`).join(', ')} — close with {/} or {/${stack[stack.length - 1]}}`);
   }
+}
+
+// A PDF field holds ONE value — loop/section tags are rejected outright at
+// fill time (file-generator-service/src/utils/docx/render.ts rejectLoops),
+// unlike a DOCX placeholder which can sit inside a repeated paragraph.
+const PDF_LOOP_TAG = /\{\s*[#/^][^{}]*\}/;
+
+function lintPdfExpressionInto(text, label, errors, warnings) {
+  if (typeof text !== 'string' || text === '') return;
+  const loop = text.match(PDF_LOOP_TAG);
+  if (loop) {
+    errors.push(
+      `${label}: a PDF field holds one value, so the loop/section tag ${loop[0]} is rejected at fill time — index the list ({items[0].name}) or join it with a filter instead`
+    );
+    return;
+  }
+  lintExpressionInto(text, label, errors, warnings);
 }
 
 // Filter args are positional and ALL required (spec critical_rule).

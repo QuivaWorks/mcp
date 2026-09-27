@@ -16,7 +16,7 @@
 
 import { createHash } from 'node:crypto';
 
-const DEFAULT_API_URL = 'https://api.microstrate.io';
+const DEFAULT_API_URL = 'https://api.quiva.ai';
 
 // The object store that backs space FILES lives at a DIFFERENT URL root from
 // /workspaces/*, and it is absent from the gateway route registry
@@ -41,6 +41,9 @@ const OBJECT_ROOT = '/api/default-storage/object';
 // Bucket holding every space's files. workspaces-service/data/const.go
 // WorkspacesObjectStoreBucketName.
 export const WORKSPACES_BUCKET = 'microstrate-workspaces';
+
+// Meeting recordings, transcripts and summaries. recall-service/config/service.go RecallObjBucket.
+export const RECALL_BUCKET = 'microstrate-recall-files';
 
 // The write response carries `digest: "SHA-256=<hash>"`. The hash uses the
 // BASE64URL alphabet (`-` and `_`, not `+` and `/`) with padding retained.
@@ -113,14 +116,27 @@ export function fileKeyOf(entry) {
 }
 
 export class QuivaClient {
-  constructor(env = process.env) {
-    this.baseUrl = (env.QUIVA_API_URL || DEFAULT_API_URL).replace(/\/+$/, '');
-    this.apiKey = env.QUIVA_API_KEY || '';
-    this.bearerToken = env.QUIVA_BEARER_TOKEN || '';
-    this.email = env.QUIVA_EMAIL || '';
-    this.password = env.QUIVA_PASSWORD || '';
-    this.account = env.QUIVA_ACCOUNT || '';
+  constructor({ apiUrl, apiKey = '', bearerToken = '', email = '', password = '', account = '' } = {}) {
+    this.baseUrl = (apiUrl || DEFAULT_API_URL).replace(/\/+$/, '');
+    this.apiKey = apiKey;
+    this.bearerToken = bearerToken;
+    this.email = email;
+    this.password = password;
+    this.account = account;
     this.sessionToken = null; // JWT from auth-with-password
+  }
+
+  // Stdio entrypoints build a client from the process environment; anything
+  // composing servers in-process should pass explicit options instead.
+  static fromEnv(env = process.env) {
+    return new QuivaClient({
+      apiUrl: env.QUIVA_API_URL,
+      apiKey: env.QUIVA_API_KEY,
+      bearerToken: env.QUIVA_BEARER_TOKEN,
+      email: env.QUIVA_EMAIL,
+      password: env.QUIVA_PASSWORD,
+      account: env.QUIVA_ACCOUNT,
+    });
   }
 
   hasCredentials() {

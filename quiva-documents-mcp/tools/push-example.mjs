@@ -12,7 +12,7 @@
 // are identical and that is the bug, reproduced.
 //
 // No e-signature request is sent: the trigger payload deliberately omits
-// insured_email, and a signatory whose rendered email is missing is silently
+// signer_email, and a signatory whose rendered email is missing is silently
 // skipped (so no HelloSign request is created and nothing is emailed).
 //
 // Usage:
@@ -30,8 +30,8 @@ const CLEANUP = process.argv.includes('--cleanup');
 // the account Specialization dashboard (SpecializationDashboard -> subtab
 // "documents" -> TemplatesConfigSection), and generated files are only browsable
 // through the object-store manager.
-const UI_TEMPLATES = 'https://app.microstrate.io/en/hub/account?tab=specialization&subtab=documents';
-const UI_STORAGE = 'https://app.microstrate.io/en/hub/resources/storage/obj/manage?bucket=microstrate-documents';
+const UI_TEMPLATES = 'https://app.quiva.ai/en/hub/account?tab=specialization&subtab=documents';
+const UI_STORAGE = 'https://app.quiva.ai/en/hub/resources/storage/obj/manage?bucket=microstrate-documents';
 
 let failures = 0;
 function check(name, ok, detail = '') {
@@ -75,12 +75,12 @@ async function pollDocument(client, key, { attempts = 12, delay = 2500 } = {}) {
 }
 
 async function main() {
-  const client = new QuivaClient();
+  const client = QuivaClient.fromEnv();
   if (!client.hasCredentials()) {
     console.error('No credentials — set QUIVA_API_KEY / QUIVA_BEARER_TOKEN / QUIVA_EMAIL+QUIVA_PASSWORD.');
     process.exit(1);
   }
-  const example = getExample('certificate-of-currency');
+  const example = getExample('document-verification-example');
   const main = example.config;
   const subKey = main.sub_templates[0].key;
   console.log(`pushing "${example.slug}" to ${client.baseUrl}/file-generator\n`);
@@ -92,7 +92,7 @@ async function main() {
   // --- the conditional sub-template, sharing the main template's DOCX source ---
   const sub = {
     key: subKey,
-    label: 'VIC terms (MCP verification sub-template)',
+    label: 'EU terms (MCP verification sub-template)',
     source: main.source,
     output: { content_type: main.output.content_type },
   };
@@ -118,7 +118,7 @@ async function main() {
   );
 
   // --- trigger ---
-  // The payload omits insured_email on purpose, so the signatory is skipped and NO
+  // The payload omits signer_email on purpose, so the signatory is skipped and NO
   // e-signature request is sent (the [sig|...] anchor then stays in the PDF as
   // literal text, which is expected).
   //
@@ -128,7 +128,7 @@ async function main() {
   // below. That is exactly what happened on 2026-07-30. Guarded here so it cannot
   // recur silently.
   const basePayload = { ...example.trigger_payload };
-  delete basePayload.insured_email;
+  delete basePayload.signer_email;
   delete basePayload._why_these_keys;
 
   const declaredPlaceholders = example.placeholders_actually_in_this_docx?.names ?? [];
@@ -143,13 +143,13 @@ async function main() {
   if (unmatched.length) process.exit(1);
 
   const runs = [
-    { label: 'condition TRUE  (risk_state VIC -> sub-template SHOULD be merged)', state: 'VIC', suffix: '-vic' },
-    { label: 'condition FALSE (risk_state NSW -> sub-template should be omitted)', state: 'NSW', suffix: '-nsw' },
+    { label: 'condition TRUE  (client_region EU -> sub-template SHOULD be merged)', region: 'EU', suffix: '-eu' },
+    { label: 'condition FALSE (client_region US -> sub-template should be omitted)', region: 'US', suffix: '-us' },
   ];
 
   const generated = [];
   for (const run of runs) {
-    const payload = { ...basePayload, risk_state: run.state, policy_number: `${basePayload.policy_number}${run.suffix}` };
+    const payload = { ...basePayload, client_region: run.region, reference_number: `${basePayload.reference_number}${run.suffix}` };
     const response = await client.post('/templates/trigger', {
       payload,
       list: [{ template: main.key }],
@@ -160,18 +160,18 @@ async function main() {
     check(`trigger queued — ${run.label}`, Boolean(entry?.subject) && !entry?.errors, JSON.stringify(entry).slice(0, 300));
     if (!entry?.subject) continue;
 
-    const docKey = `${main.output.folder}.certificate-${payload.policy_number}.pdf`;
+    const docKey = `${main.output.folder}.document-${payload.reference_number}.pdf`;
     const doc = await pollDocument(client, docKey);
-    check(`document generated — ${run.state}`, Boolean(doc?.output?.key) && !doc?.errors, `key=${docKey} doc=${JSON.stringify(doc).slice(0, 300)}`);
+    check(`document generated — ${run.region}`, Boolean(doc?.output?.key) && !doc?.errors, `key=${docKey} doc=${JSON.stringify(doc).slice(0, 300)}`);
     // A signatory whose rendered email is missing is skipped, and the field comes
     // back as an EMPTY ARRAY (not null) — so length is what to assert. Verified
-    // live 2026-07-29: `signatures: []` with insured_email omitted from the payload.
+    // live 2026-07-29: `signatures: []` with signer_email omitted from the payload.
     check(
-      `no e-signature request was created — ${run.state}`,
+      `no e-signature request was created — ${run.region}`,
       !doc?.signatures?.length,
       `signatures: ${JSON.stringify(doc?.signatures)}`
     );
-    generated.push({ state: run.state, key: docKey, output: doc?.output?.key, errors: doc?.errors });
+    generated.push({ region: run.region, key: docKey, output: doc?.output?.key, errors: doc?.errors });
   }
 
   if (NEGATIVE_CONTROL) {
@@ -179,15 +179,15 @@ async function main() {
     const wrong = { ...main, sub_templates: [example.wrong_conditions_negative_control] };
     await client.patch(`/templates/${encodeURIComponent(main.key)}`, wrong);
     await client.post(`/templates/${encodeURIComponent(main.key)}/publish`, { key: main.key });
-    const payload = { ...basePayload, risk_state: 'VIC', policy_number: `${basePayload.policy_number}-wrongform` };
+    const payload = { ...basePayload, client_region: 'EU', reference_number: `${basePayload.reference_number}-wrongform` };
     const response = await client.post('/templates/trigger', { payload, list: [{ template: main.key }] });
     const entries = Array.isArray(response) ? response : (response?.body ?? []);
     const entry = Array.isArray(entries) ? entries[0] : entries;
     check('negative-control trigger queued', Boolean(entry?.subject), JSON.stringify(entry).slice(0, 200));
-    const docKey = `${main.output.folder}.certificate-${payload.policy_number}.pdf`;
+    const docKey = `${main.output.folder}.document-${payload.reference_number}.pdf`;
     const doc = await pollDocument(client, docKey);
     check('negative-control document generated', Boolean(doc?.output?.key), JSON.stringify(doc).slice(0, 200));
-    generated.push({ state: 'VIC (wrong conditions form)', key: docKey, output: doc?.output?.key, errors: doc?.errors });
+    generated.push({ region: 'EU (wrong conditions form)', key: docKey, output: doc?.output?.key, errors: doc?.errors });
     // Restore the correct form so the artefact left on staging is the right one.
     await client.patch(`/templates/${encodeURIComponent(main.key)}`, main);
     await client.post(`/templates/${encodeURIComponent(main.key)}/publish`, { key: main.key });
@@ -196,7 +196,7 @@ async function main() {
 
   console.log('\nGenerated documents:');
   for (const g of generated) {
-    console.log(`  ${g.state.padEnd(30)} ${g.key}`);
+    console.log(`  ${g.region.padEnd(30)} ${g.key}`);
     console.log(`  ${''.padEnd(30)} -> ${g.output ?? `FAILED: ${JSON.stringify(g.errors)}`}`);
   }
 
@@ -207,13 +207,13 @@ async function main() {
   console.log(`  PDFs      : ${UI_STORAGE}`);
   console.log(`              (generated files are only browsable via the object-store`);
   console.log(`               manager — the bucket is set by output.bucket)`);
-  console.log(`  What to look for: open the VIC and NSW PDFs side by side. The VIC one`);
-  console.log(`  should carry the extra sub-template section, the NSW one should not.`);
+  console.log(`  What to look for: open the EU and US PDFs side by side. The EU one`);
+  console.log(`  should carry the extra sub-template section, the US one should not.`);
   console.log(`  If they are IDENTICAL, the v2 conditions form is not being honoured and`);
   console.log(`  the sub-template is being dropped in both cases — report that.`);
   if (NEGATIVE_CONTROL) {
     console.log(`  The "-wrongform" PDF uses the { all: [...] } form the docs describe. If it`);
-    console.log(`  matches the NSW output rather than the VIC output, the documented form is`);
+    console.log(`  matches the US output rather than the EU output, the documented form is`);
     console.log(`  silently dropping the sub-template — the bug, reproduced.`);
   }
 

@@ -40,7 +40,7 @@ generated module**, derived from that source, not two hand-maintained copies:
 
 Also worth folding in: the three-way operator divergence already documented for
 flows (engine ≈80, editor `rulesInputJSONSchema` ≈35, visual builder
-`OperatorType` ≈55 including six the engine does not implement).
+`OperatorType` ≈63 including three the engine does not implement).
 
 ---
 

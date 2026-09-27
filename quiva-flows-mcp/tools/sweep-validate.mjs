@@ -13,7 +13,7 @@ import { QuivaClient } from '../src/client.js';
 import { validate } from '../src/validate.js';
 
 const VERBOSE = process.argv.includes('--verbose');
-const client = new QuivaClient();
+const client = QuivaClient.fromEnv();
 
 const classify = (error) => {
   if (/invalid id — must start with a letter/.test(error)) return 'node id (editor nanoid — validate=true not sent by UI)';

@@ -4,9 +4,10 @@
 //   1. hub-service/jseval/rules.go — the embedded rule-engine v2 bundle that
 //      actually evaluates rules (base64 const R). `calculatingOperations` +
 //      `expressionOperators` there define the ONLY operators that work.
-//   2. hub-service/runner/graph.go — handleConditionNode (:1133) feeds the
+//   2. hub-service/runner/graph.go — handleConditionNode (:1513) feeds the
 //      condition node's whole payload in as `{ <NODE_ID>: payload }`;
-//      handleRulesNode (:1182) uses `{ rules, facts, context }`.
+//      handleRulesNode (:1562) uses `{ rules, facts, context }`. Both run
+//      hub-service/jseval/rules_validate.go ValidateRules first.
 //   3. microstrate/src/utils/json-schema.utilts.ts:242 `rulesInputJSONSchema`
 //      — the flow editor's JSON-Schema validation for rules payloads.
 //   4. microstrate/src/types/rule.types.ts `OperatorType` — the operator list
@@ -19,8 +20,8 @@
 // Operator vocabularies
 // ---------------------------------------------------------------------------
 
-// (1) Runtime truth — every key of `calculatingOperations` in the engine
-// bundle, plus the special `fact` operator handled before operator dispatch.
+// (1) Runtime truth: hub-service/jseval/rules_validate.go expressionOperatorNames +
+// calculatingOnlyNames, plus `fact`. Any other name fails the node before it runs.
 export const ENGINE_OPERATORS = new Set([
   'fact',
   // arithmetic
@@ -40,7 +41,7 @@ export const ENGINE_OPERATORS = new Set([
   // array
   'contain', 'contains', 'arrayContain', 'arrayContains',
   'notContain', 'notContains', 'arrayNotContain', 'arrayNotContains',
-  'concat-array', 'sort', 'sortString', 'split', 'empty', 'notEmpty',
+  'concat-array', 'sort', 'sortString', 'split', 'empty', 'notEmpty', 'not-empty',
   'generateArray', 'generate-array', 'array.generate',
   // data
   'jPath', 'jsonPath', 'jsonParse', 'jsonStringify',
@@ -56,7 +57,7 @@ export const ENGINE_OPERATORS = new Set([
 
 // (3) The flow editor validates rules payloads against this enum. Anything
 // outside it still RUNS, but the editor's JSON-Schema check flags it — the
-// production "Builders Risk Product Selection" flow trips this with `jPath`.
+// production flow behind the "product-selection-rules" example trips this with `jPath`.
 export const EDITOR_SCHEMA_OPERATORS = new Set([
   '@today', '@now', '+', '-', '*', '/', '=', '!=', '^', '%',
   'floor', 'ceil', 'round', 'trunc', 'or', 'and', 'not', 'in', 'notIn',
@@ -65,12 +66,9 @@ export const EDITOR_SCHEMA_OPERATORS = new Set([
   'expression', 'split', 'join', 'numberFormat',
 ]);
 
-// (4) The visual condition builder's dropdown. Six entries here are NOT
-// implemented by the engine — picking them in the UI produces a rule that
-// silently evaluates to undefined.
-export const VISUAL_BUILDER_ONLY = new Set([
-  'doesNotContain', 'string-contains', 'stringFormat', 'boolean', 'condition', ' !',
-]);
+// (4) The visual condition builder's dropdown. Three entries are NOT implemented by
+// the engine; a rule using one fails with "invalid rules: ... unknown operator".
+export const VISUAL_BUILDER_ONLY = new Set(['doesNotContain', 'stringFormat', 'condition']);
 
 export const OPERATOR_GROUPS = {
   logic: ['and (& &&)', 'or (| ||)', 'not (!)'],
@@ -196,7 +194,7 @@ or read the whole map and pick the key in an eval node.
 
 The same { facts, rules, context } payload is also accepted by the shared
 rules compute function (a "function" node with a ms.compute.* subject) — that
-is how the production Builders Risk flow runs its underwriting rules. Careful:
+is how the harvested product-selection example runs its rules. Careful:
 the rules NODE unwraps to bare outcomes, while the compute FUNCTION returns the
 raw engine output ({ outcome: ... } wrappers), which is why that flow reads
 $.NODE..outcome. Same payload in, different shape out.
@@ -212,9 +210,9 @@ Translate; never paste one into the other.
 
 --- 5. Operators -------------------------------------------------------------
 
-An operator the engine does not implement does NOT raise an error: it logs a
-warning, yields undefined, the branch is skipped, and you get a misleading
-"failed to determine next steps". Get the name right.
+An operator the engine does not implement fails the condition or rules node
+before anything is evaluated: 'invalid rules: rule "<NODE_ID>" (<path>): unknown
+operator "<op>"' (hub-service/jseval/rules_validate.go ValidateRules).
 
 ${Object.entries(OPERATOR_GROUPS).map(([k, v]) => `${k.padEnd(12)} ${v.join(', ')}`).join('\n')}
 
@@ -306,7 +304,7 @@ function checkOperatorName(op, path, label, errors, warnings, source) {
     ? ` The visual builder offers "${op}" but the engine does not implement it`
     : '';
   errors.push(
-    `${label}: ${path} operator "${op}" is not implemented by the rules engine — it silently resolves to undefined, so the branch is skipped and the run fails with "failed to determine next steps".${hint} See get_flows_reference("rules-syntax") for the operator list.`
+    `${label}: ${path} operator "${op}" is not implemented by the rules engine — the node fails at run time with "invalid rules: ... unknown operator".${hint} See get_flows_reference("rules-syntax") for the operator list.`
   );
   void source;
 }

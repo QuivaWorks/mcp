@@ -84,8 +84,10 @@ before. Never hard-code a real person into a committed file.
   and says nothing. `specs/` is the one folder that deliberately never deploys.
 - Credentials live only in per-server `.env` files. `.env.example` files must stay
   blank — a live staging key has been committed to one before.
-- `quiva-agents-mcp` needs `QUIVA_API_KEY` **empty** and a bearer token set; the
-  agent endpoints read JWT claims.
+- An API key works for every server, agents included: the gateway swaps it for a
+  user JWT (verified live 2026-09-27). A restricted key must allow the routes used.
+- Never assume a package `.env` targets staging. Check `QUIVA_API_URL` before any
+  live write, and never write test data to `api.quiva.ai`.
 
 ## Ground rules carried over
 

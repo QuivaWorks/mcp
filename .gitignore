@@ -11,3 +11,7 @@ node_modules/
 
 .DS_Store
 *.log
+
+# Local .env backups hold real credentials.
+.env.bak*
+*/.env.bak*

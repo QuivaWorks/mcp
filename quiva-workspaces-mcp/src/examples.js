@@ -74,7 +74,7 @@ export function listExamples() {
     examples: [...harvested, ...authored].map(describe),
     note:
       'harvested = REAL spaces/tasks/comments from the platform (known to work), but they are READ responses — do not echo one back as a create body. ' +
-      'authored = hand-written WRITE payloads, which is the shape you actually send. Start with "renewal-review-board" for a create_space -> create_task -> create_comment set, then compare against any harvested space to see the presentation fields the board reads. Fetch one with get_example(slug).',
+      'authored = hand-written WRITE payloads, which is the shape you actually send. Start with "review-board" for a create_space -> create_task -> add_time_log -> create_comment set, then compare against any harvested space to see the presentation fields the board reads. Fetch one with get_example(slug).',
   };
 }
 

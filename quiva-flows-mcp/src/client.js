@@ -6,17 +6,30 @@
 //   3. QUIVA_EMAIL + QUIVA_PASSWORD (+ optional QUIVA_ACCOUNT)
 //      -> POST /accounts/auth-with-password, JWT cached, re-login once on 401.
 
-const DEFAULT_API_URL = 'https://api.microstrate.io';
+const DEFAULT_API_URL = 'https://api.quiva.ai';
 
 export class QuivaClient {
-  constructor(env = process.env) {
-    this.baseUrl = (env.QUIVA_API_URL || DEFAULT_API_URL).replace(/\/+$/, '');
-    this.apiKey = env.QUIVA_API_KEY || '';
-    this.bearerToken = env.QUIVA_BEARER_TOKEN || '';
-    this.email = env.QUIVA_EMAIL || '';
-    this.password = env.QUIVA_PASSWORD || '';
-    this.account = env.QUIVA_ACCOUNT || '';
+  constructor({ apiUrl, apiKey = '', bearerToken = '', email = '', password = '', account = '' } = {}) {
+    this.baseUrl = (apiUrl || DEFAULT_API_URL).replace(/\/+$/, '');
+    this.apiKey = apiKey;
+    this.bearerToken = bearerToken;
+    this.email = email;
+    this.password = password;
+    this.account = account;
     this.sessionToken = null; // JWT from auth-with-password
+  }
+
+  // Stdio entrypoints build a client from the process environment; anything
+  // composing servers in-process should pass explicit options instead.
+  static fromEnv(env = process.env) {
+    return new QuivaClient({
+      apiUrl: env.QUIVA_API_URL,
+      apiKey: env.QUIVA_API_KEY,
+      bearerToken: env.QUIVA_BEARER_TOKEN,
+      email: env.QUIVA_EMAIL,
+      password: env.QUIVA_PASSWORD,
+      account: env.QUIVA_ACCOUNT,
+    });
   }
 
   hasCredentials() {

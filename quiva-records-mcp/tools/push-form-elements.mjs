@@ -23,7 +23,7 @@ import { validate } from '../src/validate.js';
 import { ELEMENT_KINDS } from '../src/records-docs.js';
 
 const CLEANUP = process.argv.includes('--cleanup');
-const UI = 'https://app.microstrate.io/en/hub/records/configs';
+const UI = 'https://app.quiva.ai/en/hub/records/configs';
 
 let failures = 0;
 function check(name, ok, detail = '') {
@@ -49,7 +49,7 @@ function collect(node, path = '', out = []) {
 }
 
 async function main() {
-  const client = new QuivaClient();
+  const client = QuivaClient.fromEnv();
   if (!client.hasCredentials()) {
     console.error('No credentials — set QUIVA_API_KEY / QUIVA_BEARER_TOKEN / QUIVA_EMAIL+QUIVA_PASSWORD.');
     process.exit(1);

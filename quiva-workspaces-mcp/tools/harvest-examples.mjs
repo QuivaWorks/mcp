@@ -25,6 +25,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { QuivaClient, WORKSPACES_BUCKET, fileKeyOf } from '../src/client.js';
 
+// The web app sits beside the API: api.<host> -> app.<host>.
+const appUrl = (client) => client.baseUrl.replace('//api.', '//app.');
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(HERE, '..', 'examples', 'harvested');
 
@@ -267,7 +270,7 @@ async function harvestVerticalLibrary(client) {
 }
 
 async function main() {
-  const client = new QuivaClient();
+  const client = QuivaClient.fromEnv();
   if (!client.hasCredentials()) {
     console.error('No credentials — set QUIVA_API_KEY / QUIVA_BEARER_TOKEN / QUIVA_EMAIL+QUIVA_PASSWORD.');
     process.exit(1);
@@ -323,7 +326,7 @@ async function main() {
       source: {
         environment: client.baseUrl,
         id: space.id,
-        url: `https://app.microstrate.io/en/hub/spaces/${space.id}/tasks`,
+        url: `${appUrl(client)}/en/hub/spaces/${space.id}/tasks`,
         harvested_from: 'GET /workspaces/spaces',
       },
       teaches: describeSpace(space),
@@ -391,7 +394,7 @@ async function main() {
           environment: client.baseUrl,
           task_id: task.id,
           space_id: space.id,
-          url: `https://app.microstrate.io/en/hub/spaces/${space.id}/tasks?task=${task.id}`,
+          url: `${appUrl(client)}/en/hub/spaces/${space.id}/tasks?task=${task.id}`,
           harvested_from: `GET /workspaces/task/${task.id}/comments`,
         },
         teaches: describeComments(comments),

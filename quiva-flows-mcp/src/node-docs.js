@@ -38,13 +38,16 @@ Workflow-level config fields:
 `.trim();
 
 export const GOTCHAS = [
-  'Agent nodes: nest the inline definition under payload.agent ({name, llm_provider, model, ...}); flat payloads (api_key/llm_provider/model at payload top level) are silently dropped and the node fails with "a subject, node_subject or agent property is required". Only llm_provider "claude"/"anthropic" is supported. Use platform model aliases (claude-sonnet-4-6, claude-haiku-4-5).',
+  'Agent nodes: nest the inline definition under payload.agent ({name, llm_provider, model, ...}); flat payloads (api_key/llm_provider/model at payload top level) are silently dropped and the node fails with "a subject, node_subject or agent property is required". Only llm_provider "claude"/"anthropic" is supported. Use the platform model aliases claude-sonnet-5, claude-opus-5-5 or claude-haiku-4-5. Older names still run but are remapped (claude-sonnet-4-x -> claude-sonnet-5, claude-opus-4-x -> claude-opus-5-5; bellerophon-workforce/model/internal/model/model_info.go), so write the current name.',
   'Agent results ($.<ID>.result) are STRINGS even with output_schema — and NOT raw JSON: verified live 2026-07-29, the string comes back MARKDOWN-FENCED (```json\\n{...}\\n```), so a bare JSON.parse THROWS. In an eval node, extract the object first: JSON.parse(String(r).match(/\\{[\\s\\S]*\\}/)[0]).',
   'Published workflow subjects have NO "published" segment: ms.hub.config.workflow.{collection}.{flow}. Only drafts carry ".draft.". Get the published subject from list_workflows version=published.',
   'Update records with PUT (the records service registers put.record; PATCH returns 500 despite the records openapi saying PATCH).',
   'Use node_type "delay", NOT "wait". The OpenAPI spec says "wait" but the engine has no such handler — a "wait" node silently does nothing.',
   'HTTP/integration payloads use "base_url" (snake_case), NOT "baseURL". A "baseURL" key is silently ignored and the request goes to just "url". Safest: put the full URL in "url".',
-  'Node IDs must match ^[a-zA-Z_][a-zA-Z0-9_:]*$ and must not be: trigger, static, RESOLVE_ERROR, RESOLVE_SUCCESS. BUT the server only enforces this when the request carries validate=true, and the flow editor does not send it — so UI-authored flows contain nanoid ids with hyphens (e.g. "QsY6OWA5xVhZn9aS3lF-Z") that cannot be re-sent with validation on. Use server_validate=false to update such a flow.',
+  'Node IDs must match ^[a-zA-Z_][a-zA-Z0-9_:]*$ and must not be: trigger, static, RESOLVE_ERROR, RESOLVE_SUCCESS. The server only applies that regex when the request carries validate=true, and the flow editor does not send it, so UI-authored flows contain nanoid ids with hyphens (e.g. "QsY6OWA5xVhZn9aS3lF-Z"). Use server_validate=false to update such a flow. server_validate=false skips all of ValidateConfig (hub-service/handler/create-workflow.go): the id regex, reserved ids, payload-required, schedule options.attempts, function/flow subject required and subject-exists, duplicate node ids, and edge source/target checks. But every create/update still refuses an empty node or edge id, an id containing . * > @, a space, a tab or a newline, an unknown node_type, and a record/task trigger whose id does not address its config/space (hub-service/handler/create-workflow.go ValidateGraphIDs). Publish then runs the full server validator and refuses on any error (hub-service/handler/publish-workflow.go, hub-service/validate/workflow.go).',
+  'Changing flows needs the root, admin or developer role. create/update/publish/delete workflow and create/delete collection return 403 "changing a flow needs the root, admin or developer role" for any other role (collaborator, client, monitor, billing), and 401 when the token cannot be read (hub-service/handler/account_role.go refuseUnlessFlowAuthor). Reads and runs are not gated this way.',
+  'Awaited runs on an account routed through the run queue can answer 429 with Retry-After: 5 (the account\'s concurrent-run limit is full), 504 (the run did not finish before the gateway timeout; it may still complete, so check search_run_logs before re-running), 409 (the same run attempt is already queued) or 503 with Retry-After (the queue could not take it). Back off and retry the 429/503; do not blindly retry a 504 (hub-service/handler/run_queue.go respondSyncRun).',
+  'options.attempts (> 1) is refused on a schedule node, and on a quiva-endpoint node calling microstrate.hub.post.schedule-flow or microstrate.hub.delete.unschedule-flow: a retry stamps a null topic and the timer becomes permanently uncancellable while the run reports success (hub-service/validate/schedule_attempts.go).',
   'Every node requires a payload (server rejects nodes without one).',
   'function nodes require an existing "subject" (ms.compute.*); flow nodes require an existing "subject" (ms.hub.config.workflow.*). The server verifies these exist.',
   'The graph must be acyclic. The server does NOT check for cycles — a cycle means those nodes simply never run.',
@@ -54,12 +57,14 @@ export const GOTCHAS = [
   '"gateway" is a real, live trigger_type (an inbound HTTP call routed to this flow via a trigger-service gateway mapping, Resource/ResourceType bound to the flow) — it is easy to miss because it is neither in the OpenAPI spec nor obviously named, but examples/client-folder-creation.json is a harvested, published flow that uses it.',
   'Condition branch targets are activated directly by the condition node, but you should still add edges condition -> target so merge-node bookkeeping works when a branch is skipped.',
   'condition / rules nodes use the rule-engine v2 DSL: branches are { condition: { operator, input }, outcome }, NOT { if, then, else }. The editor labels them IF / ELSE IF / ELSE, which is why the wrong shape looks plausible. A condition payload IS the branch array (no "rules" wrapper); a rules payload is { rules: { name: <rule> }, facts, context }. Call get_flows_reference("rules-syntax").',
-  'An operator the rules engine does not implement does NOT error — it resolves to undefined, the branch is skipped, and the run fails with the misleading "failed to determine next steps". The validator errors on unknown operator names; get the list from get_flows_reference("rules-syntax").',
+  'An operator the rules engine does not implement fails the condition or rules node before evaluation: invalid rules: rule "<NODE_ID>" (<path>): unknown operator "<op>" (hub-service/jseval/rules_validate.go ValidateRules). The validator errors on it first; get the list from get_flows_reference("rules-syntax").',
   'A conditional chain whose last branch still has a "condition" has no catch-all: a run where nothing matches fails with "failed to determine next steps". End with { "outcome": ... } and no condition.',
   'Nodes and edges need flow-editor presentation fields (node: position/type/measured; edge: type/edgeType/sourceHandle/targetHandle) or the graph renders stacked at the origin. create_workflow / update_workflow auto-layout anything missing.',
   'Pipe concatenation: "$.trigger.first| |$.trigger.last" joins values with a literal middle segment; "Bearer |$.env.auth_token" prefixes a literal. Secrets use the SECRET::NAME:: placeholder.',
   'verify-challenge nodes: a FAILED challenge is a successful node returning { success: false }, not an error. The run continues downstream regardless, so you MUST branch on $.<ID>.success — otherwise every bot submission proceeds exactly as a person\'s would. Check $.<ID>.hostname too: one widget can allow several domains and a token solved on any of them verifies on all of them.',
-  'task nodes: "operation" is a NODE-LEVEL property (data.operation), not a payload field. Omitting space_id is not neutral — it falls back to the ESCALATE space. An empty assignees list CLEARS assignees (only an absent field is no-change), and a mapped value resolving to nothing sends exactly that. status/priority/tags are free strings server-side, so a value the space does not define is stored and then matches no filter, and the task vanishes from every board.',
+  'task nodes: "operation" is a NODE-LEVEL property (data.operation), not a payload field; the server refuses payload.operation, a missing operation and an unknown one (13 operations, see get_node_type_reference("task")). Omitting space_id is not neutral — it falls back to the ESCALATE space. An empty assignees list CLEARS assignees (only an absent field is no-change), and a mapped value resolving to nothing sends exactly that. status/priority/tags are free strings server-side, so a value the space does not define is stored and then matches no filter, and the task vanishes from every board.',
+  'email nodes send ONE email to ONE recipient ("to" must be a single address, not a list) through the account\'s verified sending domain. The result {msg_id, accepted, status: "queued"} means accepted for sending, not delivered: suppression and consent are applied later. There is no retry, so do not wrap it in options.attempts.',
+  'verify-signature is the opposite of verify-challenge: a failed check REFUSES the run (401 "unauthorized", run status "refused") instead of returning a result to branch on. Map headers/body as "$.env.headers" / "$.trigger" with NO leading pipe; a pipe turns the object into a string and every call fails.',
   'input / human-in-the-loop payload is {title, description, message, priority, assignees} (assignees = comma-separated user ids). The spec\'s "notify" email/slack block is not read by the current engine.',
 ];
 
@@ -98,16 +103,16 @@ export const NODE_TYPES = {
     },
     record_trigger_example: {
       // The id is NOT free-form here — see record_trigger below.
-      id: 'record:risk_programme',
+      id: 'record:enquiry',
       position: { x: 0, y: 0 },
       type: 'custom',
       data: {
-        id: 'record:risk_programme',
-        name: 'On risk programme record',
+        id: 'record:enquiry',
+        name: 'On enquiry record',
         node_type: 'trigger',
         trigger_type: 'record',
         payload: {
-          record_config_id: 'risk_programme',
+          record_config_id: 'enquiry',
           event_type: ['record-created', 'record-updated'],
         },
       },
@@ -186,7 +191,7 @@ export const NODE_TYPES = {
       type: 'custom',
       data: {
         id: 'GATEWAY_TRIGGER_ID',
-        name: 'https://<gateway>.microstrate.io/client/create',
+        name: 'https://<gateway>.quiva.ai/client/create',
         subject: 'ms.gateway.<gateway_id>.mapping.post.client-create',
         node_type: 'trigger',
         trigger_type: 'gateway',
@@ -213,7 +218,7 @@ export const NODE_TYPES = {
     payload: {
       required: {
         agent:
-          'inline agent definition: { name (required), llm_provider (required: "claude" or "anthropic" — the invoke handler rejects others), model (required — use platform catalog aliases like "claude-sonnet-4-6", "claude-haiku-4-5"), behaviour, output_schema (flat map field -> short description), has_tools, tools (bit://web_search, mcp://, fun://), timeout (seconds), knowledge }. ALTERNATIVE: pass "subject" (a saved agent subject) or "node_subject" (agent node template) instead of "agent".',
+          'inline agent definition: { name (required), llm_provider (required: "claude" or "anthropic" — the invoke handler rejects others), model (required — use platform catalog aliases: "claude-sonnet-5", "claude-opus-5-5" or "claude-haiku-4-5"; older names such as "claude-sonnet-4-6" are remapped), behaviour, output_schema (flat map field -> short description), has_tools, tools (bit://web_search, mcp://, fun://), timeout (seconds), knowledge }. ALTERNATIVE: pass "subject" (a saved agent subject) or "node_subject" (agent node template) instead of "agent".',
       },
       optional: {
         prompt:
@@ -350,7 +355,7 @@ export const NODE_TYPES = {
     summary: 'Invoke another (published) workflow as a sub-flow.',
     required: ['id', 'node_type', 'subject', 'payload'],
     nodeLevelProps: {
-      subject: 'REQUIRED — sub-workflow subject (ms.hub.config.workflow.<collection>.<flow>); must exist. There is NO "published" segment — see the gotcha; only drafts carry ".draft.". The two segments are hashes of the collection and flow names (hub-service/data/const.go:190-193), so read them off list_workflows rather than composing them from names.',
+      subject: 'REQUIRED — sub-workflow subject (ms.hub.config.workflow.<collection>.<flow>); must exist. There is NO "published" segment — see the gotcha; only drafts carry ".draft.". The two segments are hashes of the collection and flow names (hub-service/data/const.go:233-236), so read them off list_workflows rather than composing them from names.',
       await: 'boolean — wait for the sub-flow to finish',
       response_map: 'optional JSONPath mapping over the sub-flow output',
       options: '{ flat_map, backoff_ms, timeout (ms), attempts, ignore_response_codes }',
@@ -474,7 +479,7 @@ export const NODE_TYPES = {
       },
     },
     notes:
-      'Returns { <ruleName>: <outcome> } — verified live. Read a single outcome as $.<ID>.<ruleName>, but ONLY if the rule name has no dots: a dotted key like "AvatarUrl.visible" cannot be read with $.<ID>.AvatarUrl.visible (the resolver walks AvatarUrl -> visible instead of matching the literal key, and you get []). Either keep rule names dot-free when a downstream node needs them, or read the whole map with $.<ID> and pick the key in an eval node. NOTE the "rules" NODE unwraps to bare outcomes, whereas the shared rules COMPUTE FUNCTION (a "function" node with an ms.compute.* subject, as used by the production Builders Risk flow) returns the raw engine output — which is why that flow reads $.NODE..outcome. Same payload, different return shape. Full DSL: get_flows_reference("rules-syntax"); real example: get_example("builders-risk-product-selection").',
+      'Returns { <ruleName>: <outcome> } — verified live. Read a single outcome as $.<ID>.<ruleName>, but ONLY if the rule name has no dots: a dotted key like "AvatarUrl.visible" cannot be read with $.<ID>.AvatarUrl.visible (the resolver walks AvatarUrl -> visible instead of matching the literal key, and you get []). Either keep rule names dot-free when a downstream node needs them, or read the whole map with $.<ID> and pick the key in an eval node. NOTE the "rules" NODE unwraps to bare outcomes, whereas the shared rules COMPUTE FUNCTION (a "function" node with an ms.compute.* subject, as used by the harvested "product-selection-rules" example) returns the raw engine output — which is why that flow reads $.NODE..outcome. Same payload, different return shape. Full DSL: get_flows_reference("rules-syntax"); real example: get_example("product-selection-rules").',
   },
 
   jsonlogic: {
@@ -579,7 +584,13 @@ export const NODE_TYPES = {
       optional: {
         trigger_in: 'delay like "5m", "1h", "2d"',
         trigger_on: 'cron expression or ISO date',
+        name:
+          'Per-entity timer name, e.g. "invoice-reminder:|$.trigger.invoice_id". Given, the timer topic is derived from it, so each entity keeps its own timer. Omitted, the topic is derived from the node id and the node holds ONE timer: a second run replaces the first run\'s timer (hub-service/model/request.go ScheduleNodePayload, runner/graph.go handleScheduleNode).',
       },
+    },
+    nodeLevelProps: {
+      options:
+        'Do NOT set options.attempts (> 1): it is refused on write and at run time, because a retry stamps a null topic and leaves an uncancellable timer (hub-service/validate/schedule_attempts.go).',
     },
     example: {
       id: 'FOLLOW_UP',
@@ -590,9 +601,12 @@ export const NODE_TYPES = {
           flow_subject: 'ms.hub.config.workflow.2408930879.1009853675',
           trigger: { customer: '$.trigger.customer' },
           trigger_in: '2d',
+          name: 'follow-up:|$.trigger.customer.id',
         },
       },
     },
+    notes:
+      'The node result carries the derived topic, which is the only handle microstrate.hub.delete.unschedule-flow accepts. Store it if the timer may need cancelling. The scheduled run executes as the user whose run armed it; a timer armed by an unattended run replays as root (runner/graph.go handleScheduleNode).',
   },
 
   input: {
@@ -616,8 +630,8 @@ export const NODE_TYPES = {
         id: 'CONFIRM_DETAILS',
         node_type: 'input',
         payload: {
-          message: 'Please confirm the extracted policy details: $.EXTRACTOR.result',
-          title: 'Confirm policy details',
+          message: 'Please confirm the extracted invoice details: $.EXTRACTOR.result',
+          title: 'Confirm invoice details',
           assignees: 'user_123',
         },
       },
@@ -658,9 +672,11 @@ export const NODE_TYPES = {
     summary: 'Invoke a Quiva endpoint by subject. (Not in the OpenAPI spec; use list_quiva_endpoints to discover subjects.)',
     required: ['id', 'node_type', 'subject', 'payload'],
     subject_is_allowlisted:
-      'THE SUBJECT IS A CLOSED ALLOWLIST, not an arbitrary bus subject. providers.InvokeEndpoint (hub-service/providers/endpoint.go:22) checks the subject against data.AllowedEndpoints and returns "endpoint not allowed: <subject>" for anything else. list_quiva_endpoints returns that exact list (32 subjects: microstrate.storage.* KV/object/stream operations, plus microstrate.hub.post.workflow-run). A flow therefore CANNOT reach an arbitrary platform service this way. Worked example of the consequence, 2026-08-04: numbergen-service provides atomic counters (microstrate.numbergen.put.increment, with compare-and-swap and 10 retries — exactly what generating a gap-free sequential reference number needs) and it is unreachable from a flow BOTH ways: not in the allowlist, and not exposed through the API gateway either — PUT https://api.microstrate.io/numbergen/increment returns 404 while known routes such as /records/{config} and /workspaces/task return 401 unauthenticated, so the 404 is absence of a route and not an auth failure. For a counter from a flow, use microstrate.storage.get.kv-entry + microstrate.storage.put.kv-entry, which ARE allowlisted — but that is read-modify-write with no compare-and-swap, so two concurrent runs can produce the same number. If a reference must be collision-free, derive it from something already unique (a record id) rather than a counter.',
+      'THE SUBJECT IS A CLOSED ALLOWLIST, not an arbitrary bus subject. providers.InvokeEndpoint (hub-service/providers/endpoint.go) checks the subject against data.AllowedEndpoints and returns "endpoint not allowed: <subject>"; publish refuses the same subjects up front (hub-service/validate/workflow.go). list_quiva_endpoints returns the list (hub-service/data/endpoints.go): microstrate.storage.* KV/object/stream operations, file-generator template-trigger, hub schedule-flow / unschedule-flow / scheduled-flows, email send/status, numbergen get.counter / put.increment / post.counter, accounts distribution-message and hub workflow-run, plus the entries the task and email nodes use. A flow cannot reach any other platform service this way. For a gap-free reference number use microstrate.numbergen.put.increment, which is compare-and-swap guarded; read back the counter name it returns, because the service normalises hyphens away.',
     nodeLevelProps: {
       subject: 'REQUIRED — endpoint subject, and it MUST be one of the allowlisted subjects from list_quiva_endpoints',
+      options:
+        '{ flat_map, backoff_ms, timeout (ms), attempts, ignore_response_codes }. attempts (> 1) is refused when the subject is schedule-flow or unschedule-flow (hub-service/validate/schedule_attempts.go).',
     },
     payload: {
       required: {
@@ -681,40 +697,43 @@ export const NODE_TYPES = {
 
   task: {
     summary:
-      'Act on a workspace task: create, update, set status, assign, comment, or complete one of its actions. (Not in the OpenAPI spec; added 2026-08.) The operation — NOT a subject — selects the endpoint, so unlike quiva-endpoint there is nothing to look up. ' +
+      'Act on workspace tasks: create, update, set status, assign, comment, complete an action, find, delete, and book or cancel scheduled task events. (Not in the OpenAPI spec.) The operation — NOT a subject — selects the endpoint, so unlike quiva-endpoint there is nothing to look up. ' +
       'DO NOT CONFUSE with the "task" TRIGGER (node_type: "trigger", trigger_type: "task" — see NODE_TYPES.trigger.task_trigger). This node_type performs a task operation as a step INSIDE a running flow (egress); a task trigger STARTS a flow when a task event happens (ingress). Same word "task", two different fields.',
     required: ['id', 'node_type', 'operation', 'payload'],
     nodeLevelProps: {
       operation:
-        'REQUIRED, and it sits on data.operation, NOT in the payload. One of: create_task, update_task, set_task_status, assign_task, comment_task, complete_task_action. An unknown value fails the node with the valid list, so a typo here is loud (unlike node_type, which is not validated at all).',
+        'REQUIRED, and it sits on data.operation, NOT in the payload. The server refuses payload.operation, a missing operation and an unknown one (hub-service/validate/workflow.go checkTaskNode). One of the 13 in `operations` below (hub-service/data/task_endpoints.go).',
+    },
+    operations: {
+      create_task: 'Required: title. Optional: space_id, description, status, priority, assignees, reporter, due_date, scheduled_at, tags, folder, contact, parent, attachments.',
+      update_task: 'Required: task_id. Optional: title, description, status, priority, assignees, reporter, space_id, due_date, scheduled_at, tags, folder, parent, archived.',
+      set_task_status: 'Required: task_id, status.',
+      assign_task: 'Required: task_id, assignees.',
+      comment_task: 'Required: task_id, body. Optional: internal, mentions, reply_id, attachments.',
+      complete_task_action: 'Required: task_id, action_id. Optional: done (default true; false unticks).',
+      list_tasks:
+        'Required: space_id. Optional filters: folder and source (exact match), currency (exact, case-sensitive), value ("min,max"), expected_close ("from,to"), status, title (word search, not exact), archived, limit (default 300), offset. Filter on folder to find a task this flow created, so a replay updates it instead of creating a duplicate.',
+      delete_task: 'Required: task_id. Optional: delete_subtasks (subtasks are NOT deleted with their parent unless set). Deletes permanently; archiving only hides.',
+      delete_tasks_in_folder:
+        'Required: space_id, plus folder OR contact (a blank pair is refused, not read as "every folder"). Deletes every task with that exact folder, archived ones included.',
+      schedule_task_event:
+        'Required: task_id, action_type ("notification" | "flow" | "agent"), payload. Also trigger_on (ISO 8601) OR cron (with optional timezone, trigger_end); action_subject for flow/agent. Fires as whoever armed it, so a run with no caller leaves it unattributed and it does not fire.',
+      reschedule_task_event: 'Required: task_id, schedule_id, action_type, payload. Replaces the whole schedule, so send every field, not just the change.',
+      unschedule_task_event: 'Required: task_id, schedule_id.',
+      list_task_schedules: 'Optional: task_id, space_id. Without task_id it reads every schedule in the account.',
     },
     payload: {
       required: {
-        'task_id (all except create_task)':
-          'Task reference such as LEADS-7. Usually mapped from an earlier node. The node moves it out of the body for you — see notes.',
-        'title (create_task)': 'Task title.',
-        'status (set_task_status)': "One of the space's own statuses.",
-        'assignees (assign_task)': 'Array of user ids.',
-        'body (comment_task)': 'Comment text; plain text or markdown.',
-        'action_id (complete_task_action)': "Id of the action to tick off.",
+        '<per operation>': 'See `operations`. task_id is a task reference such as LEADS-7, usually mapped from an earlier node.',
       },
       optional: {
         space_id:
           'Space the task belongs to. OMITTING THIS IS NOT NEUTRAL — it falls back to ESCALATE, so name the space you mean.',
-        description: 'Markdown supported.',
-        priority: "One of the space's own priorities.",
-        due_date: 'ISO 8601 timestamp.',
-        scheduled_at: 'ISO 8601 timestamp.',
-        tags: 'Array of strings.',
-        folder: 'Folder name. The only usable partition for linking, since task indexes cover no payload fields.',
-        parent: 'Task reference — makes this a subtask.',
-        reporter: 'User id.',
-        archived: 'Boolean, update_task only.',
-        attachments: 'Array of file ids.',
-        internal: 'comment_task only: hidden from client users. A flow runs as the account, so this is not refused for it.',
-        mentions: 'comment_task only: array of user ids.',
-        reply_id: 'comment_task only: id of the comment being replied to.',
-        done: 'complete_task_action only: defaults to true. Pass false to untick.',
+        contact:
+          'create_task and delete_tasks_in_folder: { email, phone, name | first_name + last_name, organisation }. Matched on the space\'s identifying fields, so an existing contact is reused; it REPLACES folder. A space with no base record ignores it and says so in base_record_skipped.',
+        assignees: 'Array of user ids. Absent = unchanged; an empty list CLEARS them (see notes).',
+        suppress_events:
+          'create_task, update_task, set_task_status, assign_task, comment_task: true publishes no task events for this write (see the trigger\'s loop_controls). Not available on complete_task_action or any delete.',
       },
     },
     example: {
@@ -733,8 +752,8 @@ export const NODE_TYPES = {
     },
     notes:
       'STATUS, PRIORITY AND TAGS ARE FREE STRINGS SERVER-SIDE. A value the space does not define is accepted, stored, and then matches no filter — the task effectively disappears from every board. Read the space first rather than guessing a status name. ' +
-      'An empty assignees list CLEARS the task assignees — only an ABSENT field leaves them unchanged. Assignees is *[]string with omitempty (workspaces-service/model/api.go:430), so an explicit [] survives encoding, and DeepMerge (workspaces-service/transform/transform.go:167-188) replaces the whole value. A mapped "$.X.users" that resolves to nothing sends exactly that empty list. ' +
-      'task_id is authored in the payload for every operation, but the node lifts it onto a header for comment_task and complete_task_action, and renames it to "id" for update_task/set_task_status/assign_task — you do not do either yourself (hub-service/runner/task_node.go). ' +
+      'An empty assignees list CLEARS the task assignees — only an ABSENT field leaves them unchanged. Assignees is *[]string with omitempty (workspaces-service/model/api.go), so an explicit [] survives encoding, and DeepMerge (workspaces-service/transform/transform.go) replaces the whole value. A mapped "$.X.users" that resolves to nothing sends exactly that empty list. ' +
+      'task_id is authored in the payload for every operation; the node moves it onto a header or renames it to "id" as each operation needs (hub-service/runner/task_node.go). ' +
       'complete_task_action reads the action back before writing it, because the underlying endpoint replaces the stored action wholesale: a blind write drops the action\'s resources, and is refused outright without a description. That means it costs two calls, and it fails with "task has no action <id>" if the id is wrong. ' +
       'The node reaches nothing the quiva-endpoint node could not — the same allowlist and secrets guard applies.',
   },
@@ -773,6 +792,121 @@ export const NODE_TYPES = {
       'The token is redacted in the run log: enough to correlate a run with a submission, not enough to replay one.',
   },
 
+  email: {
+    summary:
+      'Send one email from the account\'s own verified sending domain, through the sanctioned send endpoint (microstrate.accounts.post.send-commercial-email), so suppression, consent and the sender-domain check always apply. (Not in the OpenAPI spec.)',
+    required: ['id', 'node_type', 'payload'],
+    nodeLevelProps: {
+      operation: 'Optional; the only value is "send_email", which is also the default (hub-service/data/email_endpoints.go).',
+    },
+    payload: {
+      required: {
+        to: 'ONE recipient address. A list is refused: consent is decided per person, so send one email per recipient.',
+        subject: 'Subject line.',
+        'html | text': 'At least one body. Give text as well for clients that will not render HTML.',
+      },
+      optional: {
+        from_address: 'Must be in the account\'s verified sending domain. Empty uses the account\'s own from address.',
+        reply_to: 'Same domain rule as from_address.',
+        contact_folder: 'Files the email against a person in the activity log. Defaults from the task a scheduled run was fired from.',
+        task_id: 'Joins the email to its task. Defaults the same way.',
+        enrolment_id: 'The sequence enrolment this step belongs to.',
+      },
+    },
+    example: {
+      id: 'SEND_CONFIRMATION',
+      data: {
+        id: 'SEND_CONFIRMATION',
+        node_type: 'email',
+        operation: 'send_email',
+        payload: {
+          to: '$.trigger.email',
+          subject: 'We received your request',
+          text: 'Hi |$.trigger.first_name|, thanks for getting in touch. We will reply within one working day.',
+        },
+      },
+    },
+    notes:
+      'Result: { msg_id, accepted: true, status: "queued" }. Queued is not delivered: suppression, consent and the domain check run later, and the outcome is only in the activity log, keyed on msg_id. ' +
+      'Blank fields are dropped before sending, so a mapping that resolves to nothing is treated as absent; a missing to/subject/body fails the node. ' +
+      'No retry: the endpoint has no idempotency key, so a second attempt is a second email. Do not set options.attempts. ' +
+      'Do not send mail with an http node straight to a relay: that skips suppression and consent (hub-service/runner/email_node.go).',
+  },
+
+  'verify-signature': {
+    summary:
+      'Verify a signed account-to-account request (the x-quiva-signed / x-quiva-signature envelope) as the first node of a receiving flow. A failed check REFUSES the run. (Not in the OpenAPI spec.)',
+    required: ['id', 'node_type', 'payload'],
+    payload: {
+      required: {
+        expected_kind: 'String or list of the envelope kinds this route accepts, e.g. "order" or ["update", "cancellation"].',
+        nonce_bucket: 'KV bucket the node claims each nonce in, exactly once. Missing is a configuration error, never a silent downgrade.',
+      },
+      optional: {
+        headers: 'The request header map. Use "$.env.headers" with NO leading pipe.',
+        body: 'The parsed request body. Use "$.trigger" with NO leading pipe.',
+        path: 'The request path, e.g. "$.env.headers[\'x-url\']". The distribution id is read from x-param-distribution_id, else from a /d/<id>/ path segment.',
+        keyring: 'Secret-name PREFIX (default "distribution-verify-"); the id from the path is appended. Not a SECRET:: reference, which is refused.',
+        max_skew_seconds: 'Allowed clock skew for the envelope timestamp (default 300).',
+      },
+    },
+    example: {
+      id: 'VERIFY',
+      data: {
+        id: 'VERIFY',
+        node_type: 'verify-signature',
+        payload: {
+          headers: '$.env.headers',
+          body: '$.trigger',
+          path: "$.env.headers['x-url']",
+          expected_kind: ['order'],
+          nonce_bucket: 'distribution-nonces',
+        },
+      },
+    },
+    notes:
+      'Opposite of verify-challenge: any failure the CALLER controls ends the run with 401 "unauthorized" and run status "refused", and the message never says which check failed. A misconfigured node (no expected_kind, no nonce_bucket, a SECRET:: keyring) fails as an ordinary error instead. ' +
+      'A leading pipe ("|$.env.headers") turns the object into a string and every call fails with "the payload must be an object". ' +
+      'Result: { claims: { v, kid, distribution_id, sender_account_id, kind, quote_id, version, seq, ts, nonce, body_hash }, replay_protection: "nonce-store" | "timestamp-window-only" }. Read the sender and sequence from $.<ID>.claims, never from the body. ' +
+      'The body is omitted from the run log (hub-service/runner/verify_signature_node.go, hub-service/model/distribution_nodes.go).',
+  },
+
+  'sign-envelope': {
+    summary:
+      'Sign an outbound account-to-account request: returns { headers, body } to spread into the following http node\'s headers and data. The counterpart of verify-signature. (Not in the OpenAPI spec.)',
+    required: ['id', 'node_type', 'payload'],
+    payload: {
+      required: {
+        kind: 'Envelope kind; the receiver binds it to the route.',
+        sender_account_id: 'This account\'s id, e.g. "$.static.account_id".',
+        body: 'The request body to send. Its canonical hash is signed.',
+        'seed | distribution_id':
+          'Either seed (a SECRET:: reference holding "<kid>:<seed>") or distribution_id, which loads the secret "<seed_secret_prefix><distribution_id>" at run time.',
+      },
+      optional: {
+        seed_secret_prefix: 'Default "distribution-sign-".',
+        quote_id: 'Carried in the claims.',
+        version: 'Whole number; a quoted number is accepted.',
+        seq: 'Whole number; a quoted number is accepted.',
+      },
+    },
+    example: {
+      id: 'SIGN',
+      data: {
+        id: 'SIGN',
+        node_type: 'sign-envelope',
+        payload: {
+          distribution_id: '$.trigger.distribution_id',
+          sender_account_id: '$.static.account_id',
+          kind: 'order',
+          body: '$.BUILD_REQUEST',
+        },
+      },
+    },
+    notes:
+      'Wire the next http node as headers: "$.SIGN.headers", data: "$.SIGN.body". The seed never appears in a result, error or log. An unresolved SECRET:: seed fails the node rather than signing with literal text. distribution_id must match ^[A-Za-z0-9_-]+$ (hub-service/runner/sign_envelope_node.go).',
+  },
+
   error: {
     summary: 'Terminate the flow with an error status code and message. (Not in the OpenAPI spec.)',
     required: ['id', 'node_type', 'payload'],
@@ -789,7 +923,7 @@ export const NODE_TYPES = {
       data: {
         id: 'FAIL_VALIDATION',
         node_type: 'error',
-        payload: { status_code: 422, message: 'Missing required policy number' },
+        payload: { status_code: 422, message: 'Missing required order number' },
       },
     },
   },

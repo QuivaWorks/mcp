@@ -82,7 +82,7 @@ base64 blob — do **not** reverse-engineer the blob, read the TS.
    versions; a published one deletes only the published. The API returned
    `{"message":"success"}` regardless.
 4. **The MCP could not update any UI-authored flow.** `ValidateConfig` only runs
-   when a request carries `validate=true` (`handler/create-workflow.go:92`) and
+   when a request carries `validate=true` (`handler/create-workflow.go:123`) and
    the editor never sends it — so production has node ids like
    `QsY6OWA5xVhZn9aS3lF-Z` that violate `validate.ValidateID`. Added
    `server_validate`.
@@ -284,7 +284,7 @@ All four were traced by **reading the source, not running the app** — microstr
 
 #### Bug 1 — fields named `type` / `required` / `$schema` are silently deleted (DATA LOSS)
 
-**`microstrate/src/components/records/records.utils.ts:538`**, in `jsonSchemaToRecordSchema`:
+**`microstrate/src/components/records/records.utils.ts:605`**, in `jsonSchemaToRecordSchema`:
 
 ```ts
 const isWrapped = obj.type === 'object' && obj.properties && ...
@@ -302,13 +302,13 @@ field genuinely named `type` is treated as a meta-key and dropped. The comment
 says *"when input isn't wrapped"*; the check was simply never gated on `isWrapped`,
 which is computed 14 lines above.
 
-Knock-on: `recordSchemaToJsonSchema` (same file, ~line 501) rebuilds `required`
+Knock-on: `recordSchemaToJsonSchema` (same file, ~line 559) rebuilds `required`
 from each surviving field's `isRequired` flag, so the dropped field also vanishes
 from `required` instead of leaving a dangling entry.
 
 **Blast radius.** `deserializeConfig` calls this on *every* config read and on
 every create/update response (`src/services/api/records/records.services.ts`
-lines 59, 68, 76, 84, 96). So every frontend consumer sees `risk_programme`
+lines 61, 71, 79, 87, 109). So every frontend consumer sees `risk_programme`
 without `type`: the record create/edit form (the Type dropdown cannot render), the
 schema builder + Schema preview, the form-builder field palette, AJV validation.
 **Saving from the UI persists the truncated schema** — real deletion, and the four
@@ -723,7 +723,7 @@ store `asignees` (one "s") and no `assignees`, so the list route shows an assign
 and the detail route shows none. Task update is a DeepMerge, so the misspelled key
 persisted silently.
 
-The same typo is in **`hub-service/agents/agents.go:412`**:
+The same typo is in **`hub-service/agents/agents.go:708`**:
 
 ```go
 Assignees   *[]string `json:"asignees,omitempty"`   // workspacesTask
@@ -785,7 +785,7 @@ Recommended fix when approved: allow `shared: ""`; downgrade non-Claude
 name-shaped (`CLAUDE_API_KEY` 58, `GEMINI_API_KEY` 11, `OPEN_AI` 4,
 `ANTHROPIC_API_KEY` 3, `OPENAI_API_KEY` 1), and 107/189 configs set
 `api_key_source: "system"` so the platform resolves them. It *can* carry a literal
-key — `hub-service/agents/agents.go:175` forwards it as `X-LLM-API-Key` whenever
+key — `hub-service/agents/agents.go:500` forwards it as `X-LLM-API-Key` whenever
 `api_key_source != "system"` — so the harvester keeps name-shaped values (they are
 the lesson) and redacts anything else.
 
@@ -1055,7 +1055,7 @@ the bearer token was available. Both are silent at create time.
 400 EXECUTION_ERROR: thinking_tokens must be less than max_tokens (thinking=8000, max=1024)
 ```
 
-`bellerophon-workforce/cmd/agent-service/service/process_invoke.go:893-902`: when
+`bellerophon-workforce/cmd/agent-service/service/process_invoke.go:1046-1058 (resolvePlanner)`: when
 `ENABLE_NATIVE_THINKING` is on and the model supports thinking, the service
 **injects** `thinking_enabled=true` and `thinking_tokens=8000` into any field the
 caller left nil — and never reconciles that budget against `max_tokens`.
@@ -1360,7 +1360,7 @@ spec mandates**:
 > the FIELD renderer, which IGNORES children. Its N child node(s) will NOT render.`
 
 That was **true when written and is false now**. `record-view-renderer.component.svelte`
-gained an `{:else if view.type === 'element'}` branch (line 73) that hands the whole
+gained an `{:else if view.type === 'element'}` branch (line 76) that hands the whole
 node to the new `view-element.component.svelte` (511 lines, added in this release).
 An agent following the MCP would have refused to build the form the spec asks for.
 
@@ -1470,7 +1470,8 @@ started.** Nothing is committed — the whole session is in the working tree (§
 `accounts-service/accounts/updateaccount.go` `deployVerticals` is the **only**
 consumer of the `VERTICAL` space (the entire engine references it in two files,
 one of which is the constant). It fires from an account update when `verticals` is
-set, as `go deployVerticals(...)`.
+set, as `go deployVerticals(...)`, and also, synchronously, at account activation
+(`accounts-service/accounts/createaccount.go:402-404`).
 
 It lists `spaces.VERTICAL.*`, skips `*.metadata.json` / `*.__meta__.json`, takes
 **the first path segment after `spaces.VERTICAL.<vertical>.`** as the config type,
@@ -1498,14 +1499,16 @@ Rules that bite, all source-verified:
   referencing `Client` can be created before `Client` exists.
 - **Only observability** is the stream
   `microstrate-accounts.<account_id>.deploy-verticals`, one message per file with
-  `{name, vertical, config_type, subject, status, error}`.
+  `{name, vertical, config_type, subject, status, error, changed_fields}`; status is
+  SUCCESS, UPDATED, UNCHANGED or FAILED, and a colliding create is reconciled in place
+  (`accounts-service/accounts/verticalresources.go` `reconcileVerticalResource`).
 - Flow collection name = the vertical id split on `_`, first letter upper-cased
   only (`util.CapitalizeFirst`). So **`crm` yields a collection named "Crm"**, not
   "CRM". No override exists. Accepted knowingly.
 
 ### 13.1 `record_config_ids` is the LEGACY key — corrects the original instruction
 
-`microstrate/src/components/spaces/records/space-record-configs.utils.ts:12`:
+`microstrate/src/components/spaces/records/space-record-configs.utils.ts:13-14`:
 
 ```ts
 if (space.record_configs) return space.record_configs
@@ -1620,7 +1623,7 @@ indexing path, not migration damage, and it is **permanent** (re-listed over
 
 Why it matters, and it differs by kind:
 
-- `buildTreeStructure` (`microstrate/src/utils/storage-file-tree.utils.ts:250`)
+- `buildTreeStructure` (`microstrate/src/utils/storage-file-tree.utils.ts:252`)
   does `item.name.split('.')` and derives folders from **each file's own path**
   (`parts.slice(0,-2)`). An entry with `name: ""` yields one part, hits the
   `parts.length <= 2` branch, and never produces a folder node. So a folder that
@@ -1702,9 +1705,9 @@ flows playbook is still dead for exactly this reason.
 
 **A route that may help, half-verified:** an object-store trigger appends
 `obj://<bucket>/<key>` to a run's `knowledge`
-(`hub-service/service/service.go:293`), and `obj://` is a real agent knowledge
+(`hub-service/service/service.go:564`), and `obj://` is a real agent knowledge
 scheme (`hub-service/model/agents.go:46`) resolved at invoke time by
-`bellerophon-workforce/agent/llmagent/llm_agent.go:599`. So dropping a spec in
+`bellerophon-workforce/cmd/agent-service/service/process_invoke.go:808` → `bellerophon-workforce/knowledge/default.go:1310` `LoadFromURIs`. So dropping a spec in
 storage could hand it to an agent with no glue. **But nothing in the engine
 publishes that trigger** — `TriggerTypeObjectStore` appears exactly twice: the
 constant and the consumer. Test it early rather than designing around it.
@@ -1760,3 +1763,111 @@ only `space_id=VERTICAL`. Remove with
 6. **Commit the rest?** `4f79af1` covers the Phase 0 tooling; `verticals/**`, the
    docs, and the §13.4 fixes are still in the working tree.
 7. **`SHARED`** — does `crm` need a record config that all verticals should get?
+
+## 14. 2026-09-27 — two new servers, a remote MCP, and a docs/engine catch-up
+
+Source: `evari-olympus/docs/quiva-mcp-and-docs-update-plan.md` Wave 1 + Wave 2.
+Full per-endpoint evidence lives in `docs/endpoint-probe-2026-09-27/<server>.md`,
+one file per server, all built the same way: unauthenticated `curl` against
+`api.quiva.ai` and `api.microstrate.io` (401 = gateway-mapped, 404 = not), with a
+baseline unrouted path confirming 404 isn't a blanket response.
+
+**quiva-flows-mcp** — added node types `email`, `verify-signature`,
+`sign-envelope`; the `task` node's 13 operations; `schedule.name`, with
+`attempts` refused on schedule nodes. `validate_workflow_server` was **not**
+added — every plausible path for `hub-service/handler/validate-workflow.go`
+came back 404 on both hosts (`endpoint-probe-2026-09-27/flows.md`); publish
+still runs the same validator. Unverified: the guessed-path 404 can't rule out
+a mapping under a name nobody tried.
+
+**quiva-records-mcp** — `list_records` was broken; rebuilt on `query-records`
+(now takes `fields`, `parent_folder`, `total_hits`). Added `csv_import`,
+`export_records`, `purge_records` (confirm-gated), `upsert_record` (mapped on
+prod since 2026-09-08, ahead of the plan's staging-only assumption). `GET
+/records/{config_id}` is mapped but its handler is gone (`records.md`: staging
+500 "no responders") — no tool wraps it. History/series routes are mapped on
+prod ahead of the service; left undocumented as tools.
+
+**quiva-documents-mcp** — PDF templates (`template.pdf`, `application/pdf` in
+`validate_docx`) ride the existing `/file-generator/templates*` routes. Two new
+tools graduated from doc-note to real because they came back 401 on
+production: `extract_brand` (`brand-extract`) and `list_assigned_files`
+(`assigned-files`). Unverified: both require the caller's own bearer JWT per an
+inline comment in `brand-extract.ts`; not load-tested here.
+
+**quiva-workspaces-mcp** — added `add_time_log`/`list_time_logs` (server-minted
+ids, hydrated totals), `create_contact`, task templates + `task_from_template`
+(the from-template route the plan expected doesn't exist — see below),
+subtasks, `identity`, task-action role fix, meetings. Unverified/broken on
+staging (`workspaces.md`): `identity` is ignored (no `folder`, no
+`base_record_skipped`), a space with no `default_status` gives a new task no
+status (#1436 not deployed to staging), and `POST /workspaces/task-from-template`
+is a 404 on both hosts — no tool calls it.
+
+**quiva-agents-mcp** — added `list_mcp_servers` (`GET /hub/mcp/registry`) and
+`register_mcp_server`; updated model aliases. Unverified: `list_agents`
+paging/search/sort/`metadata` is **designed, not confirmed live** — staging
+returns the full unpaged list regardless of params (predates
+`hub-service/handler/agent-list.go`'s paging). `GET /hub/mcp/registry`'s live
+shape disagrees with its own OpenAPI spec (`next_cursor`/`total`, not
+`cursor`/`skipped`) — corrected in the tool description and reference topic.
+
+**quiva-distribution-mcp** (new, accounts-service) — wraps distributions,
+invites, messages, products/product definitions, config reservations. Every
+wrapped route is mapped on production (`distribution.md`). Not wrapped:
+`distribution-signing-key` — mapped on both hosts, called by the app and named
+in two refusal messages, but **no handler is registered**; a real call reaches
+no responder. `distribution-clear-space-cards` and
+`config-reservations-backfill` are registered but unmapped (404).
+
+**quiva-coworker-mcp** (new, hub-service, Abbie) — wraps skills, todos, org
+memory, profile, personal profile, corrections, task-space, env, model
+catalog/pool, authorisations. Read-heavy; account-wide writes require
+`confirm: true`. Not wrapped (404 on both hosts, `coworker.md`):
+`skill-discover` (the app's Discover tab is broken in production because of
+this), `todo/schedule`, `auto-approvals`, `session-read`.
+`authorisation-status` is intentionally unmapped (mesh-internal).
+
+**quiva-mcp-remote** (new) — one `StreamableHTTPServerTransport` composing all
+seven servers' tools behind `POST/GET/DELETE /mcp`, prefixed per server
+(`flows_`, `records_`, `documents_`, `workspaces_`, `assistants_`,
+`distribution_`, `coworker_`). Bearer or `X-Api-Key` forwarded per request, no
+process-level credential. Deploys to staging first, then production, as a path
+mapping on the existing gateways — see `quiva-mcp-remote/DEPLOY.md`.
+
+**Hygiene close-out (this pass)** — `.mcp.json` and `engine/sync.mjs`'s
+`SERVERS` list now include the two new packages; `engine/sync.mjs` gained a
+`--local <path>` mode (`git ls-tree`/`git rev-parse` against a checkout, for
+when `gh` isn't installed) and the `CITATION` regex now covers `coworkerenv/`
+and `bellerophon-indexer/`. `engine/provenance.json` was selectively re-pinned
+at `evari-olympus` `origin/main` `6af2ba497`: only citations a workstream
+explicitly reported re-reading were updated; citations nobody confirmed
+re-reading were left at their prior (possibly stale) pin rather than silently
+accepted. `microstrate.io` was removed from package READMEs/`.env.example`s
+and the two known leftover tool scripts
+(`quiva-flows-mcp/tools/push-record-trigger.mjs`,
+`quiva-records-mcp/tools/push-form-elements.mjs`); it remains, correctly, in
+harvested examples, `specs/openapi/`, `quiva-mcp-remote/DEPLOY.md`, internal
+working docs, and `verticals/` (untouched — separate in-flight work). The
+harvested flows example `builders-risk-product-selection.json` was renamed to
+`product-selection-rules.json` (slug and description only; harvested config
+and platform-source name kept as evidence).
+
+### 14.1 Platform defects found during these inventories (not MCP work)
+
+From `evari-olympus/docs/quiva-mcp-and-docs-audit-2026-09-27.md` §5:
+
+| Defect | Evidence | Impact |
+|---|---|---|
+| `PUT /hub/agent/model-pool` has no admin gate | `hub-service/handler/model_pool.go:904` | Any member can change the account's model routing |
+| Skill write, skill settings, skill-draft approve and org-memory writes are member-gated | `hub-service/handler/skills.go:587,854`, `skill_drafts.go:615`, `org_memory.go:111` | One member changes Abbie's behaviour for the whole account |
+| `GET /hub/coworker/skill-discover` not mapped on either environment | probe 404; `microstrate/.../skill.api.ts:62` | The app's skills Discover tab is broken in production |
+| `POST /hub/coworker/todo/schedule` not mapped | probe 404 | — |
+| `distribution-signing-key` mapped, no handler | accounts-service has no handler; the app and two refusal messages point at it | Callers are sent to a dead route |
+| Distribution role failures return 401, same as a bad token | `accounts-service/util/response.go:43` | A lower-role API key looks unauthenticated |
+| Abbie's `record_list` with no space or folder routes to the deleted `get.records` | `bellerophon-workforce/tool/platform/operations.go:1777` `buildRecordListPlan`; handler removed in 2927d7e9a (#1283) | Abbie fails to list records account-wide |
+| `GET /records/{config_id}` still gateway-mapped with no handler | staging returns 500 "no responders" | Old clients get a 500, not a 404 |
+| Product action types: since #1441, `ValidateProductDefinition` accepts only `create`/`list`, but the app offers `rate`/`bind`/`mta`/`cancellation` and stored versions carry them | `accounts-service/accounts/distributioncatalogue.go` (ValidateProductDefinition); `microstrate/src/services/api/distribution/product.services.ts` | Re-saving an existing product may 400 once #1441 is deployed |
+
+None of these are fixed by this repo — they're upstream platform bugs, listed
+here so a future session doesn't re-discover them from scratch.

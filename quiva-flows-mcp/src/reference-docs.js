@@ -66,6 +66,31 @@ Notes
 - Nodes with no incoming edges all start immediately, in parallel.
 - The graph must be acyclic; the server does not check, and nodes in a cycle
   simply never run. validate_flow_config does check.
+
+Server validation
+- Every create/update refuses empty or malformed node/edge ids (. * > @ or
+  whitespace), an unknown node_type, and record/task trigger ids that do not
+  address their config/space, even with server_validate=false
+  (hub-service/handler/create-workflow.go ValidateGraphIDs).
+- server_validate=true adds the node-id regex, payload-required and
+  subject-exists checks, and refuses options.attempts on schedule nodes.
+- publish runs the full validator (hub-service/validate/workflow.go) and refuses
+  on any error: unknown task operation, disallowed quiva-endpoint subject,
+  schedule attempts, dangling edges. Warnings never block it.
+- hub-service has a workflow-validate handler, but it has no gateway mapping on
+  api.quiva.ai, so validate_flow_config (local) is the pre-flight check.
+
+Roles
+- create/update/publish/delete workflow and create/delete collection need the
+  root, admin or developer role: other roles get 403 "changing a flow needs the
+  root, admin or developer role" (hub-service/handler/account_role.go).
+
+Awaited runs on queued accounts (hub-service/handler/run_queue.go)
+- 429 + Retry-After: the account's run limit is full. Wait and retry.
+- 504: not finished before the gateway timeout. It may still complete; check
+  search_run_logs before re-running.
+- 409: the same run attempt is already queued.
+- 503 + Retry-After: the queue could not take the run. Retry.
 `.trim();
 
 const TRIGGERS = `
@@ -157,8 +182,9 @@ THREE THINGS NAMED "TASK" — pick the right one
 - task TRIGGER (trigger_type: "task") — STARTS a flow on a workspaces task
   event (created, updated, status changed, ...). Ingress. Documented above
   and in get_node_type_reference("trigger").task_trigger.
-- task NODE (node_type: "task") — PERFORMS a task operation (create/update/
-  comment/complete-action) as a step inside an already-running flow. Egress.
+- task NODE (node_type: "task") — PERFORMS one of 13 task operations
+  (create, update, comment, complete an action, find, delete, schedule a task
+  event, ...) as a step inside an already-running flow. Egress.
   get_node_type_reference("task").
 - task_schedule_create / schedule_task_event (quiva-workspaces-mcp; the
   space/task "Automation" UI section) — a per-task CRON TIMER with

@@ -1,0 +1,29 @@
+{
+  "slug": "product-read-app-action-types",
+  "of": "product",
+  "derived_from": "A get_product response harvested read-only from a test environment on 2026-09-27. Its names and labels were domain-specific and are replaced with neutral text, so this file is an illustration, not evidence. The field set, the versions array and the action TYPES are as the platform returned them.",
+  "teaches": "What get_product returns: { code, product, versions }. This stored version carries action types the app offers (rate, bind) but the current engine check refuses, so echoing it back through update_product can 400. Rebuild the body from create-product instead.",
+  "response": {
+    "code": "managed-service",
+    "product": {
+      "code": "managed-service",
+      "name": "Managed service",
+      "active": true,
+      "record_configs": [
+        { "id": "quote_config", "label": "Requests" },
+        { "id": "service_agreement_config", "label": "Agreements" }
+      ],
+      "actions": {
+        "quote_config": [
+          { "type": "create", "label": "" },
+          { "type": "rate", "label": "" },
+          { "type": "bind", "label": "" }
+        ]
+      },
+      "version": 4,
+      "publisher_account_id": "<<ACCOUNT_1>>",
+      "published_at": "2026-09-16T12:02:37Z"
+    },
+    "versions": [1, 2, 3, 4]
+  }
+}

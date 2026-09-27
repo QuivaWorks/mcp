@@ -1,5 +1,5 @@
 {
-  "slug": "builders-risk-product-selection",
+  "slug": "product-selection-rules",
   "source": {
     "environment": "https://api.microstrate.io",
     "subject": "ms.hub.config.workflow.1508781670.1968763177",
@@ -15,7 +15,7 @@
     "map node with JSONPath filters and pipe concatenation"
   ],
   "redactions": 0,
-  "description": "Receive a submission, run multiple APIs and resolve decline rules and product selection",
+  "description": "Enrich an inbound request via external APIs, then resolve eligibility and product-selection rules",
   "config": {
     "edges": [
       {

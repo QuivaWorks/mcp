@@ -23,7 +23,7 @@ const CLEANUP = process.argv.includes('--cleanup');
 // microstrate/src/utils/transform.utils.ts — dotString = '+'). Agents are
 // labelled "Assistants" in the UI.
 const agentEditUrl = (subject) =>
-  `https://app.microstrate.io/en/hub/agents/edit/${String(subject).split('.').join('+')}`;
+  `https://app.quiva.ai/en/hub/agents/edit/${String(subject).split('.').join('+')}`;
 
 let failures = 0;
 function check(name, ok, detail = '') {
@@ -40,7 +40,7 @@ function check(name, ok, detail = '') {
 const pathId = (subject) => String(subject ?? '').split('.').pop();
 
 async function main() {
-  const client = new QuivaClient();
+  const client = QuivaClient.fromEnv();
   if (!client.hasCredentials()) {
     console.error('No credentials — set QUIVA_API_KEY / QUIVA_BEARER_TOKEN / QUIVA_EMAIL+QUIVA_PASSWORD.');
     process.exit(1);

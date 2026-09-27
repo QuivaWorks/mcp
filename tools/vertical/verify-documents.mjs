@@ -51,7 +51,7 @@ if (existsSync(envFile)) {
   }
 }
 const { QuivaClient } = await import(`${ROOT}/quiva-workspaces-mcp/src/client.js`);
-const objects = new QuivaClient();
+const objects = QuivaClient.fromEnv();
 
 function docxPlaceholders(path) {
   const py = `import zipfile,re,json;print(json.dumps(sorted(set(re.findall(r'\\{([^{}]{1,60})\\}', zipfile.ZipFile(${JSON.stringify(path)}).read('word/document.xml').decode())))))`;

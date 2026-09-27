@@ -1,9 +1,10 @@
 // Hand-rolled test runner for the agent config validator (no framework).
 // Run: npm test  (or: node test/validate.test.js)
 import assert from 'node:assert/strict';
-import { validate } from '../src/validate.js';
+import { validate, validateInvokeResponseSubject } from '../src/validate.js';
+import { AGENT_TYPES, MODELS } from '../src/agents-docs.js';
 import { readHarvested, getExample } from '../src/examples.js';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -88,6 +89,21 @@ check('invalid agent_type enum is an error', () => {
   assert.ok(r.errors.some((e) => e.includes('agent_type')));
 });
 
+check('agent_type "coworker" is a valid enum value', () => {
+  assert.ok(AGENT_TYPES.includes('coworker'), 'AGENT_TYPES must list coworker (hub-service CoworkerAgentType)');
+  const r = validate({ ...goodConfig, agent_type: 'coworker' });
+  assert.equal(r.valid, true, JSON.stringify(r.errors));
+});
+
+check('MODELS lists the current (2026-09) Claude aliases, not deprecated dated ids', () => {
+  for (const current of ['claude-opus-5-5', 'claude-sonnet-5', 'claude-fable-5-1', 'claude-haiku-4-5']) {
+    assert.ok(MODELS.includes(current), `MODELS is missing ${current}`);
+  }
+  for (const deprecated of ['claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-opus-4-5']) {
+    assert.ok(!MODELS.includes(deprecated), `MODELS still lists deprecated ${deprecated}`);
+  }
+});
+
 check('tool with unknown URI scheme warns', () => {
   const r = validate({ ...goodConfig, has_tools: true, tools: ['http://example.com'] });
   assert.equal(r.valid, true, JSON.stringify(r.errors));
@@ -146,6 +162,36 @@ check('max_tokens at or below the injected 8000 thinking budget warns', () => {
 check('max_tokens above 8000 does not warn', () => {
   const r = validate({ name: 'a', llm_provider: 'claude', model: 'claude-haiku-4-5', behaviour: 'x', llm_config: { max_tokens: 16000 } });
   assert.deepEqual(r.warnings, [], JSON.stringify(r.warnings));
+});
+
+// --- invoke_agent's response_subject/session_id pre-check (mirrors hub-service's
+// validateResponseSubject, hub-service/handler/agents.go:1087) --------------
+
+check('validateInvokeResponseSubject: no response_subject is always valid', () => {
+  assert.deepEqual(validateInvokeResponseSubject(undefined, undefined), { valid: true });
+  assert.deepEqual(validateInvokeResponseSubject('', 'session-1'), { valid: true });
+});
+
+check('validateInvokeResponseSubject: response_subject without a session_id is an error', () => {
+  const r = validateInvokeResponseSubject('some-subject', undefined);
+  assert.equal(r.valid, false);
+  assert.ok(r.error.includes('requires a session_id'));
+});
+
+check('validateInvokeResponseSubject: response_subject mismatching session_id is an error', () => {
+  const r = validateInvokeResponseSubject('subject-a', 'session-b');
+  assert.equal(r.valid, false);
+  assert.ok(r.error.includes('must equal session_id'));
+});
+
+check('validateInvokeResponseSubject: response_subject equal to session_id is valid', () => {
+  const r = validateInvokeResponseSubject('session-1', 'session-1');
+  assert.deepEqual(r, { valid: true });
+});
+
+check('llm_config.effort suppresses the warning (resolvePlanner skips the 8000 default)', () => {
+  const r = validate({ name: 'a', llm_provider: 'claude', model: 'claude-haiku-4-5', behaviour: 'x', llm_config: { max_tokens: 1024, effort: 'low' } });
+  assert.ok(!r.warnings.some((w) => w.includes('thinking_tokens must be less than max_tokens')), JSON.stringify(r.warnings));
 });
 
 check('an explicit thinking_tokens suppresses the warning (injection only fills nil fields)', () => {
@@ -247,7 +293,114 @@ check('the authored example passes the validator and keeps output_schema a descr
   }
 });
 
+// --- registerTools: pre-checks wired into the actual tool handlers ----------
+// These exercise the real MCP tool functions (not just the pure validators
+// above), against a fake server/client, to prove the pre-check actually blocks
+// the API call rather than just existing as an unused helper.
 
+async function checkAsync(name, fn) {
+  try {
+    await fn();
+    console.log(`ok   - ${name}`);
+  } catch (err) {
+    failures++;
+    console.error(`FAIL - ${name}\n      ${err.message}`);
+  }
+}
+
+function makeFakeServer() {
+  const tools = {};
+  return { registerTool: (name, _meta, handler) => { tools[name] = handler; }, tools };
+}
+
+function makeFakeClient() {
+  const calls = [];
+  const respond = (method, path, payload) => {
+    calls.push([method, path, payload]);
+    return Promise.resolve({ ok: true });
+  };
+  return {
+    calls,
+    get: (path, query) => respond('GET', path, query),
+    post: (path, body) => respond('POST', path, body),
+    put: (path, body) => respond('PUT', path, body),
+    delete: (path, query) => respond('DELETE', path, query),
+  };
+}
+
+{
+  const { registerTools } = await import('../src/index.js');
+  const server = makeFakeServer();
+  const client = makeFakeClient();
+  registerTools(server, client);
+
+  check('registerTools registers the new MCP-registry tools', () => {
+    assert.equal(typeof server.tools.list_mcp_servers, 'function');
+    assert.equal(typeof server.tools.register_mcp_server, 'function');
+  });
+
+  await checkAsync('invoke_agent rejects response_subject != session_id and never calls the API', async () => {
+    client.calls.length = 0;
+    const result = await server.tools.invoke_agent({ subject: 'ms.hub.config.agent.x', session_id: 'a', response_subject: 'b' });
+    assert.equal(result.isError, true);
+    assert.ok(result.content[0].text.includes('must equal session_id'), result.content[0].text);
+    assert.equal(client.calls.length, 0, 'the API must not be called when the local pre-check fails');
+  });
+
+  await checkAsync('invoke_agent accepts response_subject == session_id and calls the API', async () => {
+    client.calls.length = 0;
+    const result = await server.tools.invoke_agent({ subject: 'ms.hub.config.agent.x', session_id: 'a', response_subject: 'a' });
+    assert.equal(result.isError, undefined, JSON.stringify(result));
+    assert.deepEqual(client.calls[0]?.slice(0, 2), ['POST', '/hub/agent/invoke']);
+  });
+
+  await checkAsync('invoke_agent with no response_subject still calls the API (unchanged behaviour)', async () => {
+    client.calls.length = 0;
+    const result = await server.tools.invoke_agent({ subject: 'ms.hub.config.agent.x', prompt: 'hi' });
+    assert.equal(result.isError, undefined, JSON.stringify(result));
+    assert.deepEqual(client.calls[0]?.slice(0, 2), ['POST', '/hub/agent/invoke']);
+  });
+
+  await checkAsync('register_mcp_server requires endpoint or registry_name, without calling the API', async () => {
+    client.calls.length = 0;
+    const result = await server.tools.register_mcp_server({});
+    assert.equal(result.isError, true);
+    assert.ok(result.content[0].text.includes('requires either'), result.content[0].text);
+    assert.equal(client.calls.length, 0);
+  });
+
+  await checkAsync('register_mcp_server calls POST /hub/mcp/register when endpoint is given', async () => {
+    client.calls.length = 0;
+    const result = await server.tools.register_mcp_server({ endpoint: 'https://example.invalid/mcp' });
+    assert.equal(result.isError, undefined, JSON.stringify(result));
+    assert.deepEqual(client.calls[0]?.slice(0, 2), ['POST', '/hub/mcp/register']);
+  });
+
+  await checkAsync('list_mcp_servers calls GET /hub/mcp/registry', async () => {
+    client.calls.length = 0;
+    await server.tools.list_mcp_servers({});
+    assert.deepEqual(client.calls[0]?.slice(0, 2), ['GET', '/hub/mcp/registry']);
+  });
+
+  await checkAsync('list_agents forwards paging params as a query', async () => {
+    client.calls.length = 0;
+    await server.tools.list_agents({ limit: 50, sort: 'name' });
+    assert.equal(client.calls[0][1], '/hub/agent');
+    assert.equal(client.calls[0][2].limit, 50);
+    assert.equal(client.calls[0][2].sort, 'name');
+  });
+
+  await checkAsync('delete_agent refuses without confirm: true and never calls the API', async () => {
+    client.calls.length = 0;
+    const refused = await server.tools.delete_agent({ id: 'ms.hub.config.agent.abc' });
+    assert.equal(refused.isError, true);
+    assert.match(refused.content[0].text, /confirm: true/);
+    assert.equal(client.calls.length, 0);
+    const done = await server.tools.delete_agent({ id: 'ms.hub.config.agent.abc', confirm: true });
+    assert.equal(done.isError, undefined, JSON.stringify(done));
+    assert.deepEqual(client.calls[0]?.slice(0, 2), ['DELETE', '/hub/agent/abc']);
+  });
+}
 
 // --- every src module parses -------------------------------------------------
 // A syntax error in src/index.js used to be INVISIBLE to this suite: nothing here
@@ -269,6 +422,13 @@ check('every file in src/ is syntactically valid', () => {
       throw new Error(`${f} does not parse:\n${String(err.stderr || err.message).trim()}`);
     }
   }
+});
+
+check('client.js header comment is at most 3 lines', () => {
+  const src = readFileSync(fileURLToPath(new URL('../src/client.js', import.meta.url)), 'utf8');
+  const header = src.split('\n').findIndex((l) => !l.startsWith('//'));
+  assert.ok(header <= 3, `header comment is ${header} lines`);
+  assert.ok(src.includes('bellerophon-cerberus/http/middleware/ms_auth.go:143'));
 });
 
 if (failures) {

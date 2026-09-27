@@ -39,8 +39,7 @@ Auth options (checked in this order):
 | `QUIVA_BEARER_TOKEN` | `Authorization: Bearer` |
 | `QUIVA_EMAIL` + `QUIVA_PASSWORD` (+ optional `QUIVA_ACCOUNT`) | Logs in via `/accounts/auth-with-password`, caches the JWT, re-logs-in on 401 |
 
-`QUIVA_API_URL` selects the environment (default: staging
-`https://api.microstrate.io`; production: `https://api.quiva.ai`).
+`QUIVA_API_URL` selects the environment (default: `https://api.quiva.ai`).
 
 ### Register with Claude Code
 
@@ -52,7 +51,7 @@ Alternatively register it manually:
 
 ```bash
 claude mcp add quiva-flows \
-  -e QUIVA_API_URL=https://api.microstrate.io \
+  -e QUIVA_API_URL=https://api.quiva.ai \
   -e QUIVA_API_KEY=$QUIVA_API_KEY \
   -- sh /path/to/evari-olympus/quiva-flows-mcp/bin/run.sh
 ```
@@ -60,7 +59,7 @@ claude mcp add quiva-flows \
 ## Tools
 
 **Reference / validation** (no API call)
-- `list_node_types` — all 19 node types + JSONPath guide + gotchas
+- `list_node_types` — all 23 node types + JSONPath guide + gotchas
 - `get_node_type_reference` — required/optional props and a correct example per type
 - `list_reference_topics` / `get_flows_reference` — cross-cutting contracts:
   **`rules-syntax`** (the condition/rules DSL — read this first), `jsonpath`,
@@ -69,7 +68,9 @@ claude mcp add quiva-flows \
   platform (credentials redacted). These configs demonstrably run, so copy their
   conventions rather than inventing a payload shape
 - `validate_flow_config` — server rules + cycle detection + rules-DSL checks +
-  gotcha lints
+  gotcha lints. hub-service's own `workflow-validate` handler has no gateway
+  mapping on `api.quiva.ai`, so there is no server-side validate tool; the
+  server's validator runs on `publish_workflow`
 
 **Collections**: `list_collections`, `create_collection`
 
@@ -132,10 +133,21 @@ engine disagree:
   branch skipped → *"failed to determine next steps"*). The validator errors on
   unknown names.
 - Node IDs: `^[a-zA-Z_][a-zA-Z0-9_:]*$`; reserved: `trigger`, `static`,
-  `RESOLVE_ERROR`, `RESOLVE_SUCCESS`. The server only enforces this when a
+  `RESOLVE_ERROR`, `RESOLVE_SUCCESS`. The server only applies the regex when a
   request carries `validate=true` and **the flow editor does not send it**, so
-  UI-authored flows contain hyphenated nanoid ids that cannot be re-sent with
-  validation on — use `server_validate=false` to update those.
+  UI-authored flows contain hyphenated nanoid ids — use `server_validate=false`
+  to update those. `server_validate=false` does not skip the checks every write
+  runs: empty or malformed node/edge ids (`. * > @` or whitespace), unknown
+  `node_type`, and record/task trigger ids. `publish_workflow` runs the full
+  server validator regardless.
+- Creating, updating, publishing or deleting a flow (and creating or deleting a
+  collection) needs the **root, admin or developer** role; other roles get 403.
+- On accounts routed through the run queue, an awaited `run_workflow` can return
+  **429** with `Retry-After` (run limit full), **504** (not finished before the
+  gateway timeout; it may still complete), **409** (attempt already queued) or
+  **503** with `Retry-After`.
+- Agent nodes: use `claude-sonnet-5`, `claude-opus-5-5` or `claude-haiku-4-5`.
+  Older names are remapped by the platform.
 - Nodes and edges need flow-editor presentation fields (`position`, `type`,
   `measured`; edge `type`/`edgeType`/handles) or the graph renders stacked at the
   origin. `create_workflow`/`update_workflow` auto-fill them (`auto_layout`).
@@ -145,13 +157,24 @@ engine disagree:
 - `input`/`human-in-the-loop` payloads take
   `{message, title, description, priority, assignees}`; the spec's `notify`
   block is not read by the engine.
-- Extra engine node types not in the spec: `rules`, `http`, `error`,
-  `quiva-endpoint`, `task`, `verify-challenge`.
+- Extra engine node types not in the spec: `rules`, `jsonlogic`, `http`,
+  `error`, `quiva-endpoint`, `task`, `verify-challenge`, `email`,
+  `verify-signature`, `sign-envelope`.
+- **`email`** sends one email to one recipient (`to` is a single address) from
+  the account's verified domain. The result says `queued`, not delivered, and
+  the node never retries.
+- A **`verify-signature`** failure *refuses* the run (401, status `refused`),
+  unlike `verify-challenge`. Map `headers`/`body` as `$.env.headers` /
+  `$.trigger` with no leading pipe.
+- **`schedule`** nodes take an optional `payload.name` so each entity keeps its
+  own timer. `options.attempts` is refused on schedule nodes and on
+  `quiva-endpoint` nodes calling `schedule-flow` / `unschedule-flow`.
 - A **`verify-challenge`** failure is a *result*, not an error — the node
   succeeds with `{ success: false }` and the run carries on. Branch on
   `$.<ID>.success`, and check `$.<ID>.hostname` as well: one widget can allow
   several domains and a token solved on any of them verifies on all of them.
 - **`task`** nodes carry `operation` at node level (`data.operation`), not in
-  the payload. Omitting `space_id` falls back to the `ESCALATE` space, and
+  the payload; the server refuses `payload.operation`, a missing operation and
+  an unknown one (13 operations). Omitting `space_id` falls back to the `ESCALATE` space, and
   status/priority/tags are free strings — an undefined value is stored and then
   matches no filter.

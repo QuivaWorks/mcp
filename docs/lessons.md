@@ -226,7 +226,7 @@ environment and diffs old-vs-new. Across 240 versions on staging it found:
 **Three further defects found by trying to clean up after myself:**
 
 1. `ValidateConfig` only runs when a request carries `validate=true`
-   (`handler/create-workflow.go:92`), and the flow editor does not send it. So
+   (`handler/create-workflow.go:123`), and the flow editor does not send it. So
    production contains node ids like `QsY6OWA5xVhZn9aS3lF-Z` that violate
    `validate.ValidateID` — and the MCP, which always sent `validate=true`, could
    not update *any* UI-authored flow. Fixed with a `server_validate` option.
@@ -279,7 +279,7 @@ Same payload in, different shape out.
 Discovered by running the KYC flow live on staging; each cost a failed run:
 
 - **Agent node payloads**: the OpenAPI spec and even `hub-service/data/demo-flow.go` show flat payloads (`api_key`/`llm_provider`/`model` at payload top level), but `InvokeAgent` (`hub-service/handler/agents.go:517`) requires `subject`, `node_subject`, or a nested `agent` object. Flat fields are silently dropped. Prevention: the MCP validator now rejects flat agent payloads.
-- **Agent results are JSON-encoded strings** even with `output_schema` (`process_invoke.go:1288` marshals the content string). Any condition on `$.<AGENT>.result.<field>` needs a JSON.parse eval node in between. Prevention: documented in node docs + spec; consider a shared `PARSE_*` eval pattern in flows.
+- **Agent results are JSON-encoded strings** even with `output_schema` (`process_invoke.go:1638` marshals the content string). Any condition on `$.<AGENT>.result.<field>` needs a JSON.parse eval node in between. Prevention: documented in node docs + spec; consider a shared `PARSE_*` eval pattern in flows.
 - **Published subject format**: publishing strips the `.draft.` segment — there is no `.published.` segment despite the old spec's pattern. Get the runnable subject from `list_workflows?version=published`.
 - **`PATCH /hub/workflows/{c}/{f}` requires the draft subject in the body**; relying on path params returns 200-ish behaviour via some clients but can silently no-op. Always send `subject` in the body (MCP client now does).
 - **Records API**: update is `PUT /records/{config}/{id}` — the records-service `openapi.json` documents PATCH, but the service only registers `put.record`; PATCH returns 500.

@@ -39,12 +39,7 @@ Auth options (checked in this order):
 | `QUIVA_BEARER_TOKEN` | `Authorization: Bearer` |
 | `QUIVA_EMAIL` + `QUIVA_PASSWORD` (+ optional `QUIVA_ACCOUNT`) | Logs in via `/accounts/auth-with-password`, caches the JWT, re-logs-in on 401 |
 
-`QUIVA_API_URL` selects the environment (default: staging
-`https://api.microstrate.io`; production: `https://api.quiva.ai`).
-
-> **Note:** `query_records` (GET /records) needs a Bearer JWT to derive the
-> tenant — an API key alone is rejected on that one endpoint. Use bearer/email
-> auth if you rely on it.
+`QUIVA_API_URL` sets the API base URL (default `https://api.quiva.ai`).
 
 ### Register with Claude Code
 
@@ -58,7 +53,7 @@ Alternatively register it manually:
 
 ```bash
 claude mcp add quiva-records \
-  -e QUIVA_API_URL=https://api.microstrate.io \
+  -e QUIVA_API_URL=https://api.quiva.ai \
   -e QUIVA_API_KEY=$QUIVA_API_KEY \
   -- sh /path/to/evari-olympus/quiva-records-mcp/bin/run.sh
 ```
@@ -67,15 +62,19 @@ claude mcp add quiva-records \
 
 **Reference / validation** (no API call)
 - `list_reference_topics` — topics + gotchas
-- `get_records_reference` — schema / field-types / input-types / formatters / views / record / endpoints
-- `validate_record_config` — id/name/schema/views lint, incl. the `field` vs `ref` gotcha
+- `get_records_reference` — schema, views, form-builder, form-rules, table-views, flow, index-fields, config-source, record, bulk-operations, endpoints and more
+- `validate_record_config` — id/name/schema/views lint (incl. the `field` vs `ref` gotcha), table-view filters, the `views.flow` wizard, `index_fields`, `source` and the `unset_*` flags
 
 **Record configs**: `list_record_configs` (optional `ids` batch), `get_record_config`,
-`create_record_config`, `update_record_config`, `delete_record_config`
+`create_record_config`, `update_record_config`, `delete_record_config` (purges every record; requires `confirm: true`)
 
-**Records**: `list_records` (all for a config), `query_records` (by folder/space,
-optional config_id/limit/offset), `get_record`, `create_record`, `update_record`,
-`delete_record`
+**Records**: `list_records` (one config; fans out over spaces when unscoped),
+`query_records` (by folder/space, with config_id, parent_folder, filter, sort_by,
+fields, limit/offset; returns `total_hits`), `get_record`, `create_record`,
+`upsert_record` (find-or-create by identity), `update_record`, `delete_record`
+
+**Bulk**: `csv_import` (a CSV already in the knowledge bucket), `export_records`
+(emails a CSV/JSON to an explicit `email`; requires `confirm: true`), `purge_records` (requires `confirm: true`)
 
 ## Typical session
 
@@ -101,9 +100,12 @@ and the engine disagree:
   require `data`.
 - Updates are **PUT** (not PATCH). Config update applies only the fields sent;
   record update **merges `data`** key-by-key.
-- `query_records` requires **`folder` or `space_id`** and a **Bearer JWT**; it
-  also accepts `config_id` (comma-separated), `limit`, `offset`.
+- `query_records` requires **`folder` or `space_id`**. The page size defaults to
+  25 (max 1000); `total_hits` is the full match count. A filter or sort on a
+  payload field works only if the config declares it in `index_fields`.
+- `GET /records/{config_id}` is still mapped but its handler was deleted, so
+  `list_records` is built on `query_records` instead.
 - Editing a config schema does **not** retroactively re-validate existing
   records.
-- The engine has a `records-count-by-config` endpoint with **no confirmed
-  public REST route**, so it is not exposed as a tool.
+- `views.table`, `views.tables` and `views.flow` are validated server-side;
+  `views.forms` is stored opaquely, so the renderer is its only contract.
