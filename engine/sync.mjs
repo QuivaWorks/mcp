@@ -17,6 +17,11 @@
 // Requires the `gh` CLI authenticated as a user with read access to
 // myevari/evari-olympus. No clone, no submodule: 20-odd files fetched by API.
 // See engine/fetch.sh to read one file's contents.
+//
+// `--local <path>` swaps the `gh api` calls for `git -C <path>` against a
+// checkout you already have (e.g. when `gh` isn't installed). Same three
+// modes, same manifest; only where the tree/head sha comes from changes.
+//   node engine/sync.mjs --local ~/Documents/GitHub/evari-olympus --pin
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
@@ -33,6 +38,8 @@ const SERVERS = [
   'quiva-documents-mcp',
   'quiva-workspaces-mcp',
   'quiva-agents-mcp',
+  'quiva-distribution-mcp',
+  'quiva-coworker-mcp',
 ];
 
 // A citation is a path into one of the engine's source trees. Kept deliberately
@@ -48,7 +55,7 @@ const SERVERS = [
 // against this list, not by anything failing. If you cite a new tree, add it here
 // and re-run with --pin.
 const CITATION =
-  /(?:workspaces-service|records-service|hub-service|file-generator-service|accounts-service|recall-service|numbergen-service|data-point-service|bellerophon-workforce|bellerophon-cerberus|datahub-js-nodes|microstrate\/src)[A-Za-z0-9/._-]*\.(?:go|ts|svelte)/g;
+  /(?:workspaces-service|records-service|hub-service|file-generator-service|accounts-service|recall-service|numbergen-service|data-point-service|trigger-service|bellerophon-workforce|bellerophon-cerberus|bellerophon-indexer|datahub-js-nodes|microstrate\/src|coworkerenv)[A-Za-z0-9/._-]*\.(?:go|ts|svelte)/g;
 
 // The OpenAPI specs our docs argue with now live in THIS repo, at
 // specs/openapi/. They were never on evari-olympus main — they were authored on
@@ -182,6 +189,33 @@ function headSha(repo, branch) {
   return JSON.parse(gh(['api', `repos/${repo}/commits/${branch}`])).sha;
 }
 
+// --local <path>: same two lookups (a full tree, and the branch head sha),
+// answered from a checkout on disk instead of the GitHub API. No network,
+// no `gh`. `ref` is `origin/main` so a local checkout with unpushed commits
+// still compares against what's actually on the remote.
+function localFetchTree(repoPath, ref) {
+  const raw = execFileSync('git', ['-C', repoPath, 'ls-tree', '-r', ref], {
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  const map = new Map();
+  for (const line of raw.split('\n')) {
+    if (!line) continue;
+    // "<mode> blob <sha>\t<path>"
+    const tab = line.indexOf('\t');
+    const [, , sha] = line.slice(0, tab).split(' ');
+    map.set(line.slice(tab + 1), sha);
+  }
+  return map;
+}
+
+function localHeadSha(repoPath, ref) {
+  return execFileSync('git', ['-C', repoPath, 'rev-parse', ref], { encoding: 'utf8' }).trim();
+}
+
+const localIdx = process.argv.indexOf('--local');
+const LOCAL_PATH = localIdx !== -1 ? process.argv[localIdx + 1] : null;
+
 const mode = process.argv.includes('--pin')
   ? 'pin'
   : process.argv.includes('--list')
@@ -208,9 +242,15 @@ if (mode === 'list') {
   process.exit(0);
 }
 
-requireGh();
-const sha = headSha(repo, branch);
-const tree = fetchTree(repo, sha);
+let sha, tree;
+if (LOCAL_PATH) {
+  sha = localHeadSha(LOCAL_PATH, `origin/${branch}`);
+  tree = localFetchTree(LOCAL_PATH, sha);
+} else {
+  requireGh();
+  sha = headSha(repo, branch);
+  tree = fetchTree(repo, sha);
+}
 
 const drifted = [];
 const missing = [];

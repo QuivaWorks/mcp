@@ -134,32 +134,15 @@ function validateUriArray(value, key, schemes, errors, warnings) {
   });
 }
 
-// The agent service injects a thinking budget the caller never asked for, and does
-// not reconcile it with max_tokens:
-//
-//   // bellerophon-workforce/cmd/agent-service/service/process_invoke.go:893-902
-//   defaultThinkingEnabled := true
-//   defaultThinkingBudget  := 8000
-//   if llmConfig.ThinkingEnabled == nil { llmConfig.ThinkingEnabled = &defaultThinkingEnabled }
-//   if llmConfig.ThinkingTokens  == nil { llmConfig.ThinkingTokens  = &defaultThinkingBudget }
-//
-// It only fills fields left nil, and it never compares the budget against
-// max_tokens. So a config with max_tokens <= 8000 and no explicit thinking_tokens
-// stores and reads back perfectly, then fails at INVOKE with
-// "thinking_tokens must be less than max_tokens (thinking=8000, max=1024)".
-//
-// Hit live 2026-07-29 with max_tokens: 1024. 8 of the 144 live configs carrying an
-// llm_config are in this state and cannot currently be invoked.
-//
-// A warning, not an error: the injection is gated on the service's
-// ENABLE_NATIVE_THINKING flag and on the model supporting thinking, so it is not
-// unconditional — but it is on for staging today.
+// bellerophon-workforce/cmd/agent-service/service/process_invoke.go:1046-1058 (resolvePlanner) fills an unset
+// thinking_tokens with 8000 unless llm_config.effort is set, and never compares it with max_tokens, so
+// max_tokens <= 8000 stores fine and 400s at invoke. A warning: it depends on ENABLE_NATIVE_THINKING.
 const DEFAULT_THINKING_BUDGET = 8000;
 
 function checkThinkingBudget(llmConfig, warnings) {
   const maxTokens = llmConfig.max_tokens;
   if (typeof maxTokens !== 'number' || maxTokens > DEFAULT_THINKING_BUDGET) return;
-  if (llmConfig.thinking_tokens !== undefined) return;
+  if (llmConfig.thinking_tokens !== undefined || llmConfig.effort !== undefined) return;
   warnings.push(
     `llm_config.max_tokens ${maxTokens} is at or below the ${DEFAULT_THINKING_BUDGET}-token thinking budget the agent service injects when thinking_tokens is unset, ` +
       `so invoke_agent will fail with 400 "thinking_tokens must be less than max_tokens (thinking=${DEFAULT_THINKING_BUDGET}, max=${maxTokens})" even though this config stores fine. ` +
@@ -181,4 +164,19 @@ function checkRange(value, key, min, max, errors) {
 // Public entrypoint (mirrors quiva-records-mcp / quiva-flows-mcp validate()).
 export function validate(config, opts) {
   return validateAgentConfig(config, opts);
+}
+
+// Mirrors hub-service/handler/agents.go validateResponseSubject: response_subject,
+// when set, must equal session_id (a mismatch would let a caller point their run's
+// live-output stream at a subject attributed to someone else's session). Checked
+// locally so invoke_agent fails with a clear reason before the network call.
+export function validateInvokeResponseSubject(responseSubject, sessionId) {
+  if (!responseSubject) return { valid: true };
+  if (!sessionId) {
+    return { valid: false, error: 'response_subject requires a session_id (hub-service rejects response_subject without one)' };
+  }
+  if (responseSubject !== sessionId) {
+    return { valid: false, error: `response_subject must equal session_id — got response_subject=${JSON.stringify(responseSubject)}, session_id=${JSON.stringify(sessionId)} (hub-service/handler/agents.go validateResponseSubject)` };
+  }
+  return { valid: true };
 }

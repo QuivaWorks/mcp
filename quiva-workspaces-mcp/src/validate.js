@@ -3,11 +3,13 @@
 // plus lints for the spec-vs-engine gotchas, so mistakes are caught before a
 // POST/PATCH.
 //
-// validate(kind, payload, { requireRequired }) where kind is one of:
-//   'space' | 'task' | 'multi_task' | 'comment' | 'reaction' | 'task_action'
+// validate(kind, payload, { requireRequired }) — kind is one of VALID_KINDS.
 // requireRequired defaults to true (create). Pass false for update payloads.
 
-import { VERTICAL_SPACE_ID, VERTICAL_CONFIG_TYPES, FOLDER_MARKERS, VERTICAL_NON_DEPLOYING_FOLDERS } from './workspaces-docs.js';
+import {
+  VERTICAL_SPACE_ID, VERTICAL_CONFIG_TYPES, FOLDER_MARKERS, VERTICAL_NON_DEPLOYING_FOLDERS,
+  STATUS_ROLES, TERMINAL_STATUS_ROLES, SPACE_TABS, SPACE_MODULES,
+} from './workspaces-docs.js';
 
 const SPACE_ID_REGEX = /^\w+$/; // letters, numbers, underscore only
 const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -15,15 +17,15 @@ const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 // Read-only / server-set fields that should never be sent in a create/update
 // body (the engine ignores them; echoing a GET response back is the #1 mistake).
 const SPACE_READONLY = ['owner', 'created_at', 'updated_at', 'url'];
-const TASK_READONLY = ['created_at', 'updated_at', 'created_by', 'url', 'watchers', 'muted'];
+const TASK_READONLY = ['created_at', 'updated_at', 'created_by', 'url', 'watchers', 'muted', 'subtasks', 'task_actions', 'base_record_skipped'];
 const COMMENT_READONLY = ['author', 'created_at', 'updated_at', 'url', 'reactions'];
 
-const VALID_KINDS = ['space', 'task', 'multi_task', 'comment', 'reaction', 'task_action', 'folder', 'file'];
+const VALID_KINDS = ['space', 'task', 'multi_task', 'comment', 'reaction', 'task_action', 'time_log', 'contact', 'task_template', 'folder', 'file'];
 
-// Every field the frontend writes on a time log. The backend does no defaulting
-// inside time_tracking (model.TimeTracking is stored as sent), so anything the
-// client omits is simply absent — and the UI's summary reads these keys directly.
-const TIME_LOG_FIELDS = ['id', 'time_spent', 'started_at', 'description', 'user', 'created_at', 'updated_at'];
+// Server-owned on a time log (handler/task_time_logs.go AddTaskTimeLogHandler).
+const TIME_LOG_SERVER_FIELDS = ['id', 'user', 'created_at', 'updated_at'];
+// Response-only on time_tracking (model/api.go TimeTracking, hydrateTimeTracking).
+const TIME_TRACKING_HYDRATED = ['logs', 'spent', 'remaining', 'progress_percent'];
 
 export function validate(kind, payload, { requireRequired = true } = {}) {
   const errors = [];
@@ -43,6 +45,9 @@ export function validate(kind, payload, { requireRequired = true } = {}) {
     case 'comment': validateComment(payload, requireRequired, errors, warnings); break;
     case 'reaction': validateReaction(payload, errors, warnings); break;
     case 'task_action': validateTaskAction(payload, requireRequired, errors, warnings); break;
+    case 'time_log': validateTimeLog(payload, errors, warnings); break;
+    case 'contact': validateContact(payload, errors, warnings); break;
+    case 'task_template': validateTaskTemplate(payload, requireRequired, errors, warnings); break;
     case 'folder': validateFolder(payload, errors, warnings); break;
     case 'file': validateFile(payload, errors, warnings); break;
   }
@@ -62,20 +67,165 @@ function validateSpace(p, required, errors, warnings) {
 
   requireString(p, 'name', required, errors);
 
-  if (p.statuses !== undefined) validateStatuses(p.statuses, errors);
+  if (p.statuses !== undefined) validateStatuses(p.statuses, 'statuses', errors, warnings);
+  if (p.upsert_statuses !== undefined) validateStatuses(p.upsert_statuses, 'upsert_statuses', errors, warnings, { upsert: true });
+  validateIdList(p, 'upsert_priorities', errors);
+  validateIdList(p, 'upsert_tags', errors);
+  for (const key of ['remove_statuses', 'remove_priorities', 'remove_tags']) arrayOfStrings(p, key, errors);
+
+  const listEdits = ['upsert_statuses', 'remove_statuses', 'upsert_priorities', 'remove_priorities', 'upsert_tags', 'remove_tags'].filter((k) => p[k] !== undefined);
+  if (required && listEdits.length) {
+    warnings.push(`${listEdits.join(', ')} ${listEdits.length > 1 ? 'are' : 'is'} update-only — create_space ignores ${listEdits.length > 1 ? 'them' : 'it'} (model.Space has no such field). Put the entries in statuses/priorities/tags instead.`);
+  }
+  if (!required) {
+    for (const list of ['statuses', 'priorities', 'tags']) {
+      if (p[list] !== undefined) {
+        warnings.push(`${list} REPLACES the stored list — any entry not in it is deleted. To add or change one entry without knowing the rest, use upsert_${list} / remove_${list}.`);
+      }
+    }
+  }
+
+  if (p.base_record !== undefined) validateBaseRecord(p.base_record, 'base_record', errors, warnings);
+  if (p.organisation_record !== undefined) validateBaseRecord(p.organisation_record, 'organisation_record', errors, warnings);
+  if (isObject(p.base_record) && isObject(p.organisation_record) && p.base_record.config_id && p.base_record.config_id === p.organisation_record.config_id) {
+    errors.push('base_record and organisation_record name the same config_id — the person and the firm must be different record configs, or every contact and firm write collides.');
+  }
+
+  if (p.modules !== undefined) validateModules(p.modules, errors, warnings);
+  if (p.custom_tab !== undefined) validateCustomTab(p.custom_tab, p, errors, warnings);
+  if (p.hidden_tabs !== undefined) validateHiddenTabs(p.hidden_tabs, errors, warnings);
+  if (p.view !== undefined && !isObject(p.view)) errors.push('view must be an object { tasks: { board: { card: { fields: {...} } } } }');
+
+  if (p.editing_disabled !== undefined) {
+    if (typeof p.editing_disabled !== 'boolean') {
+      errors.push('editing_disabled must be a boolean');
+    } else if (!required) {
+      warnings.push('editing_disabled is CREATE-ONLY — it is absent from UpdateSpaceRequest, so sending it on update_space does nothing.');
+    } else if (p.editing_disabled) {
+      warnings.push('editing_disabled: true is IRREVERSIBLE — the space will refuse every update and delete (403) and there is no unlock.');
+    }
+  }
+
   arrayOfStrings(p, 'record_config_ids', errors);
   warnReadonly(p, SPACE_READONLY, warnings);
 }
 
-function validateStatuses(statuses, errors) {
+function validateStatuses(statuses, label, errors, warnings, { upsert = false } = {}) {
   if (!Array.isArray(statuses)) {
-    errors.push('statuses must be an array of { id, name, color?, order?, is_visible? }');
+    errors.push(`${label} must be an array of { id, name, color?, order?, complete?, is_visible?, role? }`);
     return;
   }
+  const roleAt = new Map();
   statuses.forEach((s, i) => {
-    if (!isObject(s)) { errors.push(`statuses[${i}] must be an object`); return; }
-    if (!s.id || typeof s.id !== 'string') errors.push(`statuses[${i}].id is required (string)`);
-    if (!s.name || typeof s.name !== 'string') errors.push(`statuses[${i}].name is required (string)`);
+    if (!isObject(s)) { errors.push(`${label}[${i}] must be an object`); return; }
+    if (!s.id || typeof s.id !== 'string') errors.push(`${label}[${i}].id is required (string)`);
+    // An upsert of a stored id carries its name over (carryStatus), so name is optional there.
+    if (!upsert && (!s.name || typeof s.name !== 'string')) errors.push(`${label}[${i}].name is required (string)`);
+    if (s.complete !== undefined && typeof s.complete !== 'boolean') errors.push(`${label}[${i}].complete must be a boolean`);
+    if (s.role === undefined || s.role === null || s.role === '') return;
+    if (typeof s.role !== 'string') { errors.push(`${label}[${i}].role must be a string`); return; }
+    // Hand-transcribed from model/api.go, and nothing validates it server-side: warn.
+    if (!STATUS_ROLES.includes(s.role)) {
+      warnings.push(`${label}[${i}].role "${s.role}" is not a known status role (${STATUS_ROLES.join(', ')}) — automation resolves roles by exact match, so nothing will ever address it.`);
+    }
+    if (TERMINAL_STATUS_ROLES.includes(s.role) && s.complete !== true) {
+      warnings.push(`${label}[${i}].role "${s.role}" ends the workflow, so the status should carry complete: true — otherwise the board shows a finished task as open.`);
+    }
+    if (roleAt.has(s.role)) {
+      warnings.push(`${label}[${i}] repeats role "${s.role}" (also ${label}[${roleAt.get(s.role)}]) — a role must be unique in a space; automation resolves the first one.`);
+    } else {
+      roleAt.set(s.role, i);
+    }
+  });
+}
+
+function validateIdList(p, key, errors) {
+  if (p[key] === undefined) return;
+  if (!Array.isArray(p[key])) { errors.push(`${key} must be an array of objects with an id`); return; }
+  p[key].forEach((e, i) => {
+    if (!isObject(e) || !e.id || typeof e.id !== 'string') errors.push(`${key}[${i}].id is required (string) — entries are matched by id`);
+  });
+}
+
+// model/api.go BaseRecord. The two flags belong to different records.
+function validateBaseRecord(b, label, errors, warnings) {
+  if (!isObject(b)) { errors.push(`${label} must be an object { config_id, identity_fields[], ... }`); return; }
+  if (!b.config_id || typeof b.config_id !== 'string') {
+    errors.push(`${label}.config_id is required (string) — the record config the entity is stored in. A base record with no config_id is treated as none at all.`);
+  }
+  if (b.identity_fields === undefined || (Array.isArray(b.identity_fields) && b.identity_fields.length === 0)) {
+    warnings.push(`${label}.identity_fields is empty — nothing keys the record, so the platform falls back to its built-in identity fields. Name the field(s) that identify one, e.g. ["email"].`);
+  }
+  arrayOfStrings(b, 'identity_fields', errors, label);
+  arrayOfStrings(b, 'display_fields', errors, label);
+  for (const flag of ['create_login_on_create', 'enable_distribution']) {
+    if (b[flag] !== undefined && typeof b[flag] !== 'boolean') errors.push(`${label}.${flag} must be a boolean`);
+  }
+  if (label === 'base_record' && b.create_login_on_create === true) {
+    warnings.push('base_record.create_login_on_create is true — every create_contact with an email in this space will ALSO create a client-role portal sign-in for that address.');
+  }
+  if (label === 'base_record' && b.enable_distribution === true) {
+    warnings.push('enable_distribution belongs on organisation_record — on base_record (the person) it does nothing.');
+  }
+  if (label === 'organisation_record' && b.create_login_on_create === true) {
+    warnings.push('create_login_on_create belongs on base_record — an organisation is not a person, so it is never enrolled (contact_login.go refuses it).');
+  }
+  if (label === 'base_record' && (b.parent_config_id !== undefined || b.parent_label !== undefined)) {
+    warnings.push('base_record.parent_config_id / parent_label is the legacy way to name the organisation. Declare organisation_record instead — it keys the firm on its own identity fields.');
+  }
+  if (b.legacy_config_ids !== undefined) {
+    warnings.push(`${label}.legacy_config_ids is carried server-side on update — do not send it.`);
+  }
+}
+
+function validateModules(m, errors, warnings) {
+  if (!isObject(m)) { errors.push(`modules must be an object { ${SPACE_MODULES.join('?, ')}? } of booleans`); return; }
+  for (const [key, value] of Object.entries(m)) {
+    if (!SPACE_MODULES.includes(key)) warnings.push(`modules.${key} is not a module (${SPACE_MODULES.join(', ')}) — it is stored and ignored.`);
+    else if (typeof value !== 'boolean') errors.push(`modules.${key} must be a boolean`);
+  }
+}
+
+// Mirrors model/api.go ValidateDisplay, which 400s on each of these.
+function validateCustomTab(tab, space, errors, warnings) {
+  if (!isObject(tab)) { errors.push('custom_tab must be an object { name?, cards: [...] }'); return; }
+  if (tab.cards === undefined) return;
+  if (!Array.isArray(tab.cards)) { errors.push('custom_tab.cards must be an array'); return; }
+  const declared = Array.isArray(space.record_configs) ? space.record_configs.map((c) => c?.id) : null;
+  const seen = new Map();
+  tab.cards.forEach((card, i) => {
+    const label = `custom_tab.cards[${i}]`;
+    if (!isObject(card)) { errors.push(`${label} must be an object`); return; }
+    const configId = typeof card.config_id === 'string' ? card.config_id.trim() : '';
+    if (!configId) errors.push(`${label}.config_id is required — a card acts on one record config`);
+    const action = typeof card.action === 'string' ? card.action.trim() : '';
+    if (!action) errors.push(`${label}.action is required — "create" or "list"`);
+    else if (action !== 'create' && action !== 'list') errors.push(`${label}.action "${card.action}" is not an action — it is "create" or "list"`);
+    if (card.detail !== undefined && card.detail !== '' && !['form', 'lifecycle'].includes(card.detail)) {
+      errors.push(`${label}.detail "${card.detail}" is not a detail surface — use "form" or "lifecycle"`);
+    }
+    if (action === 'create') {
+      if (card.view) errors.push(`${label}.view is meaningless on a create card — a create card opens the form, not a queue`);
+      if (card.detail) errors.push(`${label}.detail is meaningless on a create card — declare it on the list card for the same config`);
+      if (Array.isArray(card.actions) && card.actions.length) errors.push(`${label}.actions are meaningless on a create card — move them to the list card, or use on_submit`);
+    }
+    const key = [card.product_id ?? '', configId, action, card.view ?? ''].join('\u0000');
+    if (seen.has(key)) errors.push(`${label} repeats card ${seen.get(key)} — one config gets one card per action and view within a product`);
+    else seen.set(key, i);
+    if (configId && declared && !declared.includes(configId)) {
+      warnings.push(`${label}.config_id "${configId}" is not in this payload's record_configs — the Records tab is built from the space's own configs, so the card would open an empty list.`);
+    }
+  });
+}
+
+function validateHiddenTabs(tabs, errors, warnings) {
+  if (!Array.isArray(tabs)) { errors.push('hidden_tabs must be an array of tab keys'); return; }
+  tabs.forEach((tab, i) => {
+    const key = typeof tab === 'string' ? tab.trim() : tab;
+    if (typeof key !== 'string') errors.push(`hidden_tabs[${i}] must be a string`);
+    else if (key === 'overview') errors.push('hidden_tabs cannot hold "overview" — every unknown panel falls back to it (400 server-side)');
+    // The engine 400s on an unknown key, but the list is transcribed, so warn.
+    else if (!SPACE_TABS.includes(key)) warnings.push(`hidden_tabs[${i}] "${tab}" is not a known tab (${SPACE_TABS.join(', ')}) — the engine refuses unknown keys with a 400.`);
   });
 }
 
@@ -98,89 +248,102 @@ function validateTask(p, required, errors, warnings) {
     errors.push('archived must be a boolean');
   }
 
+  if (required && (p.space_id === undefined || p.space_id === '')) {
+    warnings.push('no space_id — the task lands in the built-in ESCALATE space. Name the space it belongs to.');
+  }
+
   warnDateFormat(p, 'due_date', warnings);
   warnDateFormat(p, 'scheduled_at', warnings);
   if (p.time_tracking !== undefined) validateTimeTracking(p.time_tracking, errors, warnings);
+  validateSubtaskFields(p, required, errors, warnings);
+  validatePipelineFields(p, errors, warnings);
+  validateIdentity(p, required, errors, warnings);
+  if (p.suppress_events !== undefined && typeof p.suppress_events !== 'boolean') errors.push('suppress_events must be a boolean');
   warnReadonly(p, TASK_READONLY, warnings);
 }
 
-// model.TimeTracking (workspaces-service/model/api.go) = { estimate?: {time_in_seconds},
-// logs: [{ id, time_spent: {time_in_seconds}, started_at, description?, user: {id,name},
-// created_at, updated_at? }] }. Totals/remaining/progress are NOT stored — the frontend
-// derives them (microstrate/src/components/spaces/tasks/task-time-tracking.utils.ts).
-//
-// Merge semantics, all verified live on MCP_VERIFICATION_RENEWALS-1 (2026-07-29):
-//   time_tracking omitted entirely  -> untouched
-//   time_tracking without `logs`    -> existing logs PRESERVED (the nil slice
-//                                      marshals as "logs":null but is not destructive)
-//   "logs": []                      -> every log CLEARED
-//   "logs": [ ... ]                 -> the array is REPLACED wholesale, never appended
-// So adding one log means sending the complete set back, which is why the Go comment
-// says "the client always sends the complete set".
+// handler/tasks.go validateParent: one level, must exist, not self.
+function validateSubtaskFields(p, required, errors, warnings) {
+  if (p.parent !== undefined) {
+    if (typeof p.parent !== 'string') errors.push('parent must be a task id string ("" detaches)');
+    else if (/[.*> \t\r\n]/.test(p.parent.trim())) errors.push(`parent ${JSON.stringify(p.parent)} is not a task id`);
+    else if (p.id && p.parent === p.id) errors.push('a task cannot be its own parent');
+  }
+  if (p.move_subtasks !== undefined) {
+    if (typeof p.move_subtasks !== 'boolean') errors.push('move_subtasks must be a boolean');
+    else if (required) warnings.push('move_subtasks is update-only — create_task ignores it.');
+    else if (p.move_subtasks && p.space_id === undefined && p.folder === undefined) {
+      warnings.push('move_subtasks does nothing unless the same update changes space_id or folder.');
+    }
+  }
+}
+
+function validatePipelineFields(p, errors, warnings) {
+  if (p.value !== undefined && p.value !== null && (typeof p.value !== 'number' || Number.isNaN(p.value))) {
+    errors.push('value must be a number');
+  }
+  for (const key of ['source', 'source_detail', 'currency', 'expected_close']) {
+    if (p[key] !== undefined && typeof p[key] !== 'string') errors.push(`${key} must be a string`);
+  }
+  if (typeof p.expected_close === 'string' && p.expected_close && !/^\d{4}-\d{2}-\d{2}/.test(p.expected_close)) {
+    warnings.push(`expected_close "${p.expected_close}" is not an ISO date — it is indexed as a date and range-filtered, so a loose value never matches.`);
+  }
+  if (p.value !== undefined && p.value !== null && p.currency === undefined) {
+    warnings.push('value without currency — nothing converts between currencies, so an unlabelled amount cannot be compared later.');
+  }
+}
+
+// CreateTaskRequest.Identity keys the space's base record; UpdateTaskRequest has none.
+function validateIdentity(p, required, errors, warnings) {
+  if (p.identity === undefined) return;
+  if (!isObject(p.identity)) { errors.push('identity must be an object of strings, e.g. { "email": "sam@example.com" }'); return; }
+  for (const [k, v] of Object.entries(p.identity)) {
+    if (typeof v !== 'string') errors.push(`identity.${k} must be a string`);
+  }
+  if (!required) warnings.push('identity is create-only — update_task ignores it.');
+  else warnings.push('identity links the task to the space\'s base record, but the task is created even if the link fails — check `base_record_skipped` in the response, and read the task back: a build without the feature ignores identity silently (no folder, no base_record_skipped).');
+}
+
+// Only `estimate` is persisted on the task (model/api.go TimeTracking); the rest
+// is hydrated from time-log records, so anything else sent is dead data.
 function validateTimeTracking(tt, errors, warnings) {
   if (!isObject(tt)) {
-    errors.push('time_tracking must be an object { estimate?: { time_in_seconds }, logs: [TimeLog] }');
+    errors.push('time_tracking must be an object { estimate?: { time_in_seconds } }');
     return;
   }
-  for (const key of Object.keys(tt)) {
-    if (key !== 'estimate' && key !== 'logs') {
-      warnings.push(`time_tracking.${key} is not part of model.TimeTracking (only estimate and logs) — it is stored but nothing reads it. Totals/remaining/progress are derived on the frontend, never sent.`);
-    }
-  }
-
   if (tt.estimate !== undefined) validateTimeSpent(tt.estimate, 'time_tracking.estimate', errors);
 
-  if (tt.logs === undefined) {
-    warnings.push('time_tracking has no `logs` — verified live that this PRESERVES the existing logs rather than clearing them. To clear them send "logs": [] explicitly.');
-    return;
+  if (tt.logs !== undefined) {
+    warnings.push('time_tracking.logs is stored on the task and NEVER READ — logs are hydrated from time-log records (since #1292). Log time with add_time_log, one entry per call.');
   }
-  if (!Array.isArray(tt.logs)) {
-    errors.push('time_tracking.logs must be an array of TimeLog objects');
-    return;
+  const hydrated = TIME_TRACKING_HYDRATED.filter((k) => k !== 'logs' && tt[k] !== undefined);
+  if (hydrated.length) {
+    warnings.push(`time_tracking.${hydrated.join(', ')} ${hydrated.length > 1 ? 'are' : 'is'} computed server-side on every read — never send ${hydrated.length > 1 ? 'them' : 'it'}.`);
   }
-  if (tt.logs.length > 0) {
-    warnings.push(`time_tracking.logs REPLACES the stored array wholesale (verified live) — it does not append. Sending ${tt.logs.length} log(s) discards any log not in this list, so read the task first and send the complete set.`);
+  for (const key of Object.keys(tt)) {
+    if (key !== 'estimate' && !TIME_TRACKING_HYDRATED.includes(key)) {
+      warnings.push(`time_tracking.${key} is not part of model.TimeTracking — only estimate is writable.`);
+    }
   }
+}
 
-  const seen = new Set();
-  tt.logs.forEach((log, i) => {
-    const label = `time_tracking.logs[${i}]`;
-    if (!isObject(log)) { errors.push(`${label} must be an object`); return; }
-
-    if (!log.id || typeof log.id !== 'string') {
-      errors.push(`${label}.id is required (string) — the backend never generates one, so an omitted id leaves the log unaddressable in the UI (the frontend mints time_log_<uuid>)`);
-    } else if (seen.has(log.id)) {
-      errors.push(`${label}.id "${log.id}" is duplicated — ids must be unique within logs[]`);
-    } else {
-      seen.add(log.id);
+// model.AddTimeLogRequest; AddTaskTimeLogHandler 400s on the first two checks.
+function validateTimeLog(p, errors, warnings) {
+  if (p.time_spent === undefined) {
+    errors.push('time_spent is required — { "time_in_seconds": N }');
+  } else {
+    validateTimeSpent(p.time_spent, 'time_spent', errors);
+    if (isObject(p.time_spent) && p.time_spent.time_in_seconds === 0) {
+      errors.push('time_spent.time_in_seconds must be greater than zero (the handler 400s on 0)');
     }
-
-    if (log.time_spent === undefined) {
-      errors.push(`${label}.time_spent is required — { "time_in_seconds": N }`);
-    } else {
-      validateTimeSpent(log.time_spent, `${label}.time_spent`, errors);
-    }
-
-    requireString(log, 'started_at', true, errors);
-    warnRfc3339(log, 'started_at', label, warnings);
-    warnRfc3339(log, 'created_at', label, warnings);
-
-    if (log.created_at === undefined) {
-      warnings.push(`${label}.created_at is missing — the backend does not set it, so the UI has no timestamp to sort or display the entry by`);
-    }
-    if (!isObject(log.user)) {
-      warnings.push(`${label}.user is missing or not an object — the UI shows the log's author from this snapshot ({ id, name }); the backend does not fill it in from the token`);
-    } else {
-      if (typeof log.user.id !== 'string' || !log.user.id) warnings.push(`${label}.user.id should be the user's uuid (see list_users)`);
-      if (typeof log.user.name !== 'string' || !log.user.name) warnings.push(`${label}.user.name should be the display name — the snapshot deliberately excludes avatar info`);
-    }
-
-    for (const key of Object.keys(log)) {
-      if (!TIME_LOG_FIELDS.includes(key)) {
-        warnings.push(`${label}.${key} is not part of model.TimeLog (${TIME_LOG_FIELDS.join(', ')}) — it is stored but nothing reads it`);
-      }
-    }
-  });
+  }
+  requireString(p, 'started_at', true, errors);
+  warnRfc3339(p, 'started_at', 'time_log', warnings);
+  if (p.description !== undefined && typeof p.description !== 'string') errors.push('description must be a string');
+  const owned = TIME_LOG_SERVER_FIELDS.filter((k) => p[k] !== undefined);
+  if (owned.length) {
+    warnings.push(`${owned.join(', ')} ${owned.length > 1 ? 'are' : 'is'} server-owned on a time log (id tl_<random>, user from the JWT, timestamps now) — what you send is ignored.`);
+  }
 }
 
 function validateTimeSpent(value, label, errors) {
@@ -196,8 +359,7 @@ function validateTimeSpent(value, label, errors) {
 }
 
 // A task action (handler/task_actions.go) is a checklist item hung off a task on
-// its own subject `ms.workspaces.task-action.{taskID}.{actionID}` — it is NOT a
-// field on the task, so it never appears in get_task.
+// its own subject; get_task returns it in task_actions[].
 function validateTaskAction(p, required, errors, warnings) {
   // `description` is the only server-enforced requirement, on every write:
   // AddTaskActionHandler 400s with "description is required" even when you are
@@ -230,11 +392,69 @@ function validateTaskAction(p, required, errors, warnings) {
   }
 
   warnings.push(
-    'task actions CANNOT BE READ BACK: GET /workspaces/task/{task_id}/action is mapped to the write resource ' +
-      '`microstrate.workspaces.put.task-action`, so it runs the add handler and 400s "description is required". ' +
-      'ListTaskActionsHandler exists (registered as get.task-actions) but no gateway route reaches it. ' +
-      'The write response is your request echoed back, not the stored aggregate — so nothing about a task action is verifiable today.'
+    'a task-action write RECOMPUTES the task status by status role (none done -> todo, some -> working, all -> done), ' +
+      'falling back to default_status / the first complete non-outcome status. It never writes an id the space lacks, and leaves the status alone when no role matches. ' +
+      'Chat actions do not count. Read the result back with get_task.'
   );
+  if (p.suppress_events !== undefined && typeof p.suppress_events !== 'boolean') errors.push('suppress_events must be a boolean');
+}
+
+// model.ClientProfile; handler/client.go validateContactProfile.
+function validateContact(p, errors, warnings) {
+  requireString(p, 'space_id', true, errors);
+  for (const key of ['first_name', 'last_name', 'name', 'email', 'phone', 'address', 'dob', 'config_id', 'parent_folder', 'entity_type', 'parent_entity']) {
+    if (p[key] !== undefined && typeof p[key] !== 'string') errors.push(`${key} must be a string`);
+  }
+  if (typeof p.email === 'string' && p.email.trim() && !CONTACT_EMAIL_REGEX.test(p.email.trim().toLowerCase())) {
+    errors.push(`${JSON.stringify(p.email)} is not a valid email address (400 server-side)`);
+  }
+  if (typeof p.parent_folder === 'string' && p.parent_folder.includes('.')) {
+    errors.push(`parent_folder ${JSON.stringify(p.parent_folder)} must be a single folder, not a dotted path`);
+  }
+  if (p.extra_data !== undefined && !isObject(p.extra_data)) errors.push('extra_data must be an object');
+  if (!p.email && !p.phone && !p.name && !p.first_name && !p.last_name) {
+    errors.push('a name, email or phone is required to label the contact');
+  }
+  if (typeof p.email === 'string' && p.email.trim()) {
+    warnings.push('if the space\'s base_record has create_login_on_create: true, this creates a client-role PORTAL SIGN-IN for this email. create_contact checks the space and reports it; use example.com addresses for tests.');
+  }
+}
+
+// handler/task_templates.go validateTaskTemplateActions.
+function validateTaskTemplate(p, required, errors, warnings) {
+  // workspaces-service/handler/task_templates.go:173-175: a body id overrides the path id.
+  if (!required && p.id !== undefined) errors.push('id must not be in an update body: it overrides the id in the path, so the write lands on another template');
+  requireString(p, 'name', required, errors);
+  arrayOfStrings(p, 'tags', errors);
+  arrayOfStrings(p, 'assignees', errors);
+  if (p.estimate !== undefined) validateTimeSpent(p.estimate, 'estimate', errors);
+  for (const key of ['status', 'due_date', 'space_id']) {
+    if (p[key] !== undefined) warnings.push(`${key} is not a template field — a new task gets it fresh, so the template ignores it.`);
+  }
+  if (p.task_actions === undefined) return;
+  if (!Array.isArray(p.task_actions)) { errors.push('task_actions must be an array'); return; }
+  p.task_actions.forEach((a, i) => {
+    const label = `task_actions[${i}]`;
+    if (!isObject(a)) { errors.push(`${label} must be an object`); return; }
+    if (!a.description) errors.push(`${label}.description is required`);
+    switch (a.kind) {
+      case 'form':
+        if (!a.config_id && !(Array.isArray(a.configs) && a.configs.length)) errors.push(`${label}: config_id or configs is required for a form action`);
+        break;
+      case 'document': {
+        const source = a.document_source || 'generate';
+        if (source === 'knowledge') { if (!a.knowledge_key) errors.push(`${label}: knowledge_key is required for a knowledge-sourced document action`); }
+        else if (source === 'generate') { if (!a.document_template_id) errors.push(`${label}: document_template_id is required for a document action`); }
+        else errors.push(`${label}: document_source must be "generate" or "knowledge"`);
+        break;
+      }
+      case 'chat':
+        if (!a.agent_subject && !a.flow_config_id) errors.push(`${label}: agent_subject or flow_config_id is required for a chat action`);
+        break;
+      default:
+        errors.push(`${label}: kind must be "form", "document" or "chat"`);
+    }
+  });
 }
 
 function validateMultiTask(p, errors, warnings) {
@@ -324,16 +544,20 @@ function requireString(p, key, required, errors) {
   }
 }
 
-function arrayOfStrings(p, key, errors) {
+function arrayOfStrings(p, key, errors, prefix = '') {
   if (p[key] === undefined) return;
+  const label = prefix ? `${prefix}.${key}` : key;
   if (!Array.isArray(p[key])) {
-    errors.push(`${key} must be an array of strings`);
+    errors.push(`${label} must be an array of strings`);
     return;
   }
   p[key].forEach((item, i) => {
-    if (typeof item !== 'string') errors.push(`${key}[${i}] must be a string`);
+    if (typeof item !== 'string') errors.push(`${label}[${i}] must be a string`);
   });
 }
+
+// Mirrors handler/client.go contactEmailRe.
+const CONTACT_EMAIL_REGEX = /^[^@\s]+@[^@\s.]+(\.[^@\s.]+)+$/;
 
 const RFC3339_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 
@@ -519,7 +743,7 @@ function validateFolder(p, errors, warnings) {
     if (segs.length === 4) lintVerticalCategory(segs[3], warnings);
     if (segs.length === 3 && segs[2] !== 'SHARED' && !/^[a-z0-9_]+$/.test(segs[2])) {
       warnings.push(
-        `vertical id "${segs[2]}" is not lower_snake_case. Existing verticals are (financial_advisor, insurance_broker, uig), and accounts-service derives the flow COLLECTION name by splitting the id on "_" and title-casing each part — so anything else produces an odd collection name.`
+        `vertical id "${segs[2]}" is not lower_snake_case. Existing verticals are lower_snake_case (e.g. financial_advisor), and accounts-service derives the flow COLLECTION name by splitting the id on "_" and title-casing each part — so anything else produces an odd collection name.`
       );
     }
   }

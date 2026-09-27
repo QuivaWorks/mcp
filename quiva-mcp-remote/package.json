@@ -1,0 +1,19 @@
+{
+  "name": "quiva-mcp-remote",
+  "version": "0.1.0",
+  "description": "Remote (Streamable HTTP) MCP server composing every Quiva MCP server behind one API-key-authenticated endpoint",
+  "type": "module",
+  "private": true,
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.24.0",
+    "zod": "^3.24.0"
+  }
+}

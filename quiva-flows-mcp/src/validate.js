@@ -1,7 +1,8 @@
 // Local workflow-config validation.
 //
 // Mirrors the server-side checks in hub-service/handler/create-workflow.go
-// (ValidateConfig) and adds checks the server misses: cycle detection,
+// (ValidateConfig, ValidateGraphIDs) and hub-service/validate/workflow.go (run
+// on publish), and adds checks the server misses: cycle detection,
 // per-node-type required payload props, and lints for known spec-vs-engine
 // gotchas (wait -> delay, baseURL -> base_url, unresolvable $.X references).
 
@@ -24,8 +25,21 @@ function isRecordTrigger(data) {
 const RESERVED_CONDITION_TARGETS = new Set(['RESOLVE_ERROR', 'RESOLVE_SUCCESS']);
 const BUILTIN_LOOKUPS = new Set(['trigger', 'static', 'env', 'context']);
 
-// Node types whose payload is skipped at runtime or has no fixed shape.
 const VALID_NODE_TYPES = new Set(Object.keys(NODE_TYPES));
+// The server also accepts the editor's "chat" (a no-op) and agent_* sub-nodes (hub-service/model/request.go IsKnownNodeType).
+const EDITOR_ONLY_NODE_TYPES = new Set(['chat']);
+const AGENT_SUB_NODE_PREFIX = 'agent_';
+
+const TASK_OPERATIONS = Object.keys(NODE_TYPES.task.operations);
+const EMAIL_OPERATIONS = ['send_email'];
+
+// Exact mirror of hub-service/handler/create-workflow.go graphIDBadChars (".*>@ \t\n"); refused on every write.
+const GRAPH_ID_BAD_CHARS = /[.*>@ \t\n]/;
+
+// Subjects that create or cancel a durable timer (hub-service/validate/schedule_attempts.go).
+const SCHEDULE_SUBJECTS = new Set(['microstrate.hub.post.schedule-flow', 'microstrate.hub.delete.unschedule-flow']);
+
+const DISTRIBUTION_ID_REGEX = /^[A-Za-z0-9_-]+$/;
 
 export function validateFlowConfig(config) {
   const errors = [];
@@ -57,6 +71,10 @@ export function validateFlowConfig(config) {
     if (!id) {
       errors.push('node <missing id>: data.id is required');
       continue;
+    }
+    const legacyRecordId = isRecordTrigger(data) && LEGACY_RECORD_TRIGGER_ID_REGEX.test(id);
+    if (typeof node.id === 'string' && GRAPH_ID_BAD_CHARS.test(node.id) && !legacyRecordId) {
+      errors.push(`node ${label}: top-level id "${node.id}" cannot contain . * > @, a space, a tab or a newline — the server refuses it on every write, validate=true or not`);
     }
     if (node.id && node.id !== data.id) {
       warnings.push(`node ${label}: top-level id ("${node.id}") differs from data.id ("${data.id}") — they should match`);
@@ -93,13 +111,22 @@ export function validateFlowConfig(config) {
 
     const type = data.node_type;
     if (!type) {
-      errors.push(`node ${label}: data.node_type is required`);
+      // The editor's unconfigured "New Node"; the server saves and publishes it (validate/workflow.go nodeTypeError).
+      warnings.push(`node ${label}: no node_type, so the node does nothing at run time`);
+      runtimeNodeIds.add(id);
       continue;
     }
     if (type === 'wait') {
       errors.push(
         `node ${label}: node_type "wait" does not exist in the engine — use "delay" (payload: { time_ms: <int ms> })`
       );
+      continue;
+    }
+    if (type.startsWith(AGENT_SUB_NODE_PREFIX) || EDITOR_ONLY_NODE_TYPES.has(type)) {
+      if (EDITOR_ONLY_NODE_TYPES.has(type)) {
+        warnings.push(`node ${label}: node_type "${type}" is editor-only — the runner has no case for it, so it does nothing at run time`);
+        runtimeNodeIds.add(id);
+      }
       continue;
     }
     if (!VALID_NODE_TYPES.has(type)) {
@@ -110,6 +137,12 @@ export function validateFlowConfig(config) {
     }
 
     if (type !== 'trigger') runtimeNodeIds.add(id);
+
+    if (schedulesATimer(type, data) && Number(data.options?.attempts) > 1) {
+      errors.push(
+        `node ${label}: options.attempts is not allowed on a node that schedules or cancels a timer — a retry stamps a null topic and the timer becomes permanently uncancellable while the run reports success (hub-service/validate/schedule_attempts.go). Remove options.attempts.`
+      );
+    }
 
     if (data.payload === undefined || data.payload === null) {
       errors.push(`node ${label}: payload is required (server rejects nodes without one)`);
@@ -131,7 +164,11 @@ export function validateFlowConfig(config) {
       continue;
     }
     if (!edge.id) {
-      warnings.push(`edge ${label}: missing "id" — give every edge a unique id (e.g. "${source}-${target}")`);
+      warnings.push(
+        `edge ${label}: missing "id" — the server refuses an edge without one; create_workflow / update_workflow fill it when auto_layout is on`
+      );
+    } else if (typeof edge.id === 'string' && GRAPH_ID_BAD_CHARS.test(edge.id)) {
+      errors.push(`edge ${label}: id "${edge.id}" cannot contain . * > @, a space, a tab or a newline — the server refuses it on every write`);
     }
     if (!nodeIds.has(source)) errors.push(`edge ${label}: source node not found: ${source}`);
     if (!nodeIds.has(target)) errors.push(`edge ${label}: target node not found: ${target}`);
@@ -253,6 +290,13 @@ function validateNodePayload(type, data, label, errors, warnings) {
 
     case 'integration':
     case 'http':
+      if (type === 'integration' && data.integration_id) {
+        // The request definition lives on the integration (validate/workflow.go).
+        if (isObj && payload.baseURL !== undefined) {
+          errors.push(`node ${label}: payload key "baseURL" is silently ignored by the engine — rename it to "base_url"`);
+        }
+        break;
+      }
       if (requireKeys(['url', 'method'])) {
         if (payload.baseURL !== undefined) {
           errors.push(
@@ -278,6 +322,25 @@ function validateNodePayload(type, data, label, errors, warnings) {
       if (isObj && !payload.trigger_in && !payload.trigger_on) {
         warnings.push(`node ${label}: schedule payload has neither trigger_in nor trigger_on — the run will not be deferred`);
       }
+      if (isObj && payload.name !== undefined && typeof payload.name !== 'string') {
+        errors.push(`node ${label}: schedule payload "name" must be a string, e.g. "reminder:|$.trigger.id"`);
+      }
+      break;
+
+    case 'task':
+      checkTaskNode(data, payload, isObj, label, errors);
+      break;
+
+    case 'email':
+      checkEmailNode(data, payload, isObj, label, errors);
+      break;
+
+    case 'verify-signature':
+      checkVerifySignatureNode(payload, isObj, label, errors);
+      break;
+
+    case 'sign-envelope':
+      checkSignEnvelopeNode(payload, isObj, label, errors, warnings);
       break;
 
     case 'input':
@@ -319,7 +382,7 @@ function validateNodePayload(type, data, label, errors, warnings) {
         const rules = payload.rules;
         if (Array.isArray(rules) || typeof rules !== 'object' || rules === null) {
           errors.push(
-            `node ${label}: rules payload "rules" must be a MAP of rule name -> rule (e.g. { "risk.value": [ { condition, outcome } ] }), not ${
+            `node ${label}: rules payload "rules" must be a MAP of rule name -> rule (e.g. { "priority.value": [ { condition, outcome } ] }), not ${
               Array.isArray(rules) ? 'an array' : typeof rules
             }`
           );
@@ -375,6 +438,94 @@ function validateNodePayload(type, data, label, errors, warnings) {
       break;
     case 'map':
       break;
+  }
+}
+
+function schedulesATimer(type, data) {
+  return type === 'schedule' || (type === 'quiva-endpoint' && SCHEDULE_SUBJECTS.has(data.subject));
+}
+
+// Mirrors hub-service/validate/workflow.go checkTaskNode: all three are errors there too.
+function checkTaskNode(data, payload, isObj, label, errors) {
+  if (!data.operation) {
+    if (isObj && payload.operation !== undefined) {
+      errors.push(`node ${label}: a task node reads data.operation, not payload.operation — move "operation" up beside node_type`);
+    } else {
+      errors.push(`node ${label}: a task node needs data.operation, one of ${TASK_OPERATIONS.join(', ')}`);
+    }
+    return;
+  }
+  if (!TASK_OPERATIONS.includes(data.operation)) {
+    errors.push(`node ${label}: unknown task operation "${data.operation}": expected one of ${TASK_OPERATIONS.join(', ')}`);
+  }
+}
+
+const isLiteral = (value) => typeof value === 'string' && !value.includes('$.') && !value.includes('SECRET::');
+const hasValue = (value) => value !== undefined && value !== null && value !== '';
+
+// hub-service/runner/email_node.go validateEmailPayload refuses these at run time.
+function checkEmailNode(data, payload, isObj, label, errors) {
+  if (data.operation && !EMAIL_OPERATIONS.includes(data.operation)) {
+    errors.push(`node ${label}: unknown email operation "${data.operation}": expected ${EMAIL_OPERATIONS.join(', ')}`);
+  }
+  if (!isObj) {
+    errors.push(`node ${label}: email payload must be an object with to, subject and html or text`);
+    return;
+  }
+  if (Array.isArray(payload.to)) {
+    errors.push(`node ${label}: email "to" must be ONE address, not a list — consent is decided per person, so send one email per recipient`);
+  } else if (!hasValue(payload.to)) {
+    errors.push(`node ${label}: email payload requires "to"`);
+  }
+  if (!hasValue(payload.subject)) errors.push(`node ${label}: email payload requires "subject"`);
+  if (!hasValue(payload.html) && !hasValue(payload.text)) {
+    errors.push(`node ${label}: email payload has no body — give "html", "text" or both`);
+  }
+}
+
+// hub-service/runner/verify_signature_node.go verifySignatureInput.
+function checkVerifySignatureNode(payload, isObj, label, errors) {
+  if (!isObj) {
+    errors.push(`node ${label}: verify-signature payload must be an object`);
+    return;
+  }
+  const kinds = payload.expected_kind;
+  if (!hasValue(kinds) || (Array.isArray(kinds) && kinds.length === 0)) {
+    errors.push(`node ${label}: verify-signature needs "expected_kind" — the kind or kinds this route carries, e.g. "order" or ["update","cancellation"]`);
+  }
+  if (!hasValue(payload.nonce_bucket)) {
+    errors.push(`node ${label}: verify-signature needs "nonce_bucket" — the KV bucket nonces are claimed in`);
+  }
+  if (typeof payload.keyring === 'string' && payload.keyring.trim().startsWith('SECRET::')) {
+    errors.push(`node ${label}: verify-signature "keyring" is a secret-name PREFIX, not a SECRET:: reference — the distribution id is appended to it`);
+  }
+  for (const key of ['headers', 'body']) {
+    if (typeof payload[key] === 'string' && payload[key].trim().startsWith('|')) {
+      errors.push(`node ${label}: verify-signature "${key}" starts with a pipe, which resolves the object to a STRING and fails every call — use "${payload[key].trim().slice(1)}"`);
+    }
+  }
+}
+
+// hub-service/runner/sign_envelope_node.go signEnvelopeInput / resolveSigningSeed.
+function checkSignEnvelopeNode(payload, isObj, label, errors, warnings) {
+  if (!isObj) {
+    errors.push(`node ${label}: sign-envelope payload must be an object`);
+    return;
+  }
+  for (const key of ['kind', 'sender_account_id', 'body']) {
+    if (!hasValue(payload[key])) errors.push(`node ${label}: sign-envelope payload requires "${key}"`);
+  }
+  if (!hasValue(payload.seed) && !hasValue(payload.distribution_id)) {
+    errors.push(`node ${label}: sign-envelope needs "seed" (a SECRET:: reference) or "distribution_id" (loads <seed_secret_prefix><distribution_id>)`);
+  }
+  if (isLiteral(payload.distribution_id) && payload.distribution_id && !DISTRIBUTION_ID_REGEX.test(payload.distribution_id.trim())) {
+    errors.push(`node ${label}: sign-envelope "distribution_id" must match ^[A-Za-z0-9_-]+$`);
+  }
+  if (isLiteral(payload.seed) && payload.seed) {
+    warnings.push(`node ${label}: sign-envelope "seed" is a literal — use a SECRET:: reference; a flow config is readable by anyone who can read the flow`);
+  }
+  if (typeof payload.body === 'string' && payload.body.trim().startsWith('|')) {
+    warnings.push(`node ${label}: sign-envelope "body" starts with a pipe, so the body is signed and sent as a STRING — drop the pipe to send the object`);
   }
 }
 

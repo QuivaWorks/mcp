@@ -1,0 +1,21 @@
+{
+  "name": "quiva-coworker-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for reading and carefully changing the settings of Abbie, the Quiva AI coworker (hub-service /hub/coworker/*)",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "quiva-coworker-mcp": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node test/validate.test.js && node test/tools.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.24.0"
+  }
+}

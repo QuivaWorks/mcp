@@ -6,7 +6,7 @@
     "there are exactly seven kinds: text-heading, text-paragraph, text-note, text-link, alert (leaves) and card, card-collapsable (containers)",
     "a CONTAINER element's children are grid ROWS, laid out exactly like the top level — a field placed straight into a card skips the row layer",
     "leaf elements take no children; anything nested in one is dropped",
-    "element rules ARE evaluated (view-element receives the whole node and reads node.rules itself) — unlike the array-field repeater, whose own rules are still never passed to ViewRepeater",
+    "element rules ARE evaluated (view-element receives the whole node and reads node.rules itself) — as is an array-field repeater's own visible rule (record-view-renderer), though no other property on it",
     "text-note aligns with `align`; text-heading and text-paragraph use `textAlign`. The builder writes textAlign on a note, which the renderer ignores — see divergences_verified",
     "text-note and text-paragraph carry content in `markdown`, but a `text` RULE is what overrides it (element-catalog ruleTargets)",
     "alert.showSeverityIcon defaults to TRUE — the renderer tests `props.showSeverityIcon !== false`, so only an explicit false hides the icon",
@@ -30,9 +30,9 @@
         },
         "employee_count": { "type": "integer", "title": "Employees", "minimum": 1, "maximum": 5000 },
         "description": { "type": "string", "title": "Business description" },
-        "sum_insured": { "type": "number", "title": "Sum insured", "minimum": 0 },
-        "excess_percent": { "type": "number", "title": "Excess", "minimum": 0, "maximum": 50 },
-        "start_date": { "type": "string", "format": "date", "title": "Cover start date" },
+        "budget_amount": { "type": "number", "title": "Budget", "minimum": 0 },
+        "contingency_percent": { "type": "number", "title": "Contingency", "minimum": 0, "maximum": 50 },
+        "start_date": { "type": "string", "format": "date", "title": "Project start date" },
         "contact_phone": { "type": "string", "title": "Contact number" },
         "portal_enabled": { "type": "boolean", "title": "Enable portal access" },
         "portal_api_key": { "type": "string", "title": "API key" },
@@ -44,7 +44,7 @@
       "forms": [
         {
           "id": "default",
-          "title": "Submission",
+          "title": "Request",
           "description": "Every element kind in one form, so each can be checked in the UI.",
           "layout": {
             "type": "grid",
@@ -58,12 +58,12 @@
                     "type": "element",
                     "element": "text-heading",
                     "props": {
-                      "text": "Commercial submission",
+                      "text": "Project request",
                       "size": "large",
                       "textAlign": "left",
                       "overflowWrap": "break-word",
                       "spacing": "xSmall",
-                      "helpText": { "markdown": "Captures the business, the cover requested and portal access." }
+                      "helpText": { "markdown": "Captures the business, the project requested and portal access." }
                     }
                   }
                 ]
@@ -93,7 +93,7 @@
                     "element": "alert",
                     "props": {
                       "title": "Terms not yet accepted",
-                      "text": "The submission cannot be completed until the terms of business are accepted at the bottom of this form.",
+                      "text": "The request cannot be completed until the terms of business are accepted at the bottom of this form.",
                       "severity": "warning",
                       "showSeverityIcon": true,
                       "spacing": "small"
@@ -189,25 +189,25 @@
                         "type": "grid",
                         "props": { "gridTemplateColumns": "1fr" },
                         "children": [
-                          { "type": "element", "element": "text-heading", "props": { "text": "Cover requested", "size": "small", "spacing": "xSmall" } }
+                          { "type": "element", "element": "text-heading", "props": { "text": "Project requested", "size": "small", "spacing": "xSmall" } }
                         ]
                       },
                       {
                         "type": "grid",
                         "props": { "gridTemplateColumns": "1fr 1fr" },
                         "children": [
-                          { "type": "field", "field": "sum_insured", "inputType": "currency", "props": { "label": "Sum insured", "placeholder": "0.00", "min": 0, "decimalPlace": 2 } },
+                          { "type": "field", "field": "budget_amount", "inputType": "currency", "props": { "label": "Budget", "placeholder": "0.00", "min": 0, "decimalPlace": 2 } },
                           {
                             "type": "field",
-                            "field": "excess_percent",
+                            "field": "contingency_percent",
                             "inputType": "slider",
-                            "props": { "label": "Excess (%)", "min": 0, "max": 50, "decimalPlace": 0 },
+                            "props": { "label": "Contingency (%)", "min": 0, "max": 50, "decimalPlace": 0 },
                             "rules": [
                               {
-                                "id": "excess_percent.disabled",
+                                "id": "contingency_percent.disabled",
                                 "property": "disabled",
-                                "logic": { "!": [{ "var": "sum_insured" }] },
-                                "description": "Disabled until a sum insured is entered."
+                                "logic": { "!": [{ "var": "budget_amount" }] },
+                                "description": "Disabled until a budget is entered."
                               }
                             ]
                           }
@@ -217,7 +217,7 @@
                         "type": "grid",
                         "props": { "gridTemplateColumns": "1fr 1fr" },
                         "children": [
-                          { "type": "field", "field": "start_date", "inputType": "date", "props": { "label": "Cover start date", "placeholder": "Select a date" } },
+                          { "type": "field", "field": "start_date", "inputType": "date", "props": { "label": "Project start date", "placeholder": "Select a date" } },
                           { "type": "field", "field": "contact_phone", "inputType": "phone", "props": { "label": "Contact number" } }
                         ]
                       },
@@ -228,7 +228,7 @@
                           {
                             "type": "element",
                             "element": "text-note",
-                            "props": { "markdown": "We only use this number for claims and renewal contact.", "size": "small", "align": "left", "lineClamp": 2, "spacing": "small" }
+                            "props": { "markdown": "We only use this number for project updates.", "size": "small", "align": "left", "lineClamp": 2, "spacing": "small" }
                           }
                         ]
                       }
@@ -328,12 +328,12 @@
     "card visible rules": {
       "runtime": "both the card and card-collapsable branches are wrapped in {#if !ruleState.visible}, so a visible rule hides the card and everything in it.",
       "builder": "allowedRuleProperties for card and card-collapsable omit 'visible'.",
-      "verdict": "Safe to author (this example does, on the Cover card) but the builder's Rules tab will not offer it and may not round-trip it."
+      "verdict": "Safe to author (this example does, on the Project card) but the builder's Rules tab will not offer it and may not round-trip it."
     },
     "repeater visible rules": {
-      "runtime": "record-view-renderer passes schema/fieldRef/childNodes/value/errors/nodeProps/onChange to ViewRepeater and NEVER passes rules, so an array-field's own rules are not evaluated.",
-      "spec": "the Form Creator spec claims the repeater container supports `visible`.",
-      "verdict": "The spec is wrong. A visible rule on an array-field is inert — put it on the enclosing grid row. This example therefore uses no repeater rule."
+      "runtime": "record-view-renderer evaluates an array-field's own visible rule and renders nothing when hidden; ViewRepeater never receives rules, so no other property applies.",
+      "spec": "the Form Creator spec says the repeater container supports `visible`.",
+      "verdict": "The spec is right for visible. Any other property on an array-field is inert. This example uses no repeater rule."
     }
   },
   "corpus_context": {
@@ -345,10 +345,10 @@
   "how_to_verify_on_staging": [
     "validate_record_config with this config — expect valid with no warnings",
     "create_record_config, then open the form's Preview tab (the Edit tab sets pointer-events: none, so inputs will not respond there)",
-    "check each element: the large heading with its info icon, the intro paragraph, the warning alert, the primary-accented Cover card, the quiet note inside it, the collapsed Portal card, and the terms link",
+    "check each element: the large heading with its info icon, the intro paragraph, the warning alert, the primary-accented Project card, the quiet note inside it, the collapsed Portal card, and the terms link",
     "leave `terms_accepted` unticked: the alert must be visible. Tick it: the alert must disappear (element visible rules)",
-    "type a legal name: the alert's severity must switch from info to warning, and the Cover card must appear (card visible rule — the one the builder will not let you author)",
-    "leave `sum_insured` empty: the Excess slider must be disabled",
+    "type a legal name: the alert's severity must switch from info to warning, and the Project card must appear (card visible rule — the one the builder will not let you author)",
+    "leave `budget_amount` empty: the Contingency slider must be disabled",
     "expand Portal & integrations and toggle Enable portal access: the API key field appears",
     "clean up with delete_record_config (which also purges its records)"
   ]

@@ -19,6 +19,14 @@
     "quiva-agents": {
       "command": "sh",
       "args": ["quiva-agents-mcp/bin/run.sh"]
+    },
+    "quiva-distribution": {
+      "command": "sh",
+      "args": ["quiva-distribution-mcp/bin/run.sh"]
+    },
+    "quiva-coworker": {
+      "command": "sh",
+      "args": ["quiva-coworker-mcp/bin/run.sh"]
     }
   }
 }

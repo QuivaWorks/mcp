@@ -41,7 +41,7 @@ if (existsSync(envFile)) {
   }
 }
 const { QuivaClient } = await import(`${ROOT}/quiva-workspaces-mcp/src/client.js`);
-const objects = new QuivaClient();
+const objects = QuivaClient.fromEnv();
 
 const m = open(`${ROOT}/quiva-documents-mcp/bin/run.sh`);
 await m.ready;

@@ -1,0 +1,107 @@
+{
+  "slug": "publisher-register",
+  "kind": "harvested",
+  "source": {
+    "harvested_at": "2026-09-27"
+  },
+  "teaches": "list_distributions as the publisher: one grant per counterparty, one example per status. The list is trimmed, so results_total is the platform count.",
+  "response": {
+    "request": {
+      "method": "GET",
+      "path": "/accounts/distributions",
+      "query": {}
+    },
+    "status": 200,
+    "refused": false,
+    "body": {
+      "data": {
+        "results": [
+          {
+            "subject": "ms.product.distribution.<<ACCOUNT_1>>.<<ACCOUNT_2>>",
+            "publisher_account_id": "<<ACCOUNT_1>>",
+            "distributor_account_id": "<<ACCOUNT_2>>",
+            "distributor_name": "<<NAME_1>>",
+            "products": [
+              {
+                "product_id": "<<PRODUCT_1>>",
+                "active": true
+              }
+            ],
+            "distribution_id": "<<DISTRIBUTION_1>>",
+            "space_id": "<<SPACE_1>>",
+            "publisher_space_id": "<<SPACE_1>>",
+            "status": "suspended",
+            "provisioning_state": "partial",
+            "publisher_name": "<<NAME_2>>",
+            "record_config_ids": [
+              "quote_config",
+              "<<CONFIG_1>>"
+            ],
+            "distributor_space_id": "<<SPACE_2>>",
+            "decision_publish_flow_subject": "ms.hub.config.workflow.<<NUMBER_1>>.<<NUMBER_2>>",
+            "granted_by": "<<REDACTED:granted_by>>",
+            "requested_by": "<<REDACTED:requested_by>>",
+            "invite_id": "<<INVITE_1>>",
+            "created_at": "2026-09-11T10:16:53+01:00",
+            "updated_at": "2026-09-18T07:42:55Z"
+          },
+          {
+            "subject": "ms.product.distribution.<<ACCOUNT_1>>.<<ACCOUNT_3>>",
+            "publisher_account_id": "<<ACCOUNT_1>>",
+            "distributor_account_id": "<<ACCOUNT_3>>",
+            "distributor_name": "<<NAME_3>>",
+            "products": [
+              {
+                "product_id": "<<PRODUCT_1>>",
+                "active": true
+              }
+            ],
+            "distribution_id": "<<DISTRIBUTION_2>>",
+            "space_id": "<<SPACE_1>>",
+            "publisher_space_id": "<<SPACE_1>>",
+            "status": "active",
+            "provisioning_state": "complete",
+            "publisher_name": "<<NAME_2>>",
+            "record_config_ids": [
+              "quote_config",
+              "<<CONFIG_1>>"
+            ],
+            "distributor_space_id": "<<SPACE_2>>",
+            "decision_publish_flow_subject": "ms.hub.config.workflow.<<NUMBER_1>>.<<NUMBER_2>>",
+            "granted_by": "<<REDACTED:granted_by>>",
+            "requested_by": "<<REDACTED:requested_by>>",
+            "invite_id": "<<INVITE_2>>",
+            "created_at": "2026-09-16T22:13:46Z",
+            "updated_at": "2026-09-16T22:13:47Z"
+          },
+          {
+            "subject": "ms.product.distribution.<<ACCOUNT_1>>.<<ACCOUNT_4>>",
+            "publisher_account_id": "<<ACCOUNT_1>>",
+            "distributor_account_id": "<<ACCOUNT_4>>",
+            "distributor_name": "<<NAME_4>>",
+            "products": [
+              {
+                "product_id": "<<PRODUCT_2>>",
+                "active": true
+              }
+            ],
+            "distribution_id": "<<DISTRIBUTION_3>>",
+            "publisher_gateway_id": "<<GATEWAY_1>>",
+            "ingress_path_format": "/d/%s/rate",
+            "bind_path_format": "/d/%s/bind",
+            "return_path": "/decision",
+            "space_id": "<<SPACE_1>>",
+            "status": "revoked",
+            "provisioning_state": "partial",
+            "granted_by": "<<REDACTED:granted_by>>",
+            "requested_by": "<<REDACTED:requested_by>>",
+            "invite_id": "<<INVITE_3>>",
+            "created_at": "2026-09-04T16:17:35+01:00",
+            "updated_at": "2026-09-04T17:29:31+01:00"
+          }
+        ],
+        "results_total": 36
+      }
+    }
+  }
+}

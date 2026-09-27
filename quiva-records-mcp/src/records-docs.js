@@ -1,12 +1,20 @@
-// Records reference data — derived from the records-service engine source
-// (records-service/handler, records-service/model, records-service/validate)
-// AND the frontend form renderer (microstrate/src/components/records/form/**
-// and rules/**), NOT just the OpenAPI spec. The records-service stores
-// `views.forms`/`views.tables` as OPAQUE `[]map[string]any` (model/api.go) and
-// never validates their inner shape — so the ONLY real contract for the form
-// UI shape is the frontend renderer. The `form-builder` and `form-rules`
-// topics below encode that contract (the form-creator / form-rule agent
-// instructions), reconciled to what the renderer actually reads.
+// Records reference data, derived from records-service (handler, model, validate)
+// and the frontend form renderer, not the OpenAPI spec. `views.forms` is stored
+// opaquely (model/api.go `*[]map[string]any`), so the renderer is its contract;
+// `views.table`, `views.tables` and `views.flow` are typed and validated server-side.
+
+// index_fields type names -> { type, sortable } (records-service/indexer/payload-fields.go
+// indexFieldTypes). "" means keyword; the three aliases are contract-artefact spellings.
+export const INDEX_FIELD_TYPES = {
+  '': { type: 'keyword', sortable: false },
+  keyword: { type: 'keyword', sortable: false },
+  text: { type: 'text', sortable: false },
+  text_sortable: { type: 'text', sortable: true },
+  number: { type: 'number', sortable: true },
+  numeric: { type: 'number', sortable: true },
+  date: { type: 'date', sortable: true },
+  datetime: { type: 'date', sortable: true },
+};
 
 // Gotchas: spec-vs-engine truths the validator lints and the tools encode.
 export const GOTCHAS = [
@@ -20,21 +28,25 @@ export const GOTCHAS = [
   // Discrepancy #6 — required-field truth.
   'Config create requires only `id` and `name`. `schema` must compile as JSON Schema (an empty object compiles). `views` is optional. Record create/update does not strictly require `data` (a nil data is coerced to {}), but any data present is validated against the config schema.',
   // Update method + semantics.
-  'Both record configs and records are updated with PUT (not PATCH). Config update applies only the fields you send; record update merges `data` key-by-key into the existing record and re-validates the merged result against the CURRENT schema.',
+  'Both record configs and records are updated with PUT (not PATCH). Config update applies only the fields you send; record update merges `data` key-by-key (or swaps it whole with `replace: true`, the only way to remove a key) and re-validates the merged result against the CURRENT schema. Pass the `revision` from a read to make the update compare-and-swap (409 if the record moved).',
   // Query-records requirements.
-  'GET /records requires `folder` OR `space_id`, and requires a Bearer JWT (used to derive the tenant) — an API key alone is rejected on this endpoint. It also accepts `config_id` (comma-separated: one → AND filter, many → OR group), `limit`, and `offset`. Results are sorted by created_at.',
+  'GET /records (query-records) is the ONLY records list route. It requires `folder` OR `space_id` and derives the tenant from the caller\'s JWT (an API key works: the gateway swaps it for one). It also takes `config_id` (comma-separated), `parent_folder`, `filter`, `sort_by` (default created_at), `fields` (projection) and `limit` (default 25, max 1000)/`offset`, and returns `total_hits` — the full match count, not the page size (records-service/handler/records.go QueryRecordsHandler; bellerophon-indexer/request/query_index.go:13-14).',
+  // Removed list route.
+  'GET /records/{config_id} is still gateway-mapped but its handler (get.records) was deleted (2927d7e9a, #1283), so it answers 500 "no responders". list_records is rebuilt on query-records and fans out over spaces when no scope is given (records-service/service/service.go).',
   // Schema-change semantics.
   'Editing a config schema does NOT retroactively re-validate or migrate existing records. Old records keep their data; only new writes are checked against the new schema.',
   // Auth reality.
   'The service engine only reads `Authorization: Bearer <jwt>` (X-Api-Key is resolved by the gateway). Config CRUD and single-record ops do not enforce auth in the handler — tenant isolation there comes from the gateway/KV layer.',
-  // Undocumented capability.
-  'An engine endpoint `microstrate.records.get.records-count-by-config` (records-per-config counts, `ids` comma-separated) exists but has no confirmed public REST route, so it is not exposed as a tool here. See get_records_reference("endpoints").',
+  // Record counts.
+  '`GET /records/count?ids=a,b` (records-count-by-config) returns `{ "<config_id>": <count> }` from the KV, independent of the index. list_records uses it to say whether a fan-out reached every record.',
   // Multi-form model (records-service #1262, microstrate #1263/#1264).
-  '`views.forms` (an array of `{ id, title, description?, layout }`) is the current model — a config can have several named forms, each with its own grid `layout`. The old singular `views.form` is deprecated but still accepted by the server; the frontend migrates it to `forms: [{ id: "default", ... }]` on read and drops it on save. On the wire, `RecordViews.Forms`/`.Tables` are stored server-side as opaque `[]map[string]any` (records-service/model/api.go) — the server does NOT validate their internal shape, so the frontend renderer (and this MCP\'s validator) is the only shape check an agent gets. `form-creator`\'s `{ "form": <root grid> }` output is exactly a `views.forms[].layout`.',
+  '`views.forms` (an array of `{ id, title, description?, layout }`) is the current model — a config can have several named forms, each with its own grid `layout`. The old singular `views.form` is deprecated but still accepted by the server; the frontend migrates it to `forms: [{ id: "default", ... }]` on read and drops it on save. `views.forms` is stored opaquely (`*[]map[string]any`, records-service/model/api.go), so the renderer and this validator are its only shape check. `views.table`, `views.tables` (typed RecordTableView) and `views.flow` (typed RecordFlow) ARE validated server-side. See get_records_reference("table-views") and ("flow").',
+  // index_fields.
+  '`index_fields` declares the only payload fields a filter or sort can use: `{ field (or key), type?: keyword|text|number|date (aliases text_sortable, numeric, datetime), sortable? }`. A filter on an undeclared field returns an empty page with a 200. Adding a field does not backfill existing records. See get_records_reference("index-fields").',
   // Repeater / array-field node.
   'A view node can be `{ "type": "array-field", "field": "<array-of-object schema path>", "props"?: {...}, "children": [...] }` — a repeating section bound to an array field. Each child\'s `field` is ELEMENT-RELATIVE (resolved against the array\'s `items.properties`), e.g. for array field "products", a child `field: "title"` means "products[].title", NOT the top-level path "products.title". `props` is UI-only container config (label, itemLabel, required, minItems, maxItems, collapsible, defaultCollapsed). Array-field `rules` are reserved/unused in v1 (the repeater does not evaluate node rules yet).',
   // Rules engine.
-  'Conditional behaviour is expressed with `rules` on a node, evaluated by json-logic-engine. Field nodes support all five properties (visible, required, disabled, readonly, value); grid (container) nodes support `visible` only; ELEMENT nodes support `visible` plus a per-kind list; array-field rules are still NOT evaluated (record-view-renderer never passes `rules` to ViewRepeater). A rule is `{ id, property, logic, description? }`. See get_records_reference("form-rules") and ("form-elements").',
+  'Conditional behaviour is expressed with `rules` on a node, evaluated by json-logic-engine. Field nodes support all five properties (visible, required, disabled, readonly, value); grid (container) nodes support `visible` only; ELEMENT nodes support `visible` plus a per-kind list; an array-field node\'s own `visible` rule IS evaluated (record-view-renderer hides the whole repeater) but no other property is. A rule is `{ id, property, logic, description? }`, or the multi-property form `{ id, logic, set: { <property>: value }, otherwise? }` where `logic` is a boolean condition and `property` is omitted. See get_records_reference("form-rules") and ("form-elements").',
   // Element nodes now render (this reverses earlier guidance).
   'A view node can be `{ "type": "element", "element": "<kind>", "props": {...}, "children"?: [...] }` — presentational content with no schema binding: text-heading, text-paragraph, text-note, text-link, alert, and the containers card and card-collapsable. THESE NOW RENDER: record-view-renderer.component.svelte gained an `{:else if view.type === \'element\'}` branch handing the node to view-element.component.svelte. Earlier versions of this MCP warned that element nodes fall through to the field renderer and drop their children — that was true then and is WRONG now. A container element\'s `children` must be grid ROWS, same as the top level; leaf elements take no children. See get_records_reference("form-elements").',
   // Element key traps, all read off the renderer rather than the spec.
@@ -42,7 +54,7 @@ export const GOTCHAS = [
   // Validation bypass (records-service #1287).
   'create_record and update_record accept `validate: false`, which SKIPS schema validation entirely — required fields, types, formats, all of it. Verified live 2026-07-29: a create carrying only {"not_in_schema":123} 400s by default and returns 200 with validate:false, stored verbatim. Nothing marks such a record afterwards, and any form or flow built on that config can break on it. See get_records_reference("validation-bypass").',
   // Record-driven flow triggers (records-service + hub-service #1287).
-  'A record write can START A FLOW, but it is OPT-IN: nothing is published unless the body sets `completed: true` (or passes `test_flow`). records-service then publishes `hub.trigger.record.<config_id>.<record_id>` and hub-service runs every PUBLISHED flow whose trigger node is trigger_type "record" on that config. Three traps: the publish is async so the write returns 200 regardless of whether any flow ran; the trigger glob never matches DRAFT flows; and `completed` is stored on update but NOT on create. `test_flow: { subject, run_id }` (create only, both fields required) runs one named flow instead and suppresses every configured trigger — the only way to hit a draft. See get_records_reference("flow-triggers").',
+  'A record write can START A FLOW via `hub.trigger.record.<config_id>.<record_id>`, which runs every PUBLISHED flow whose trigger node is trigger_type "record" on that config. A CREATE publishes only with `completed: true` (or `test_flow`). An UPDATE publishes "record-updated" on the transition to completed, and "record-patched" on any other write that changed data; `suppress_events: true` silences either (records-service/handler/records.go updateEventType). Traps: the publish is async so the write returns 200 regardless; the trigger glob never matches DRAFT flows; upsert_record publishes nothing. `test_flow: { subject, run_id }` (create only) runs one named flow and suppresses every configured trigger. See get_records_reference("flow-triggers").',
 ];
 
 // JSON Schema field types the record schema accepts (standard JSON Schema —
@@ -57,7 +69,7 @@ const FIELD_TYPES = [
 // form.types.ts is larger (see INPUT_TYPES_EXTENDED) but the extras are not
 // surfaced by the builder and most lack prop editors.
 const INPUT_TYPES = [
-  'array', 'checkbox', 'country', 'currency', 'date', 'date-range', 'dropdown',
+  'array', 'checkbox', 'country', 'currency', 'date', 'date-range', 'dropdown', 'email',
   'key-value', 'lookup', 'multi-country', 'multi-select', 'multi-toggle',
   'number', 'phone', 'slider', 'tags', 'text', 'textarea', 'toggle', 'uploader',
 ];
@@ -83,13 +95,13 @@ const INPUT_TYPES_EXTENDED = [...INPUT_TYPES_EXTENDED_USABLE, ...INPUT_TYPES_AVO
 
 // The builder's per-JSON-type input options (records.utils.ts inputOptionsForType).
 const INPUT_TYPES_BY_DATA_TYPE = {
-  string: ['text', 'textarea', 'dropdown', 'multi-select', 'multi-toggle', 'tags', 'array', 'date', 'date-range', 'phone', 'country', 'multi-country', 'uploader', 'lookup'],
+  string: ['text', 'textarea', 'email', 'dropdown', 'multi-select', 'multi-toggle', 'tags', 'array', 'date', 'phone', 'country', 'multi-country', 'uploader', 'lookup'],
   number: ['number', 'currency', 'slider'],
   integer: ['number', 'currency', 'slider'],
   boolean: ['toggle', 'checkbox'],
   // multi-select reads props.options and never items.enum, so an array of
   // strings qualifies whether or not the enum has been authored.
-  array: ['tags', 'array', 'multi-select (array of strings)', 'uploader (array of strings — stores file paths)'],
+  array: ['tags', 'array', 'multi-select (array of strings)', 'uploader (array of strings — stores file paths)', 'date-range (array of strings, or items type not yet narrowed)'],
   object: ['key-value'],
 };
 
@@ -158,13 +170,12 @@ const FORMATTER_TYPES = [
 ];
 
 // Rule properties, and which node kinds honour which (rule.config.ts
-// RULE_PROPERTIES_BY_KIND + renderer). Field nodes: all five. Grid/array-field
-// containers: `visible` only (array-field rules are reserved in v1).
+// RULE_PROPERTIES_BY_KIND + renderer). Field nodes: all five. Grid/array-field containers: `visible` only.
 const RULE_PROPERTIES = ['visible', 'required', 'disabled', 'readonly', 'value'];
 const RULE_PROPERTIES_BY_NODE = {
   field: ['visible', 'required', 'disabled', 'readonly', 'value'],
   grid: ['visible'],
-  'array-field': ['visible (reserved — NOT evaluated: record-view-renderer passes field/children/props to ViewRepeater but never `rules`)'],
+  'array-field': ['visible (hides the whole repeater; no other property is applied, as ViewRepeater never receives `rules`)'],
   element: ['visible, plus a per-kind list — see ELEMENT_CATALOG / get_records_reference("form-elements")'],
   table: ['(rules not evaluated by the form renderer)'],
 };
@@ -456,7 +467,7 @@ const FORM_BUILDER_GUIDE = {
       item_input_config_gotcha:
         'CRITICAL: the renderer does NOT read the `inputType`/`props` you put on array-field CHILDREN. ViewArray renders each item by pointing ViewField at `{ item: field.items }` with no nodeInputType and no nodeProps (view-array.component.svelte), so every item leaf takes its input config from `schema.<array>.items.properties.<leaf>.ui = { inputType, props }` — the legacy fallback — or else the bare type default. Consequence if you only set the children: a money item renders as a plain number, a long-text item as single-line text, and an ENUM item as a free-typed text box. So for every repeater, WRITE THE CONFIG TWICE: onto `items.properties.<leaf>.ui` (what renders) and onto the children (what the visual builder writes, and what live configs carry). Live example: insurers.json does both. A corollary: item input config is per-SCHEMA, so a repeater looks the same in every form that places it — a per-form item layout is not expressible.',
       rules_gotcha:
-        'The array-field node\'s OWN `rules` are still not evaluated: record-view-renderer passes schema/fieldRef/childNodes/value/errors/nodeProps/onChange to ViewRepeater and never passes `rules`. The Form Creator spec says the repeater container supports `visible`; it does not. Put that rule on the enclosing grid ROW instead — grid rules ARE evaluated and hiding the row hides the repeater. Child field rules inside a repeater do work, evaluated per item.',
+        'The array-field node\'s OWN `visible` rule IS evaluated: microstrate/src/components/records/form/record-view-renderer.component.svelte hides the whole repeater, and the hidden array is pruned from submission. No other property (required, disabled, readonly, value) is applied on an array-field, because ViewRepeater never receives `rules`. Child field rules inside a repeater work, evaluated per item.',
     },
     element: {
       shape: '{ "type": "element", "element": "<kind>", "props": {...}, "children"?: [...], "rules"?: [...] }',
@@ -479,7 +490,7 @@ const FORM_BUILDER_GUIDE = {
     allowed_by_type: INPUT_TYPES_BY_DATA_TYPE,
     hints: [
       'string with enum → dropdown; array items with enum → multi-select.',
-      'format date → date; a start/end pair → date-range.',
+      'format date → date; an array of two date strings → date-range.',
       'long text (description/notes, large maxLength) → textarea.',
       'phone → phone; country → country (multi-country for arrays of countries).',
       'money/price/amount → currency; a bounded rating/percentage → slider.',
@@ -523,7 +534,7 @@ const FORM_RULES_GUIDE = {
   summary:
     'How to write conditional rules on view nodes. Rules drive an element\'s state (visible / required / disabled / readonly / value) from the live form value, evaluated by json-logic-engine (LogicEngine.run). Rules are OPTIONAL — add one only when a node\'s behaviour genuinely depends on other fields; default to none.',
   rule_shape:
-    'A rule attached to a node is `{ "id": "<Field>.<property>", "property": "visible|required|disabled|readonly|value", "logic": <json-logic>, "description"?: "<one plain sentence>" }`. `id` convention is "<FieldPath>.<property>" (e.g. "Address.Country.visible") and must be present on a stored node rule. `description` is human-readable and does not affect evaluation. (Note: a form-rule generator agent emits `{ property, logic, description, warning? }` WITHOUT an id — add the `id` when you attach it to a node.)',
+    'A rule attached to a node is `{ "id": "<Field>.<property>", "property": "visible|required|disabled|readonly|value", "logic": <json-logic>, "description"?: "<one plain sentence>" }`. `id` convention is "<FieldPath>.<property>" (e.g. "Address.Country.visible") and must be present on a stored node rule. `description` is human-readable and does not affect evaluation. (Note: a form-rule generator agent emits `{ property, logic, description, warning? }` WITHOUT an id — add the `id` when you attach it to a node.) The multi-property form `{ "id", "logic", "set": { "disabled": true, ... }, "otherwise"?: { ... } }` omits `property`: `logic` is a boolean condition, `set` applies when it is true and `otherwise` when false (microstrate/src/types/records.types.ts ElementRule).',
   properties: {
     values: RULE_PROPERTIES,
     by_node_kind: RULE_PROPERTIES_BY_NODE,
@@ -586,7 +597,7 @@ const REFERENCE = {
   },
   'views': {
     summary:
-      'Optional UI layout on a config. `views.forms` (current model) is an array of named forms: `{ "id", "title", "description"?, "layout": <root grid node> }`. `views.form` (singular) is the deprecated legacy single form (a bare root grid), still accepted by the server but migrated to `forms:[{id:"default",...}]` and dropped on save. `views.table` lists columns: `{ "type": "table", "columns": [ { "field": "<name>", "order": 0 } ] }`. Node kinds — grid: `{ "type":"grid","props":{"gridTemplateColumns":"1fr 1fr","gap"?:8},"children":[...],"rules"?:[...] }`; field: `{ "type":"field","field":"<dotted path>","inputType"?,"props"?,"rules"? }` (key is `field`, never `ref`; input config on the NODE); array-field repeater: `{ "type":"array-field","field":"<array path>","props"?,"children":[...] }` with element-relative child refs. For the full form-building spec use get_records_reference("form-builder"); for conditional rules use get_records_reference("form-rules").',
+      'Optional UI layout on a config. `views.forms` (current model) is an array of named forms: `{ "id", "title", "description"?, "layout": <root grid node> }`. `views.form` (singular) is the deprecated legacy single form (a bare root grid), still accepted by the server but migrated to `forms:[{id:"default",...}]` and dropped on save. `views.table` is the default table (`{ "type": "table", "columns": [ { "field", "order", "sortable"?, "filterable"? } ], "filter"?, "sort"? }`) and `views.tables` a list of named saved views — see get_records_reference("table-views"). `views.flow` is a multi-step wizard over one form — see ("flow"). Unknown view keys are dropped silently. Node kinds — grid: `{ "type":"grid","props":{"gridTemplateColumns":"1fr 1fr","gap"?:8},"children":[...],"rules"?:[...] }`; field: `{ "type":"field","field":"<dotted path>","inputType"?,"props"?,"rules"? }` (key is `field`, never `ref`; input config on the NODE); array-field repeater: `{ "type":"array-field","field":"<array path>","props"?,"children":[...] }` with element-relative child refs. For the full form-building spec use get_records_reference("form-builder"); for conditional rules use get_records_reference("form-rules").',
     example: CONFIG_EXAMPLE.views,
     array_field_example: ARRAY_FIELD_EXAMPLE,
   },
@@ -594,30 +605,159 @@ const REFERENCE = {
   'form-rules': FORM_RULES_GUIDE,
   'record': {
     summary:
-      'A record is `{ id, config_id, data, created_at, updated_at }`. Create with `{ data, folder?, space_id? }` — `id` and `config_id` are set by the server (config_id from the URL). `data` is validated against the config schema. Update (PUT) merges the `data` you send into the existing record.',
-    example: { data: { rating: 5, category: 'feature', comment: 'Loved it.' }, folder: 'folder_abc' },
+      'A record is `{ id, config_id, folder?, space_id?, parent_folder?, data, completed?, created_at, updated_at, revision? }` (records-service/model/api.go Record). `id` is server-generated; `config_id` comes from the URL. `data` is validated against the config schema.',
+    fields: {
+      folder: 'The record\'s own folder. A create that names none, in a space whose base record is this config, is filed under the folder its identity values derive — the same key upsert_record uses (records-service/handler/create_record_folder.go).',
+      space_id: 'The space it belongs to. A record with neither folder nor space_id is returned by no query.',
+      parent_folder: 'The folder of a record this one hangs off (an organisation, a household). Indexed, so query_records can ask for everything under one parent. On update, an empty string detaches it; omitted leaves it.',
+      revision: 'Stamped by a read, never stored. Pass it back on update to make that write compare-and-swap: 409 if the record changed since. Omitted, the write is last-writer-wins.',
+    },
+    write_flags: {
+      hidden_fields: 'Dotted refs a form rule hid. Their schema `required` is relaxed and nothing else is (validate/validate.go ValidateWithHiddenFields). Create, update and upsert.',
+      suppress_events: 'Stops the write publishing a record event. A flow triggered by record-patched that writes back to its own record must set it, or it re-triggers itself. Create and update.',
+      replace: 'Update only: `data` replaces the stored data instead of merging. The only way to remove a key.',
+      validate: 'Default true. false skips schema validation entirely — see validation-bypass.',
+    },
+    example: { data: { rating: 5, category: 'feature', comment: 'Loved it.' }, space_id: 'SUPPORT', parent_folder: 'org-acme' },
+  },
+  'table-views': {
+    summary:
+      '`views.table` is the config\'s default table; `views.tables` is a list of named saved views ("queues") picked by title. Both are typed (records-service/model/api.go ViewTableNode, RecordTableView) and validated on write (handler/config.go validateTableViews), so a bad filter is a 400 rather than an empty table.',
+    table_node: '{ "type": "table", "columns": [ { "field", "order", "sortable"?: bool, "filterable"?: bool } ], "filter"?: [<condition>], "sort"?: "field" | "-field" }',
+    named_view: '{ "id": "<letters, digits, _ or ->", "title": "<shown in the picker>", "description"?, ...table_node } — flat, not nested. ids are unique within the config.',
+    filter:
+      'ANDed with the folder/space scope on every query for the view. A leaf is `{ field, keyword | term | prefix | exact | min+max | date_start/date_end }`; a group is `{ operator: "AND"|"OR", conditions: [...] }`. Max depth 4, 50 conditions. No NOT, fuzzy, wildcard or phrase match.',
+    field_names:
+      'Record fields (folder, parent_folder, space_id, created_at, updated_at, config_id) are always queryable. Every other name is a payload field and must be declared in index_fields, or the view returns nothing.',
+    stored_filter_traps: [
+      'A min or max of 0 is read as "no bound" — use exact to name zero.',
+      'A min with no max matches nothing (the indexer builds [min, 0)). A stored view refuses it (records-service/handler/config.go checkStoredBounds); an ad-hoc query_records/export_records filter is accepted (records-service/handler/record_query.go checkFilterLeaf) and silently returns nothing, so those tools warn.',
+      'A date window and a numeric range cannot share a condition; exact cannot combine with min/max.',
+    ],
+    sortable_filterable: 'Column flags narrow within the view; neither widens past its filter. Pointers server-side, so an explicit false is kept.',
+    on_a_reference: 'On a config with `source`, views.tables is the ONLY thing you can edit — it is this account\'s overlay on the publisher\'s definition. See config-source.',
+    example: {
+      tables: [
+        {
+          id: 'open_high_priority',
+          title: 'Open, high priority',
+          columns: [
+            { field: 'title', order: 0 },
+            { field: 'priority', order: 1, filterable: true },
+            { field: 'due_date', order: 2, sortable: true },
+          ],
+          filter: [
+            { field: 'status', keyword: 'open' },
+            { operator: 'OR', conditions: [{ field: 'priority', keyword: 'high' }, { field: 'priority', keyword: 'urgent' }] },
+          ],
+          sort: '-due_date',
+        },
+      ],
+    },
+  },
+  'flow': {
+    summary:
+      '`views.flow` turns one form into a multi-step wizard: step counter, progress, back/next, resume, and conditional section skipping. Stored typed (records-service/model/api.go RecordFlow) and checked on write (validate/validate.go ValidateFlow, ValidateFlowSections).',
+    shape: '{ "id", "title", "intro"?, "form": "<views.forms[].id>", "header"?: [<view node rows>], "sections": [ { "title", "say"?, "start_field"?, "rules"? } ] }',
+    sections:
+      'A section is a contiguous run of the base form\'s TOP-LEVEL grid rows. sections[0] has no start_field (it starts at the top); every later section names the bound field whose row opens it, in form order, each used once. Presentational rows (headings) attach to the section below them.',
+    completeness: 'Every required schema property must be bound somewhere in the form, or the record could never be completed and the write is refused.',
+    header: 'Presentational rows shown above every section. Untyped server-side; the client renders them.',
+    say: 'What the assistant says when the section comes up in a chat.',
+    rules: 'Property rules on the section\'s Save & continue control: `disabled` gates navigation, `text` relabels it, `note` shows a message. Evaluated client-side.',
+    completion_contract:
+      'Intermediate pages save with validate:false and without completed; the final page sets completed:true, so the record trigger fires once, at the end.',
+    example: {
+      id: 'onboarding',
+      title: 'New starter onboarding',
+      intro: 'One page at a time. Each page saves, so you can stop and come back.',
+      form: 'default',
+      sections: [
+        { title: 'About you', say: 'Let us start with your details.' },
+        { title: 'Equipment', start_field: 'laptop_model' },
+        { title: 'Access', start_field: 'systems_needed' },
+      ],
+    },
+  },
+  'index-fields': {
+    summary:
+      '`index_fields` on a config declares which payload fields are lifted into the search index — the only payload fields a filter or sort can use (records-service/indexer/payload-fields.go).',
+    shape: '[ { "field" (or "key"): "<dotted path>", "type"?: "<type>", "sortable"?: bool } ]',
+    types: {
+      keyword: 'Exact, unanalysed match (status, code, id). The default when type is empty. Sort needs sortable:true.',
+      text: 'Analysed: token and prefix matches, no exact equality. The only type that indexes a list value. Sort needs sortable:true.',
+      number: 'min/max ranges and exact. Always sortable.',
+      date: 'date_start/date_end windows. Values coerce to RFC3339; a bare 2006-01-02 is midnight UTC. Always sortable.',
+    },
+    aliases: { text_sortable: 'text + sortable', numeric: 'number', datetime: 'date' },
+    rules: [
+      'Path segments are letters, digits or underscores; dots nest.',
+      'Dots and underscores collide: "a.b" and "a_b" both index as data_a_b and are refused together.',
+      'Update REPLACES the list wholesale; an empty array clears it.',
+      'A value that will not coerce is skipped silently at index time, so that record misses the filter.',
+      'Adding a field does not backfill. Existing records return nothing on it until rewritten: POST /records/reindex { config_id, limit?, cursor? } rewrites one page and returns next_cursor (mapped on production; no tool yet).',
+    ],
+    example: [
+      { field: 'status' },
+      { field: 'title', type: 'text_sortable' },
+      { field: 'budget', type: 'number' },
+      { field: 'due_date', type: 'date' },
+    ],
+  },
+  'config-source': {
+    summary:
+      'A config with `source` is a REFERENCE to a published catalogue definition, not a definition of its own. The stored document holds id, name, source and an optional views.tables overlay; every read resolves the rest (records-service/model/api.go ConfigSource; kv/resolve.go mergeStub).',
+    source: '{ "publisher_account_id", "config_id", "version"?: "<n>" | "latest" } — ids are letters, digits, _ or - (max 64). Reads add `resolved_version` (number) and, in a listing, `resolution_error`.',
+    update_rules: [
+      'A PUT carrying `source` REPOINTS the config: the stored document is replaced by the stub. The old schema, index_fields and views go; views.tables survive.',
+      'A PUT to an existing reference may only change views.tables (or unset_views: ["tables"]). Any other field is refused with a 400 naming it.',
+      '`unset_source: true` converts a reference back into an ordinary config. It must carry a `schema`, or it is refused. On a config that is not a reference it is a no-op.',
+    ],
+    unset_views:
+      '`unset_views: ["form" | "table" | "forms" | "tables" | "flow"]` clears view keys outright on update — JSON cannot tell an absent key from null, so this is the only way. Applied after the merge, so one call can drop a flow and the forms it used.',
   },
   'endpoints': {
-    summary: 'The records-service surface (REST path → engine subject).',
+    summary:
+      'The records-service HTTP surface (path → engine subject). Mapping status probed on production and staging 2026-09-27 against the gateway store and each environment\'s $SRV.INFO.',
     record_configs: [
-      'GET    /records/config            → get.configs   (optional ?ids=a,b for batch)',
+      'GET    /records/config            → get.configs   (?ids=a,b batch, or ?limit=&cursor= paging: truncated + next_cursor)',
       'POST   /records/config            → post.config   (409 if id exists)',
       'GET    /records/config/{id}       → get.config',
-      'PUT    /records/config/{id}       → put.config    (partial: only fields sent)',
+      'PUT    /records/config/{id}       → put.config    (partial: only fields sent; source / unset_source / unset_views)',
       'DELETE /records/config/{id}       → delete.config (also purges its records)',
     ],
     records: [
-      'GET    /records                   → get.query-records (folder|space_id required + Bearer; config_id/limit/offset optional)',
-      'GET    /records/{config_id}       → get.records   (all records for a config)',
+      'GET    /records                   → get.query-records (folder|space_id required; see query_records)',
+      'GET    /records/count?ids=a,b     → get.records-count-by-config ({ id: count }, from the KV)',
       'POST   /records/{config_id}       → post.record',
-      'GET    /records/{config_id}/{id}  → get.record',
-      'PUT    /records/{config_id}/{id}  → put.record    (merges data)',
+      'GET    /records/{config_id}/{id}  → get.record    (carries revision)',
+      'PUT    /records/{config_id}/{id}  → put.record    (merges data; replace, revision)',
       'DELETE /records/{config_id}/{id}  → delete.record',
-      'NOTE: create and update both accept `validate` (default true — false skips schema validation entirely) and `completed` (true also publishes a record event that can start a flow). Create additionally accepts `test_flow: { subject, run_id }` to run one named flow and suppress every configured trigger. See get_records_reference("flow-triggers") and ("validation-bypass").',
+      'POST   /records/upsert-record     → post.upsert-record',
+      'POST   /records/csv-import        → post.csv-import',
+      'POST   /records/export-records    → post.export-records',
+      'DELETE /records/{config_id}/purge → delete.purge-records',
+      'POST   /records/reindex           → post.reindex  (no tool; see index-fields)',
     ],
-    undocumented: [
-      'get.records-count-by-config (records-per-config counts; `ids` comma-separated) — no confirmed public REST route, not exposed as a tool.',
+    dead_or_unsupported: [
+      'GET /records/{config_id} is mapped but its handler (get.records) was deleted: 500 "no responders". Use query_records or list_records.',
+      'PATCH /records/config/{id} and PATCH /records/{config_id}/{id} are mapped to subjects the service never registers. Use PUT.',
+      'Path shapes overlap: POST /records/<anything> matches POST /records/{config_id}, so an unauthenticated probe cannot tell a real route from a config id.',
     ],
+    staging_only: [
+      'Record history and series: GET/DELETE /records/{config_id}/{id}/history and GET /records/{config_id}/series are mapped on production but production\'s records-service does not serve them yet; POST .../history/{version}/{amend|erase|hide|restore} is mapped on staging only. Not wrapped here until production serves them.',
+    ],
+  },
+  'bulk-operations': {
+    summary: 'Server-side bulk endpoints. All four are gateway-mapped on production.',
+    csv_import:
+      'POST /records/csv-import — turns a CSV already uploaded to the `microstrate-agent-knowledge` bucket into records, synchronously, through the same create path (validation, folder derivation, index, events). Needs space_id or folder. Up to 50,000 rows; batch_size default 25, max 100; per-row errors capped at 20 (`failed` is exact). `completed` defaults to false so a bulk load fires no flows (records-service/handler/csv_import.go, config/csv-import.go).',
+    export_records:
+      'POST /records/export-records — builds a CSV or JSON of a record set and EMAILS it as an attachment; nothing is returned but `{ message, records }`. Needs space_id or folder. filter/sort_by are the query_records strings. Over 50,000 rows it refuses rather than truncating. The recipient defaults to the token\'s `name` claim, which for an API key may not be an address — pass email (records-service/handler/export_records.go). The server mails any address it is given, so this MCP requires email and confirm: true.',
+    purge_records:
+      'DELETE /records/{config_id}/purge?space_id=&folder= — deletes a config\'s records and keeps the config. Unscoped, the whole set goes in one operation; scoped, matching records (own folder, not parent) are deleted in batches. `truncated: true` means run the same call again. No events, no undo (records-service/handler/records.go PurgeRecordsHandler).',
+    upsert_record:
+      'POST /records/upsert-record — finds a record by the folder derived from `identity` (`<config_id>-<sha256(field:value)[:12]>`), then creates it or shallow-merges `data`. `resolve_only` returns the folder and writes nothing. Publishes NO record event. Its lookup reads the lagging index, so verify from its own response, not a re-read (records-service/handler/upsert_record.go).',
   },
   'form-elements': {
     summary:
@@ -653,18 +793,18 @@ const REFERENCE = {
       },
       'repeater visible rules': {
         runtime:
-          'record-view-renderer passes schema/fieldRef/childNodes/value/errors/nodeProps/onChange to ViewRepeater and NEVER passes `rules`, so an array-field node\'s own rules are not evaluated.',
+          'record-view-renderer evaluates the array-field node\'s own `visible` rule and renders nothing when it is hidden; ViewRepeater itself never receives `rules`.',
         spec:
-          'the Form Creator spec claims the repeater container supports `visible`. It does not.',
+          'the Form Creator spec says the repeater container supports `visible`. It does.',
         consequence:
-          'A `visible` rule on an array-field is silently inert. Put the rule on the enclosing grid ROW instead — grid rules ARE evaluated, and hiding the row hides the repeater. Child field rules inside the repeater work and are evaluated per item.',
+          'A `visible` rule on an array-field works. Any other property on it (required, disabled, readonly, value) is inert. Child field rules inside the repeater work and are evaluated per item.',
       },
     },
     element_vs_field_rules:
       'An element node keeps its rules on the node and view-element evaluates them itself (it receives the whole node). That is why element rules work while repeater rules do not.',
     examples: {
       heading: { type: 'element', element: 'text-heading', props: { text: 'Client onboarding', size: 'large', spacing: 'xSmall' } },
-      note: { type: 'element', element: 'text-note', props: { markdown: 'Used for claims contact only.', size: 'small', align: 'left' } },
+      note: { type: 'element', element: 'text-note', props: { markdown: 'Used for project updates only.', size: 'small', align: 'left' } },
       conditional_alert: {
         type: 'element',
         element: 'alert',
@@ -686,14 +826,14 @@ const REFERENCE = {
           {
             type: 'grid',
             props: { gridTemplateColumns: '1fr' },
-            children: [{ type: 'element', element: 'text-heading', props: { text: 'Cover details', size: 'small' } }],
+            children: [{ type: 'element', element: 'text-heading', props: { text: 'Budget details', size: 'small' } }],
           },
           {
             type: 'grid',
             props: { gridTemplateColumns: '1fr 1fr' },
             children: [
-              { type: 'field', field: 'cover.sum_insured', inputType: 'currency', props: { label: 'Sum insured', min: 0, decimalPlace: 2 } },
-              { type: 'field', field: 'cover.start_date', inputType: 'date', props: { label: 'Start date' } },
+              { type: 'field', field: 'budget.amount', inputType: 'currency', props: { label: 'Budget', min: 0, decimalPlace: 2 } },
+              { type: 'field', field: 'budget.start_date', inputType: 'date', props: { label: 'Start date' } },
             ],
           },
         ],
@@ -702,19 +842,19 @@ const REFERENCE = {
   },
   'flow-triggers': {
     summary:
-      'A record create/update can start a flow. This is OPT-IN on the records side: nothing is published unless the write sets `completed: true` or passes `test_flow`. A plain create is silent. records-service #1287 / hub-service #1287.',
+      'A record create/update can start a flow. On CREATE it is opt-in: nothing is published unless the write sets `completed: true` or passes `test_flow`, so a plain create is silent. On UPDATE, the completion transition publishes "record-updated" and any other data change publishes "record-patched" (which a trigger node must name to receive). `suppress_events: true` silences both.',
     how_it_works: [
-      'records-service RepublishRecord publishes the marshalled record to `hub.trigger.record.<config_id>.<record_id>` with an `x-event-type` header of "record-created" or "record-updated".',
+      'records-service RepublishRecord publishes the marshalled record to `hub.trigger.record.<config_id>.<record_id>` with an `x-event-type` header of "record-created", "record-updated" or "record-patched".',
       'hub-service subscribes to `hub.trigger.>` and, for a record subject, looks up trigger nodes by GLOB: `ms.hub.config.workflow-node.*.*.record.<config_id>`.',
-      'Each matching node must have node_type "trigger" and trigger_type "record". If its payload.event_type array is non-empty, the header must appear in it; an absent or empty array accepts every event.',
+      'Each matching node must have node_type "trigger" and trigger_type "record". If its payload.event_type array is non-empty, the header must appear in it; an absent or empty array accepts record-created and record-updated only, so a node must name "record-patched" to receive it (hub-service/service/record_trigger_events.go).',
       'The flow is then run with the record as the trigger payload, so `$.trigger` is the whole record: { id, data, folder, space_id, completed, created_at, updated_at }.',
       'SOURCE-DERIVED, NOT OBSERVED: the steps above come from records-service/handler/records.go and hub-service/service/service.go. No triggered run has been observed end to end — see test_flow.verification_status for why (there is no read channel for an async run today).',
     ],
     completed: {
       on_create:
-        '`completed: true` publishes the event. It is NOT stored on the record — CreateRecordHandler reads it off the request only, so a later GET does not show it.',
+        '`completed: true` publishes "record-created" (unless suppress_events) and IS stored: the request embeds the Record, whose `completed` is written with it. Verified live on staging 2026-09-27; older docs said otherwise.',
       on_update:
-        '`completed` IS stored on update (existing.Completed is assigned) and publishes only when true. So the field is persistent after an update but absent after a create-with-completed.',
+        '`completed` IS stored on update. The transition into completed publishes "record-updated" (a repeat true does not); any other write that changed data publishes "record-patched", which reaches only trigger nodes whose event_type names it. A write that changed nothing, or sets `suppress_events: true`, publishes nothing (records-service/handler/records.go updateEventType).',
       async: 'The publish happens in a goroutine after the response is sent. The write returns 200 whether or not any flow matched or ran — check the flow run, never the write response.',
     },
     test_flow: {
@@ -736,13 +876,13 @@ const REFERENCE = {
     the_node_id_trap:
       'The trigger node\'s id must be literally `record.<config_id>`, because the glob matches on the node subject and a node subject is the flow subject + "." + node.id. Any other id and the trigger never fires. That id contains a dot, which hub-service validate.ValidateID rejects — so a record-trigger flow has to be sent with server-side validation off. See quiva-flows-mcp get_node_type_reference("trigger").',
     example_create_that_fires: {
-      config_id: 'risk_programme',
+      config_id: 'project_request',
       completed: true,
-      data: { status: 'bound' },
+      data: { status: 'approved' },
     },
     example_create_that_tests_one_flow: {
-      config_id: 'risk_programme',
-      data: { status: 'bound' },
+      config_id: 'project_request',
+      data: { status: 'approved' },
       test_flow: {
         subject: 'ms.hub.config.workflow.draft.1389718614.1365955493',
         run_id: 'my-verification-run-1',
@@ -765,7 +905,7 @@ const REFERENCE = {
       'On UPDATE, when the config schema has moved on and the stored record no longer satisfies it: validation runs against the schema as it is NOW, so an unrelated field edit can otherwise be blocked by a pre-existing mismatch.',
     ],
     not_stored:
-      '`validate` is a request-only flag. It is echoed in the create response (which is the request struct, not the stored Record — that response also always carries `test_flow: null`), but a later GET shows neither field.',
+      '`validate`, `suppress_events`, `hidden_fields` and `test_flow` are request-only. The create response is the request struct, so it echoes whichever were sent; a later GET shows none of them. Records created before `test_flow` gained omitempty still carry a stored `test_flow: null`.',
   },
   'gotchas': { summary: 'Spec-vs-engine truths.', values: GOTCHAS },
 };

@@ -178,7 +178,7 @@ function describeDocument(d) {
 }
 
 async function main() {
-  const client = new QuivaClient();
+  const client = QuivaClient.fromEnv();
   if (!client.hasCredentials()) {
     console.error('No credentials — set QUIVA_API_KEY / QUIVA_BEARER_TOKEN / QUIVA_EMAIL+QUIVA_PASSWORD.');
     process.exit(1);

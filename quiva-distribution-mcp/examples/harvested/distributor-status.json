@@ -1,0 +1,87 @@
+{
+  "slug": "distributor-status",
+  "kind": "harvested",
+  "source": {
+    "harvested_at": "2026-09-27"
+  },
+  "teaches": "get_distribution_status from the distributor side: 200 with complete: false and one failed check named in missing[].",
+  "response": {
+    "request": {
+      "method": "GET",
+      "path": "/accounts/distribution-status",
+      "query": {
+        "account_id": "<<ACCOUNT_1>>",
+        "side": "distributor"
+      }
+    },
+    "status": 200,
+    "refused": false,
+    "body": {
+      "data": {
+        "account_id": "<<ACCOUNT_1>>",
+        "side": "distributor",
+        "export_name": "",
+        "complete": false,
+        "checks": [
+          {
+            "name": "distribution_record_present",
+            "passed": true,
+            "detail": "ms.product.distribution.<<ACCOUNT_1>>.<<ACCOUNT_6>> granting <<PRODUCT_7>>"
+          },
+          {
+            "name": "distribution_active",
+            "passed": true,
+            "detail": "status \"active\""
+          },
+          {
+            "name": "catalogue_version_current",
+            "passed": true,
+            "detail": "quote_config v9 resolve in <<ACCOUNT_6>>"
+          },
+          {
+            "name": "config_ids_reserved",
+            "passed": true,
+            "detail": "quote_config -> <<ACCOUNT_1>>, distribution_submission -> platform, distribution_decision -> platform, distribution_outcome -> platform, distribution_quote_submission -> platform, distribution_mta_request -> platform, distribution_cancellation_request -> platform"
+          },
+          {
+            "name": "landing_configs_present",
+            "passed": true,
+            "detail": "distribution_submission in <<ACCOUNT_1>> resolves platform.distribution_submission.latest v1; distribution_outcome in <<ACCOUNT_6>> resolves platform.distribution_outcome.latest v1"
+          },
+          {
+            "name": "dead_letters",
+            "passed": true,
+            "detail": "no dead letters for this grant"
+          },
+          {
+            "name": "publisher_flow_current",
+            "passed": false,
+            "detail": "the register records no subject for distribution-decision-publish in <<ACCOUNT_1>>, so there is nothing to read a bundle version off; a grant redeemed before the field existed reads this way and a re-provision records it"
+          },
+          {
+            "name": "distributor_configs_present",
+            "passed": true,
+            "detail": "quote_config, distribution_outcome, distribution_quote_submission, distribution_mta_request, distribution_cancellation_request are installed"
+          },
+          {
+            "name": "distributor_space_present",
+            "passed": true,
+            "detail": "space <<SPACE_2>> in <<ACCOUNT_6>>"
+          }
+        ],
+        "missing": [
+          "publisher_flow_current"
+        ],
+        "account_plane_only": false,
+        "unverified": [
+          "the landing consumer itself: whether distribution-landing exists on microstrate-distribution, and whether it is delivering (trigger-service)",
+          "whether the publisher's distribution-decision-publish flow is published rather than draft, and reaching the platform endpoint; publisher_flow_current reads its bundle stamp, not its state (hub-service)",
+          "a message in flight — accepted, on the stream, and not yet landed. Only a dead letter is visible here, and only after the consumer has given up",
+          "whether the resolved definition is the one the publisher MEANT to publish; the check compares versions, not content"
+        ],
+        "path": "gateway"
+      },
+      "message": "Distribution Status"
+    }
+  }
+}

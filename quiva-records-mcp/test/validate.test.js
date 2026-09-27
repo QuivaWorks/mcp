@@ -5,7 +5,7 @@ import { readHarvested } from '../src/examples.js';
 import { validate } from '../src/validate.js';
 import { getReference, GOTCHAS, ELEMENT_CATALOG, ELEMENT_KINDS, ELEMENT_CONTAINERS } from '../src/records-docs.js';
 import { config as riskProgramme } from './fixtures/risk-programme.mjs';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -366,7 +366,7 @@ check('non-visible rule property on a grid container warns', () => {
   assert.ok(r.warnings.some((w) => w.includes('not honoured on a grid node')));
 });
 
-check('rules on an array-field node warn (reserved in v1)', () => {
+check('an array-field visible rule is accepted silently; other properties warn (record-view-renderer)', () => {
   const r = validate({
     id: 'kyc', name: 'KYC', schema: arraySchema,
     views: {
@@ -384,7 +384,41 @@ check('rules on an array-field node warn (reserved in v1)', () => {
     },
   });
   assert.equal(r.valid, true);
-  assert.ok(r.warnings.some((w) => w.includes('reserved on array-field')));
+  assert.ok(!r.warnings.some((w) => w.includes('array-field (repeater)')), JSON.stringify(r.warnings));
+  const req = validate({
+    id: 'kyc', name: 'KYC', schema: arraySchema,
+    views: { forms: [{ id: 'default', title: 'Default', layout: { type: 'grid', props: { gridTemplateColumns: '1fr' }, children: [{
+      type: 'array-field', field: 'products', props: { label: 'Products' },
+      rules: [{ id: 'products.required', property: 'required', logic: true }],
+      children: [{ type: 'field', field: 'title' }],
+    }] } }] },
+  });
+  assert.ok(req.warnings.some((w) => w.includes('is not applied on an array-field')), JSON.stringify(req.warnings));
+});
+
+check('multi-property set/otherwise rules need no property (records.types.ts ElementRule)', () => {
+  const withRule = (rule) => validate({
+    id: 'r', name: 'R', schema: { type: 'object', properties: { title: { type: 'string' } } },
+    views: { forms: [{ id: 'default', title: 'Default', layout: { type: 'grid', props: { gridTemplateColumns: '1fr' }, children: [
+      { type: 'field', field: 'title', props: { label: 'Title' }, rules: [rule] },
+    ] } }] },
+  });
+  const ok = withRule({ id: 'title.lock', logic: { '==': [{ var: 'title' }, 'x'] }, set: { disabled: true }, otherwise: { disabled: false } });
+  assert.deepEqual(ok.errors, []);
+  const bad = withRule({ id: 'title.lock', logic: true, set: { colour: 'red' } });
+  assert.ok(bad.errors.some((e) => e.includes('set/otherwise must be one of')), JSON.stringify(bad.errors));
+  const none = withRule({ id: 'title.x', logic: true });
+  assert.ok(none.errors.some((e) => e.includes('.property must be one of')), JSON.stringify(none.errors));
+});
+
+check('email is a builder input type for strings (records.utils.ts inputOptionsForType)', () => {
+  const r = validate({
+    id: 'r', name: 'R', schema: { type: 'object', properties: { contact: { type: 'string' } } },
+    views: { forms: [{ id: 'default', title: 'Default', layout: { type: 'grid', props: { gridTemplateColumns: '1fr' }, children: [
+      { type: 'field', field: 'contact', inputType: 'email', props: { label: 'Contact' } },
+    ] } }] },
+  });
+  assert.ok(!r.warnings.some((w) => w.includes('not a known InputType')), JSON.stringify(r.warnings));
 });
 
 check('legacy field node with empty-string type is treated as a field', () => {
@@ -901,7 +935,7 @@ check('the flow-triggers topic explains that record events are opt-in', () => {
   );
   assert.ok(
     ref.completed?.on_create && ref.completed?.on_update,
-    '`completed` is stored on update but not on create — both halves must be stated'
+    'create and update publish different events — both halves must be stated'
   );
   assert.ok(
     ref.test_flow?.both_required?.includes('run_id'),
@@ -927,6 +961,313 @@ check('both write flags appear in the gotchas an agent sees first', () => {
 });
 
 
+// --- index_fields, table views, flow, source (records-service 2026-09) ----------
+// Each rule mirrors a server-side refusal; the cited file is the source.
+
+const base = { id: 'tasks', name: 'Tasks', schema: { type: 'object', properties: { title: { type: 'string' }, status: { type: 'string' }, budget: { type: 'number' }, due_date: { type: 'string' } } } };
+const withViews = (views, extra = {}) => validate({ ...base, ...extra, views });
+const hasError = (r, re) => r.errors.some((e) => re.test(e));
+const hasWarning = (r, re) => r.warnings.some((w) => re.test(w));
+
+check('index_fields: every engine type and alias is accepted (payload-fields.go indexFieldTypes)', () => {
+  const types = ['', 'keyword', 'text', 'text_sortable', 'number', 'numeric', 'date', 'datetime'];
+  const r = validate({ ...base, index_fields: types.map((type, i) => ({ field: `f${i}`, type })) });
+  assert.deepEqual(r.errors, []);
+});
+
+check('index_fields: "key" is accepted as a synonym for "field"', () => {
+  assert.equal(validate({ ...base, index_fields: [{ key: 'status' }] }).valid, true);
+});
+
+check('index_fields: unknown type, bad segment, missing field and dot/underscore collision are errors', () => {
+  assert.ok(hasError(validate({ ...base, index_fields: [{ field: 'x', type: 'integer' }] }), /unknown type "integer"/));
+  assert.ok(hasError(validate({ ...base, index_fields: [{ field: 'a-b' }] }), /not a usable path/));
+  assert.ok(hasError(validate({ ...base, index_fields: [{ field: 'a.b' }, { field: 'a_b' }] }), /both index as/));
+  assert.ok(hasError(validate({ ...base, index_fields: [{ type: 'text' }] }), /field is required/));
+});
+
+check('views.tables: id, title and uniqueness are enforced (config.go validateTableViews)', () => {
+  const cols = [{ field: 'title', order: 0 }];
+  assert.ok(hasError(withViews({ tables: [{ id: 'bad id', title: 'X', columns: cols }] }), /id must contain only/));
+  assert.ok(hasError(withViews({ tables: [{ id: 'a', columns: cols }] }), /title is required/));
+  assert.ok(hasError(withViews({ tables: [{ id: 'a', title: 'A', columns: cols }, { id: 'a', title: 'B', columns: cols }] }), /duplicate view id/));
+  assert.ok(hasError(withViews({ tables: { id: 'a' } }), /must be an array/));
+});
+
+check('views.tables: a well-formed saved view with a nested OR filter validates cleanly', () => {
+  const r = withViews(
+    {
+      tables: [
+        {
+          id: 'open_urgent',
+          title: 'Open, urgent',
+          columns: [{ field: 'title', order: 0, sortable: true }, { field: 'status', order: 1, filterable: false }],
+          filter: [{ field: 'status', keyword: 'open' }, { operator: 'OR', conditions: [{ field: 'budget', min: 1, max: 5000 }, { field: 'created_at', date_start: '2026-01-01' }] }],
+          sort: '-due_date',
+        },
+      ],
+    },
+    { index_fields: [{ field: 'status' }, { field: 'budget', type: 'number' }, { field: 'due_date', type: 'date' }] }
+  );
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.warnings.filter((w) => /index_fields|sort/.test(w)), []);
+});
+
+check('table filter: the query path\'s refusals are errors (record_query.go checkFilterLeaf)', () => {
+  const t = (filter) => withViews({ table: { type: 'table', columns: [{ field: 'title', order: 0 }], filter } });
+  assert.ok(hasError(t([{ field: 'budget', min: 0, max: 10 }]), /min or max of 0/));
+  assert.ok(hasError(t([{ field: 'budget', min: 100 }]), /min with no max/));
+  assert.ok(hasError(t([{ field: 'budget' }]), /needs one of keyword/));
+  assert.ok(hasError(t([{ field: 'budget', exact: 3, max: 9 }]), /exact cannot be combined/));
+  assert.ok(hasError(t([{ field: 'due_date', date_start: '2026-01-01', min: 1, max: 2 }]), /date window and a numeric range/));
+  assert.ok(hasError(t([{ operator: 'NOT', conditions: [{ field: 'status', keyword: 'x' }] }]), /AND or OR/));
+  assert.ok(hasError(t([{ field: 'status', keyword: 'x', conditions: [{ field: 'status', keyword: 'y' }] }]), /never both/));
+  assert.ok(hasError(t([{ field: 'bad-name', keyword: 'x' }]), /not a usable field name/));
+  const deep = [{ conditions: [{ conditions: [{ conditions: [{ conditions: [{ field: 'status', keyword: 'x' }] }] }] }] }];
+  assert.ok(hasError(t(deep), /nested more than 4/));
+  const many = Array.from({ length: 51 }, () => ({ field: 'status', keyword: 'x' }));
+  assert.ok(hasError(t(many), /more than 50 conditions/));
+});
+
+check('table sort and columns: bad names are errors, undeclared or unsortable fields warn', () => {
+  assert.ok(hasError(withViews({ table: { columns: [{ field: 'a b', order: 0 }] } }), /not a usable field name/));
+  assert.ok(hasError(withViews({ table: { columns: [], sort: '--x' } }), /sort/));
+  assert.ok(hasError(withViews({ table: { columns: [{ field: 'title', order: 0, sortable: 'yes' }] } }), /sortable must be a boolean/));
+  const idx = { index_fields: [{ field: 'status' }] };
+  assert.ok(hasWarning(withViews({ table: { columns: [], filter: [{ field: 'title', keyword: 'x' }] } }, idx), /not declared in index_fields/));
+  assert.ok(hasWarning(withViews({ table: { columns: [], sort: 'status' } }, idx), /cannot be sorted on/));
+  assert.ok(!hasWarning(withViews({ table: { columns: [], sort: '-created_at' } }, idx), /index_fields|sorted/), 'record fields need no declaration');
+});
+
+check('views.table with type "" validates (the seeded contact config stores it)', () => {
+  assert.equal(withViews({ table: { type: '', columns: [{ field: 'title', order: 0 }] } }).valid, true);
+});
+
+check('views: an unknown view key warns that the service drops it', () => {
+  assert.ok(hasWarning(withViews({ tableViews: [] }), /drops silently/));
+});
+
+const flowForm = {
+  id: 'default',
+  title: 'Default',
+  layout: {
+    type: 'grid',
+    props: { gridTemplateColumns: '1fr' },
+    children: [
+      { type: 'grid', props: { gridTemplateColumns: '1fr' }, children: [{ type: 'field', field: 'title' }] },
+      { type: 'grid', props: { gridTemplateColumns: '1fr' }, children: [{ type: 'element', element: 'text-heading', props: { text: 'Money' } }] },
+      { type: 'grid', props: { gridTemplateColumns: '1fr' }, children: [{ type: 'field', field: 'budget' }] },
+      { type: 'grid', props: { gridTemplateColumns: '1fr' }, children: [{ type: 'field', field: 'due_date' }] },
+    ],
+  },
+};
+const flowOf = (sections, extra = {}) => withViews({ forms: [flowForm], flow: { id: 'wiz', title: 'Wizard', form: 'default', sections, ...extra } });
+
+check('views.flow: a well-formed wizard validates (validate.go ValidateFlowSections)', () => {
+  const r = flowOf([{ title: 'Basics' }, { title: 'Money', start_field: 'budget', say: 'Now the budget.' }, { title: 'Dates', start_field: 'due_date' }]);
+  assert.deepEqual(r.errors, []);
+});
+
+check('views.flow: required keys and section anchors are enforced', () => {
+  assert.ok(hasError(withViews({ forms: [flowForm], flow: { title: 'x', form: 'default', sections: [{ title: 'a' }] } }), /flow\.id is required/));
+  assert.ok(hasError(flowOf([]), /at least one section/));
+  assert.ok(hasError(flowOf([{ title: 'a', start_field: 'title' }]), /sections\[0\]\.start_field must be empty/));
+  assert.ok(hasError(flowOf([{ title: 'a' }, { title: 'b' }]), /start_field is required/));
+  assert.ok(hasError(flowOf([{ title: 'a' }, { title: 'b', start_field: 'nope' }]), /not a bound field/));
+  assert.ok(hasError(flowOf([{ title: 'a' }, { title: 'b', start_field: 'due_date' }, { title: 'c', start_field: 'budget' }]), /does not come after/));
+  assert.ok(hasError(flowOf([{ title: 'a' }, { title: 'b', start_field: 'budget' }, { title: 'c', start_field: 'budget' }]), /already used/));
+  assert.ok(hasError(flowOf([{ title: 'a' }], { form: 'other' }), /does not match any views\.forms/));
+});
+
+check('views.flow: a heading row attaches downward, so it can empty section 0', () => {
+  const form = structuredClone(flowForm);
+  form.layout.children.splice(0, 1, { type: 'grid', props: { gridTemplateColumns: '1fr' }, children: [{ type: 'element', element: 'text-heading', props: { text: 'Intro' } }] });
+  const r = withViews({ forms: [form], flow: { id: 'w', title: 'W', form: 'default', sections: [{ title: 'a' }, { title: 'b', start_field: 'budget' }] } });
+  assert.ok(hasError(r, /leaving section 0 empty/), r.errors.join('; '));
+});
+
+check('views.flow: a required property no section binds is an error', () => {
+  const r = validate({ ...base, schema: { ...base.schema, required: ['status'] }, views: { forms: [flowForm], flow: { id: 'w', title: 'W', form: 'default', sections: [{ title: 'a' }] } } });
+  assert.ok(hasError(r, /required schema property "status"/));
+});
+
+check('views.flow: camelCase startField warns, and a flow without forms in the payload warns', () => {
+  assert.ok(hasWarning(flowOf([{ title: 'a' }, { title: 'b', startField: 'budget', start_field: 'budget' }]), /use start_field/));
+  assert.ok(hasWarning(withViews({ flow: { id: 'w', title: 'W', form: 'default', sections: [{ title: 'a' }] } }), /cannot be checked against its form/));
+});
+
+check('source: ids must be subject-safe, and local definition fields warn they are shadowed', () => {
+  assert.ok(hasError(validate({ id: 'q', name: 'Q', source: { publisher_account_id: 'a.b', config_id: 'c' } }), /publisher_account_id/));
+  const r = validate({ id: 'q', name: 'Q', schema: base.schema, source: { publisher_account_id: 'pub', config_id: 'quote' } });
+  assert.deepEqual(r.errors, []);
+  assert.ok(hasWarning(r, /reference/));
+});
+
+check('update-only unset flags: unknown view key and unset_source without schema are errors', () => {
+  assert.ok(hasError(validate({ id: 'q', unset_views: ['tableViews'] }, { requireId: false }), /unknown view key/));
+  assert.ok(hasError(validate({ id: 'q', unset_source: true }, { requireId: false }), /needs a schema/));
+  assert.equal(validate({ id: 'q', unset_views: ['flow', 'tables'] }, { requireId: false }).valid, true);
+  assert.equal(validate({ id: 'q', unset_source: true, schema: base.schema }, { requireId: false }).valid, true);
+});
+
+check('reference topics exist for every new surface; stale claims stay gone', () => {
+  for (const topic of ['table-views', 'flow', 'index-fields', 'config-source', 'bulk-operations', 'endpoints']) {
+    assert.ok(!getReference(topic).error, `topic missing: ${topic}`);
+  }
+  const types = JSON.stringify(getReference('index-fields').types);
+  assert.ok(/number/.test(types) && /date/.test(types), 'index_fields docs must cover number and date');
+  assert.ok(!/OPAQUE/i.test(JSON.stringify(getReference('views'))), 'views.tables is typed now');
+  assert.ok(/deleted/.test(getReference('endpoints').dead_or_unsupported.join(' ')), 'the dead get.records route must be named');
+  assert.ok(!/API key alone is rejected/.test(GOTCHAS.join(' ')), 'query-records accepts an API key (the gateway swaps it for a JWT)');
+});
+
+// --- tool handlers, against a fake client -------------------------------------
+
+const { registerTools } = await import('../src/index.js');
+function harness(routes) {
+  const handlers = {};
+  const calls = [];
+  const server = { registerTool: (name, _meta, fn) => { handlers[name] = fn; } };
+  const reply = (method) => async (path, a, b) => {
+    const hasBody = method === 'POST' || method === 'PUT';
+    const query = hasBody ? b : a;
+    calls.push({ method, path, query, body: hasBody ? a : undefined });
+    const out = routes(method, path, query ?? {});
+    if (out instanceof Error) throw out;
+    return out;
+  };
+  registerTools(server, { get: reply('GET'), post: reply('POST'), put: reply('PUT'), delete: reply('DELETE') });
+  const raw = (name, args) => handlers[name](args);
+  const run = async (name, args) => {
+    const res = await raw(name, args);
+    if (res.isError) throw new Error(res.content[0].text);
+    return JSON.parse(res.content[0].text);
+  };
+  return { run, raw, calls };
+}
+
+async function checkAsync(name, fn) {
+  try {
+    await fn();
+    console.log(`ok   - ${name}`);
+  } catch (err) {
+    failures++;
+    console.error(`FAIL - ${name}\n      ${err.message}`);
+  }
+}
+
+await checkAsync('list_records: a scoped call is one query-records call, never the deleted GET /records/{config_id}', async () => {
+  const h = harness(() => ({ results: [{ id: 'r1' }], results_total: 1, total_hits: 1 }));
+  await h.run('list_records', { config_id: 'tasks', space_id: 'OPS', fields: ['title', 'status'] });
+  assert.equal(h.calls.length, 1);
+  assert.equal(h.calls[0].path, '/records');
+  assert.equal(h.calls[0].query.config_id, 'tasks');
+  assert.equal(h.calls[0].query.fields, 'title,status');
+  assert.equal(h.calls[0].query.limit, 100);
+});
+
+await checkAsync('list_records: unscoped fans out over spaces and reports records outside any space', async () => {
+  const h = harness((method, path, q) => {
+    if (path === '/records/count') return { tasks: 5 };
+    if (path === '/workspaces/spaces') return { results: [{ id: 'A' }, { id: 'B' }, { id: 'C' }] };
+    if (q.space_id === 'A') return { results: [{ id: '1' }, { id: '2' }], total_hits: 2 };
+    if (q.space_id === 'B') return { results: [{ id: '3' }], total_hits: 1 };
+    return { results: [], total_hits: 0 };
+  });
+  const out = await h.run('list_records', { config_id: 'tasks' });
+  assert.equal(out.total_hits, 3);
+  assert.equal(out.record_count, 5);
+  assert.equal(out.complete, false);
+  assert.deepEqual(out.hits_by_space, { A: 2, B: 1 });
+  assert.equal(out.results.length, 3);
+  assert.ok(!h.calls.some((c) => c.path === '/records/tasks'));
+});
+
+await checkAsync('list_records: a failing space makes the fan-out incomplete instead of failing it', async () => {
+  const h = harness((method, path, q) => {
+    if (path === '/records/count') return { tasks: 1 };
+    if (path === '/workspaces/spaces') return { results: [{ id: 'A' }, { id: 'B' }] };
+    if (q.space_id === 'B') return new Error('boom');
+    return { results: [{ id: '1' }], total_hits: 1 };
+  });
+  const out = await h.run('list_records', { config_id: 'tasks' });
+  assert.equal(out.complete, false);
+  assert.ok(out.errors_by_space.B);
+});
+
+await checkAsync('list_records: complete:false notes that the count may include deleted keys', async () => {
+  const h = harness((method, path, q) => {
+    if (path === '/records/count') return { tasks: 2 };
+    if (path === '/workspaces/spaces') return { results: [{ id: 'A' }] };
+    return { results: [{ id: '1' }], total_hits: 1 };
+  });
+  const out = await h.run('list_records', { config_id: 'tasks' });
+  assert.equal(out.complete, false);
+  assert.match(out.note, /may include deleted keys/);
+});
+
+await checkAsync('delete_record_config: refuses without confirm: true and sends nothing', async () => {
+  const h = harness(() => ({ message: 'success' }));
+  assert.equal((await h.raw('delete_record_config', { id: 'tasks' })).isError, true);
+  assert.equal(h.calls.length, 0);
+  await h.run('delete_record_config', { id: 'tasks', confirm: true });
+  assert.equal(h.calls[0].method, 'DELETE');
+  assert.equal(h.calls[0].path, '/records/config/tasks');
+});
+
+await checkAsync('query_records: a min with no max is sent but warned (the query path accepts it)', async () => {
+  const h = harness(() => ({ results: [], total_hits: 0 }));
+  const out = await h.run('query_records', { space_id: 'OPS', filter: [{ operator: 'OR', conditions: [{ field: 'budget', min: 100 }] }] });
+  assert.equal(h.calls.length, 1);
+  assert.ok(out.warnings.some((w) => /min with no max/.test(w)));
+  const ok = await h.run('query_records', { space_id: 'OPS', filter: [{ field: 'budget', min: 100, max: 200 }] });
+  assert.equal(ok.warnings, undefined);
+});
+
+await checkAsync('query_records: fields, parent_folder and filter reach the query string', async () => {
+  const h = harness(() => ({ results: [], results_total: 0, total_hits: 0 }));
+  await h.run('query_records', { space_id: 'OPS', parent_folder: 'org-1', fields: 'title', filter: [{ field: 'status', keyword: 'open' }] });
+  const q = h.calls[0].query;
+  assert.equal(q.parent_folder, 'org-1');
+  assert.equal(q.fields, 'title');
+  assert.equal(q.filter, JSON.stringify([{ field: 'status', keyword: 'open' }]));
+});
+
+await checkAsync('purge_records: refuses without confirm: true and sends nothing', async () => {
+  const h = harness(() => ({ purged: 0 }));
+  assert.equal((await h.raw('purge_records', { config_id: 'tasks', confirm: false })).isError, true);
+  assert.equal(h.calls.length, 0);
+  await h.run('purge_records', { config_id: 'tasks', space_id: 'OPS', confirm: true });
+  assert.equal(h.calls[0].method, 'DELETE');
+  assert.equal(h.calls[0].path, '/records/tasks/purge');
+  assert.equal(h.calls[0].query.space_id, 'OPS');
+});
+
+await checkAsync('csv_import and export_records refuse a call with no space or folder', async () => {
+  const h = harness(() => ({}));
+  assert.equal((await h.raw('csv_import', { config_id: 't', key: 'k.csv' })).isError, true);
+  assert.equal((await h.raw('export_records', { config_id: 't' })).isError, true);
+  assert.equal(h.calls.length, 0);
+  assert.equal((await h.raw('export_records', { config_id: 't', space_id: 'OPS', confirm: true })).isError, true, 'no default recipient');
+  assert.equal((await h.raw('export_records', { config_id: 't', space_id: 'OPS', email: 'ops@example.com' })).isError, true, 'confirm required');
+  assert.equal(h.calls.length, 0);
+  await h.run('export_records', { config_id: 't', space_id: 'OPS', email: 'ops@example.com', confirm: true, filter: [{ field: 'status', keyword: 'x' }] });
+  assert.equal(typeof h.calls[0].body.filter, 'string', 'export takes the filter as a JSON string');
+});
+
+await checkAsync('update_record forwards revision, replace, parent_folder, hidden_fields, suppress_events', async () => {
+  const h = harness(() => ({}));
+  await h.run('update_record', { config_id: 't', id: 'r', data: { a: 1 }, revision: 7, replace: true, parent_folder: '', hidden_fields: ['x'], suppress_events: true });
+  assert.deepEqual(h.calls[0].body, { data: { a: 1 }, parent_folder: '', replace: true, revision: 7, hidden_fields: ['x'], suppress_events: true });
+});
+
+await checkAsync('update_record_config: unset_source without a schema is stopped locally', async () => {
+  const h = harness(() => ({}));
+  const out = await h.run('update_record_config', { id: 'q', unset_source: true, skip_local_validation: false });
+  assert.equal(out.updated, false);
+  assert.equal(h.calls.length, 0);
+});
+
 // --- every src module parses -------------------------------------------------
 // A syntax error in src/index.js used to be INVISIBLE to this suite: nothing here
 // imports the entry point (it would start the server on stdio), so the tests all
@@ -947,6 +1288,14 @@ check('every file in src/ is syntactically valid', () => {
       throw new Error(`${f} does not parse:\n${String(err.stderr || err.message).trim()}`);
     }
   }
+});
+
+check('the index_fields filter comment above filterCondition is at most 3 lines', () => {
+  const lines = readFileSync(fileURLToPath(new URL('../src/index.js', import.meta.url)), 'utf8').split('\n');
+  const at = lines.findIndex((l) => l.startsWith('const filterCondition'));
+  let n = 0;
+  for (let i = at - 1; i >= 0 && lines[i].startsWith('//'); i--) n++;
+  assert.ok(n >= 1 && n <= 3, `${n} comment lines`);
 });
 
 if (failures) {

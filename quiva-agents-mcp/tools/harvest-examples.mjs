@@ -36,7 +36,7 @@ const SECRET_VALUES = [/^ms[rk]?-[A-Z0-9]{20,}$/i, /^eyJ[A-Za-z0-9_-]{20,}\./, /
 
 // `api_key` CAN carry a literal LLM key — on invoke, hub-service forwards it as
 // the X-LLM-API-Key header whenever api_key_source is not "system"
-// (hub-service/agents/agents.go:175). But every value stored on staging is a NAME
+// (hub-service/agents/agents.go:500). But every value stored on staging is a NAME
 // referencing an account secret (CLAUDE_API_KEY, GEMINI_API_KEY, OPEN_AI, ...),
 // and that name is precisely what an example needs to teach. So keep name-shaped
 // values and redact anything else — scrubbing them all would delete the lesson.
@@ -179,7 +179,7 @@ function describeConfig(config) {
 }
 
 async function main() {
-  const client = new QuivaClient();
+  const client = QuivaClient.fromEnv();
   if (!client.hasCredentials()) {
     console.error('No credentials — set QUIVA_API_KEY / QUIVA_BEARER_TOKEN / QUIVA_EMAIL+QUIVA_PASSWORD.');
     process.exit(1);

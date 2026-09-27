@@ -6,8 +6,8 @@
 
 export const GOTCHAS = [
   // Content correctness vs mechanical success — the failure mode that produced a
-  // completely blank certificate on staging while every check passed.
-  'A placeholder in the source DOCX with no matching key in the trigger payload resolves to an EMPTY STRING — silently. No error, no warning, no `errors` entry on the document: trigger_templates returns a subject, the job succeeds, and a blank PDF lands in the bucket. Every mechanical signal is green (template published, trigger queued, document generated, byte sizes differ between runs) while the content is entirely empty. validate_docx does NOT check payload/placeholder agreement. So before authoring a payload, EXTRACT THE PLACEHOLDERS FROM THE DOCX and key the payload to exactly those names: python3 -c "import zipfile,re;print(sorted(set(re.findall(r\'{[^{}]{1,60}}\', zipfile.ZipFile(F).read(\'word/document.xml\').decode()))))". The tell in the output is stranded literal punctuation — an address line rendering as \'Mailing Address: , , \' is three empty placeholders with the DOCX\'s own commas between them. Hit live 2026-07-30: this MCP\'s own certificate example sent invented keys (insured_name, sum_insured, premium) against a DOCX expecting camelCase ones (firstName, coverageLimit, premiumAmount), and shipped a blank document that was only caught when a human opened the PDF.',
+  // completely blank document on staging while every check passed.
+  'A placeholder in the source DOCX with no matching key in the trigger payload resolves to an EMPTY STRING — silently. No error, no warning, no `errors` entry on the document: trigger_templates returns a subject, the job succeeds, and a blank PDF lands in the bucket. Every mechanical signal is green (template published, trigger queued, document generated, byte sizes differ between runs) while the content is entirely empty. validate_docx does NOT check payload/placeholder agreement. So before authoring a payload, EXTRACT THE PLACEHOLDERS FROM THE DOCX and key the payload to exactly those names: python3 -c "import zipfile,re;print(sorted(set(re.findall(r\'{[^{}]{1,60}}\', zipfile.ZipFile(F).read(\'word/document.xml\').decode()))))". The tell in the output is stranded literal punctuation — an address line rendering as \'Mailing Address: , , \' is three empty placeholders with the DOCX\'s own commas between them. Hit live 2026-07-30: this MCP\'s own document-verification example sent invented keys (signer_name, total_amount, monthly_fee) against a DOCX expecting the camelCase names already sitting in that file, and shipped a blank document that was only caught when a human opened the PDF.',
   // Signature anchors are not expressions.
   'A HelloSign anchor in the DOCX (e.g. `[sig|req|signer1]`) is NOT an expression and is not substituted by the document engine. It is consumed by HelloSign when a signature request is created; if no request is created — because every signatory was skipped, e.g. the rendered email is missing — the anchor stays in the PDF as LITERAL TEXT. Seeing `Sig: [sig|req|signer1]` in output means no e-signature request was made, which may be intentional.',
   // Discrepancy #1 — REST base path (confirmed live on staging).
@@ -32,6 +32,18 @@ export const GOTCHAS = [
   'E-signatures are HelloSign-backed. signatories[].name/email are expressions resolved from the trigger payload; a signatory whose rendered email is missing/invalid (or name empty) is silently skipped, and if none remain no request is sent (document.signatures stays null). get_document_signature_url only works for signatures created in embedded mode. The HelloSign webhook is platform-called and is intentionally not exposed as a tool.',
   // Coverage note.
   'The file-generator service also has AI-generation handlers (pptx, docx-generator, docx-editor, pdf-python, xlsx, html-pdf), but they are NOT in the gateway route registry (quiva-endpoints.json) and 404 at the REST gateway — not agent-callable via REST, so they are intentionally NOT exposed as tools (agents invoke them through other means when needed). The internal `approval-audit` handler and the HelloSign webhook are likewise not exposed.',
+  // PDF fill: the field that is neither mapped nor tagged is the silent case.
+  'A PDF form field with no entry in `pdf.fields` AND no `{tag}` already sitting in its own value/default-value/tooltip is left EXACTLY as the source PDF had it — not blanked, not filled, no warning at trigger time (fill.ts: an unmatched field only gets cleared if its stray text itself looks like a tag). A stale example value a designer left in the source PDF (e.g. sample text in a text field) ships into every generated document silently. `validate_docx` surfaces unmapped fields as warnings, but trigger_templates does not call it for you — check the field list yourself before publishing.',
+  // PDF fill: loops are a hard rejection, not a silent no-op.
+  'A PDF field value is ONE expression — a loop/section tag ({#items}...{/items}) is REJECTED outright at fill time ("a PDF field holds one value..."), which fails the whole trigger with an error. This is the one placeholder mistake that is NOT silent; the silent ones are a missing key (renders empty) and an unmapped/untagged field (left as-is).',
+  // PDF fill: buttons.
+  'Mapping a push-button field in `pdf.fields` has NO EFFECT — the fill code skips PDFButton fields entirely. validate_docx reports this as a warning, not an error, so it is easy to miss.',
+  // PDF fill: choice fields are the one case that is NOT silent, with a caveat.
+  'A dropdown/radio value that is not one of the field\'s real options is NOT silent at fill time — it throws and fails the whole trigger with an error entry, unlike the DOCX-placeholder case. But `validate_docx` can only catch this early when the mapped expression has no `{tag}` (a fixed value); a dynamic expression is checked against an EMPTY payload at validate time, so a mismatch only surfaces once you actually trigger.',
+  // PDF publish-time gates (file-generator-service/src/handler/template-publish.ts).
+  'Publish refuses a `pdf` config unless `source.content_type` is application/pdf, refuses a PDF source paired with a DOCX output, and refuses a template with signatories and a PDF source that has no `boxes[].kind: "signature"` entry — a PDF carries no text tag to place a signature, so the box is the only way in. Every sub-template must also be published with the SAME source content type as the parent (a PDF parent cannot merge a DOCX sub-template).',
+  // Units caveat, carried over from the implementing commit (0cbc615a0).
+  'PDF box coordinates are PDF points, origin bottom-left, absolute (MediaBox/CropBox offset included) and unrotated — the same convention pdf.js\'s `viewport.convertToPdfPoint` produces. Per the commit that shipped this (0cbc615a0), the signing-box-to-HelloSign coordinate conversion is "not yet confirmed against the live API" — verify placement on an actual signed document before relying on exact positioning.',
 ];
 
 const DOCX_CONTENT_TYPE =
@@ -45,11 +57,14 @@ const OUTPUT_CONTENT_TYPES = [PDF_CONTENT_TYPE, DOCX_CONTENT_TYPE];
 // source.content_type MIME types the service understands.
 const SOURCE_CONTENT_TYPES = [DOCX_CONTENT_TYPE, 'application/pdf'];
 
-// validate_docx accepts these content types (TemplateValidateCodec).
+// validate_docx accepts these content types (TemplateValidateCodec). PDF is a
+// distinct path: it returns the AcroForm field list + page geometry, and (with
+// `pdf`/`signatory_count` also sent) checks a draft `pdf` config against them.
 const VALIDATE_CONTENT_TYPES = [
   'application/msword',
   DOCX_CONTENT_TYPE,
   'application/xml',
+  PDF_CONTENT_TYPE,
 ];
 
 const SIGNATURE_STATUSES = ['DRAFT', 'SENT', 'SIGNED', 'EXPIRED', 'FAILED'];
@@ -84,6 +99,30 @@ const TEMPLATE_EXAMPLE = {
       conditions: { operator: '=', input: ['@fact:client_region.value', 'EU'] },
     },
   ],
+};
+
+const PDF_TEMPLATE_EXAMPLE = {
+  key: 'onboarding-form',
+  label: 'Onboarding Form (PDF)',
+  source: { key: 'onboarding-form.pdf', content_type: PDF_CONTENT_TYPE },
+  output: {
+    content_type: PDF_CONTENT_TYPE,
+    bucket: 'microstrate-documents',
+    folder: 'onboarding',
+  },
+  signatories: [
+    { name: '{employee_name}', email: '{employee_email}', validity: { week: 1 }, order: 0 },
+  ],
+  pdf: {
+    fields: [
+      { name: 'StartDate', expression: '{start_date | formatdate:"dd MMM yyyy":0:en-US}' },
+      { name: 'RoleTitle', expression: '{role_title}' },
+    ],
+    boxes: [
+      { id: 'sig-1', kind: 'signature', signatory: 0, page: 0, x: 380, y: 60, width: 160, height: 40 },
+    ],
+    flatten: true,
+  },
 };
 
 const TRIGGER_EXAMPLE = {
@@ -131,7 +170,7 @@ const REFERENCE = {
   },
   'template': {
     summary:
-      'A template is { key, label?, source?, output?, signatories?, sub_templates? }. `key` is the only required field (read from the body). `source` references a DOCX/PDF in object storage; `output` controls where/how the rendered file is written. Writes target the DRAFT; publish to make generation use it.',
+      'A template is { key, label?, source?, output?, signatories?, sub_templates?, pdf? }. `key` is the only required field (read from the body). `source` references a DOCX/PDF in object storage; `output` controls where/how the rendered file is written. `pdf` (fields/boxes/flatten) fills a PDF source\'s own form fields — see the pdf-templates topic. Writes target the DRAFT; publish to make generation use it.',
     source_content_types: SOURCE_CONTENT_TYPES,
     example: TEMPLATE_EXAMPLE,
   },
@@ -162,6 +201,27 @@ const REFERENCE = {
     example: TEMPLATE_EXAMPLE.sub_templates,
     wrong_example_do_not_use: { key: 'terms-eu', conditions: { all: [{ fact: 'client_region.value', operator: 'equal', value: 'EU' }] } },
   },
+  'pdf-templates': {
+    summary:
+      'A PDF-sourced template fills its OWN AcroForm fields instead of substituting DOCX placeholders. `template.pdf` = { fields?, boxes?, flatten? } — only valid when source.content_type is application/pdf, and the output must also be PDF (PDF -> DOCX is not supported). See the "gotchas" topic for what fails silently vs what does not.',
+    fields:
+      'Array of { name, expression }. `name` must match a real field name in the PDF\'s AcroForm — get the real list from validate_docx, never guess. `expression` is the SAME single-brace angular syntax as DOCX ({field}, {a.b.c}, filters) but with NO loop/section tags: a PDF field holds one value, so {#items}...{/items} is rejected at fill time ("index the list ({items[0].name}) or join it with a filter"). Index a list instead: {items[0].name}.',
+    precedence:
+      'Per field, the first of these that exists wins: (1) a mapping in pdf.fields, (2) a {tag} already sitting in the field\'s own /V (value), /DV (default value) or /TU (tooltip) inside the source PDF — so a form can be tagged once in Acrobat and never touched again in config. A field with neither is left EXACTLY as the source PDF had it.',
+    boxes:
+      'Array of drawn boxes layered onto the page: { id, kind, page, x, y, width, height }. `kind: "text"` additionally takes `expression` (+ optional font_size, align: left|center|right, multiline). `kind: "signature"|"initials"|"date_signed"` takes `signatory` — the index into template.signatories AFTER sorting by `order` — and becomes a HelloSign field rather than being filled directly; it is not itself an expression. Coordinates are PDF points, origin bottom-left, absolute (MediaBox/CropBox offset included) and unrotated — what pdf-lib\'s addToPage / a widget\'s /Rect take, and what pdf.js\'s viewport.convertToPdfPoint produces, so a pdf.js-based UI can pass coordinates through unconverted. Box ids must be unique within a template.',
+    flatten:
+      'Defaults to true: the filled form is baked into flat page content (no longer editable) after generation. Set false to ship an editable filled form instead.',
+    publish_requirements: [
+      '`pdf` is rejected at publish unless source.content_type is application/pdf (create/update accept it regardless — publish is where it is enforced)',
+      'a PDF source must have output.content_type application/pdf',
+      'if the template has signatories, at least one boxes[] entry must be kind "signature" — a PDF carries no text tag to place a signature',
+      'every sub_template must be published with a source of the SAME content_type as the parent',
+    ],
+    validate_before_create:
+      'validate_docx with content_type "application/pdf" returns the real field list and page geometry. Also pass `pdf` (and `signatory_count`, if signatories are already known) to run the same checks create/update trigger server-side: expressions compile, no loop tags, mapped names exist in the PDF, fixed choice values are real field options, box pages/signatory indexes are in range, and which real fields are left unmapped.',
+    example: PDF_TEMPLATE_EXAMPLE,
+  },
   'trigger': {
     summary:
       'POST /templates/trigger generates documents from PUBLISHED templates. `payload` is the shared expression data context (free-form). `list` names template keys with optional per-entry output overrides. Async: the 200 is a bare array of { template, subject } (queued) or { template, errors } (failed) — poll get_document.',
@@ -180,7 +240,11 @@ const REFERENCE = {
     },
   },
   'endpoints': {
-    summary: 'The file-generator REST surface (all under the /file-generator prefix) -> engine subject. Confirmed live for reads + create/validate/trigger; update/delete/publish/unset follow the same pattern.',
+    summary: 'The file-generator REST surface (all under the /file-generator prefix) -> engine subject. Confirmed live for reads + create/validate/trigger; update/delete/publish/unset follow the same pattern. `assigned-files` and `brand-extract` are confirmed gateway-mapped on production (401 unauthenticated, 2026-09-27) despite being absent from the published OpenAPI spec.',
+    account: [
+      'GET  /file-generator/assigned-files              -> get.assigned-files (documents + workspace files assigned to the current user)',
+      'POST /file-generator/brand-extract                -> post.brand-extract (bucket, key -> theme fonts/colors from an Office doc already in storage; requires the CALLER\'s own connection, so only buckets that user can already read work)',
+    ],
     templates: [
       'GET    /file-generator/templates?draft=            -> get.templates',
       'GET    /file-generator/templates/{key}?draft=      -> get.template',
@@ -227,5 +291,6 @@ export {
   VALIDATE_CONTENT_TYPES,
   SIGNATURE_STATUSES,
   TEMPLATE_EXAMPLE,
+  PDF_TEMPLATE_EXAMPLE,
   TRIGGER_EXAMPLE,
 };
