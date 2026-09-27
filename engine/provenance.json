@@ -151,8 +151,7 @@
       "cited_by": [
         "quiva-agents-mcp/src/agents-docs.js",
         "quiva-agents-mcp/src/client.js",
-        "quiva-agents-mcp/test/validate.test.js",
-        "verticals/cip-referrals/flows/README.md"
+        "quiva-agents-mcp/test/validate.test.js"
       ]
     },
     "bellerophon-indexer/request/query_index.go": {
@@ -804,9 +803,7 @@
         "docs/quiva-mcp-handoff.md",
         "quiva-workspaces-mcp/examples/authored/review-board.json",
         "quiva-workspaces-mcp/src/workspaces-docs.js",
-        "specs/openapi/quiva-workspace.json",
-        "verticals/cip-referrals/flows/README.md",
-        "verticals/cip-referrals/flows/referral-intake.json"
+        "specs/openapi/quiva-workspace.json"
       ]
     },
     "workspaces-service/handler/task_templates.go": {
