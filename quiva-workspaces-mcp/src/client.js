@@ -6,6 +6,9 @@
 //   3. QUIVA_EMAIL + QUIVA_PASSWORD (+ optional QUIVA_ACCOUNT)
 //      -> POST /accounts/auth-with-password, JWT cached, re-login once on 401.
 //
+// An integration token (1-hour client-credentials bearer) goes in QUIVA_BEARER_TOKEN;
+// it is not an API key and is refused as X-Api-Key.
+//
 // Auth reality (workspaces-service/handler/*.go): the core space/task/comment
 // CRUD works with an API key alone, but user-attribution fields (owner,
 // created_by, comment author, comment reactions) are only populated when a
@@ -178,14 +181,15 @@ export class QuivaClient {
   }
 
   // request('POST', '/workspaces/space', { body: {...} })
-  async request(method, path, { query, body } = {}) {
+  // `headers` are extra request headers, e.g. { 'If-Match': '3' }.
+  async request(method, path, { query, body, headers: extra } = {}) {
     const url = new URL(this.baseUrl + path);
     for (const [k, v] of Object.entries(query || {})) {
       if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, String(v));
     }
 
     const doFetch = async () => {
-      const headers = { ...(await this.authHeaders()) };
+      const headers = { ...(await this.authHeaders()), ...(extra || {}) };
       if (body !== undefined) headers['Content-Type'] = 'application/json';
       return fetch(url, {
         method,
@@ -222,17 +226,17 @@ export class QuivaClient {
   // workspaces-service update handlers are registered under the `patch` route
   // group. Space/comment updates are a partial merge over the event stream;
   // task update is a DeepMerge of the fields you send.
-  patch(path, body, query) {
-    return this.request('PATCH', path, { body, query });
+  patch(path, body, query, headers) {
+    return this.request('PATCH', path, { body, query, headers });
   }
   // PUT is the odd one out: only the task-action and task-event-schedule routes
   // use it (service/service.go "put" group). Task actions are a create-OR-update
   // upsert on that single verb — there is no separate POST.
-  put(path, body, query) {
-    return this.request('PUT', path, { body, query });
+  put(path, body, query, headers) {
+    return this.request('PUT', path, { body, query, headers });
   }
-  delete(path, query) {
-    return this.request('DELETE', path, { query });
+  delete(path, query, headers) {
+    return this.request('DELETE', path, { query, headers });
   }
 
   // --- Object store (space files) ------------------------------------------

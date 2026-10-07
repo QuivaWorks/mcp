@@ -11,10 +11,6 @@
             {
                 "url": "https://api.quiva.ai",
                 "description": "Production API server"
-            },
-            {
-                "url": "https://api.microstrate.io",
-                "description": "Staging server"
             }
         ],
         "security": [

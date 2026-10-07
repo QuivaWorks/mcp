@@ -7,7 +7,7 @@ import { z } from 'zod';
 
 import { QuivaClient, WORKSPACES_BUCKET, RECALL_BUCKET, fileKeyOf, digestMatches, expectedDigestString } from './client.js';
 import { GOTCHAS, listReferenceTopics, getReference } from './workspaces-docs.js';
-import { validate, verticalRouting } from './validate.js';
+import { validate, verticalRouting, externalIdProblem } from './validate.js';
 import { listExamples, getExample } from './examples.js';
 
 export const instructions = `
@@ -31,6 +31,8 @@ Recipe:
    PORTAL SIGN-IN when the space enrols contacts; it refuses unless allow_sign_in.
 9. list_task_templates / create_task_template ... — templates that pre-fill tasks.
 10. list_meetings / get_meeting_transcript — meeting files a notetaker filed.
+10a. upsert_task_by_external_id / list_space_changes / if_match on update_task and
+   delete_task — keep an external system in step; see get_workspaces_reference("task-sync").
 
 Spaces also hold FILES, and the space "VERTICAL" is a template library whose
 folders are deployed into an account when a vertical is added to it:
@@ -92,8 +94,15 @@ async function withValidation(kind, payload, requireRequired, skip, run, key) {
   return validation?.warnings?.length ? { ...wrap(result), warnings: validation.warnings } : result;
 }
 
-const spacePayload = jsonValue.describe('The space object: { id, name, description?, default_status?, statuses?[{ id, name, color, order, complete, is_visible, role? }], priorities?[], tags?[], record_configs?[], base_record?, organisation_record?, modules?, custom_tab?, hidden_tabs?[], view?, upsert_/remove_{statuses,priorities,tags}? (update only), editing_disabled? (create only, irreversible) }. See get_workspaces_reference("spaces").');
-const taskPayload = jsonValue.describe('The task object: { title, space_id, description?, assignees?[], priority?, status?, due_date?, scheduled_at?, archived?, tags?[], parent?, source?, value?, currency?, expected_close?, time_tracking?: { estimate } , identity? (create only), move_subtasks? (update only), suppress_events? }. See get_workspaces_reference("tasks").');
+const spacePayload = jsonValue.describe('The space object: { id, name, description?, default_status?, statuses?[{ id, name, color, order, complete, is_visible, role? }], priorities?[], tags?[], record_configs?[], base_record?, organisation_record?, modules?, custom_tab?, hidden_tabs?[], view?, upsert_/remove_{statuses,priorities,tags}? (update only), editing_disabled? (create only, irreversible), staging? (root/admin only) }. See get_workspaces_reference("spaces").');
+const taskPayload = jsonValue.describe('The task object: { title, space_id, description?, assignees?[], priority?, status?, due_date?, scheduled_at?, archived?, tags?[], parent?, source?, value?, currency?, expected_close?, time_tracking?: { estimate } , identity? (create only), external_id?, move_subtasks? (update only), suppress_events? }. See get_workspaces_reference("tasks").');
+const ifMatch = z.union([z.number().int(), z.string()]).optional().describe('Task `version` you last read, sent as the If-Match header. A stale value fails with 409 version_conflict and the current task; omit for last-writer-wins. See get_workspaces_reference("task-sync").');
+
+// Only send the header when a value was given.
+function ifMatchHeader(value) {
+  return value === undefined || value === null || value === '' ? undefined : { 'If-Match': String(value) };
+}
+
 const commentPayload = jsonValue.describe('The comment object: { body, reply_id? }. See get_workspaces_reference("comments").');
 const taskActionPayload = jsonValue.describe('The task action: { description, id?, done?, resources?[{ resource_id, resource_type, metadata? }] }. `description` is required on EVERY write, even one that only flips `done`. See get_workspaces_reference("task-actions").');
 
@@ -315,6 +324,7 @@ export function registerTools(server, client, { prefix = '' } = {}) {
       currency: z.string().optional().describe('Exact'),
       value: z.string().optional().describe('"min,max", either side optional (e.g. ",5000")'),
       expected_close: z.string().optional().describe('Date or {start},{end} range'),
+      external_id: z.string().optional().describe('Exact match on the task\'s external_id'),
     },
     async ({ space_id, ...query }) =>
       client.get(`/workspaces/space/${encodeURIComponent(space_id)}/tasks`, query)
@@ -340,14 +350,46 @@ export function registerTools(server, client, { prefix = '' } = {}) {
 
   tool(
     'update_task',
-    'Update one task (PATCH merge). Send only changed fields, built from scratch. Accepts title/description/assignees/priority/status/due_date/scheduled_at/archived/tags/parent/pipeline fields/time_tracking.estimate. `parent: ""` detaches a sub-task; `move_subtasks: true` carries sub-tasks along when space_id or folder changes. Setting archived:true unschedules the task. Do not send time_tracking.logs — it is stored and never read; use add_time_log.',
+    'Update one task (PATCH merge). Send only changed fields, built from scratch. Accepts title/description/assignees/priority/status/due_date/scheduled_at/archived/tags/parent/pipeline fields/time_tracking.estimate. `parent: ""` detaches a sub-task; `move_subtasks: true` carries sub-tasks along when space_id or folder changes. Setting archived:true unschedules the task. Do not send time_tracking.logs — it is stored and never read; use add_time_log. Optional if_match (the task `version`) makes the write conditional: a stale value returns 409 version_conflict with the current task.',
     {
       id: z.string().describe('Task id'),
       task: taskPayload,
+      if_match: ifMatch,
       skip_local_validation: z.boolean().default(false),
     },
-    async ({ id, task, skip_local_validation }) =>
-      withValidation('task', task, false, skip_local_validation, () => client.patch(`/workspaces/task/${encodeURIComponent(id)}`, task), 'updated')
+    async ({ id, task, if_match, skip_local_validation }) =>
+      withValidation('task', task, false, skip_local_validation, () => client.patch(`/workspaces/task/${encodeURIComponent(id)}`, task, undefined, ifMatchHeader(if_match)), 'updated')
+  );
+
+  tool(
+    'upsert_task_by_external_id',
+    'Create or update a task keyed by YOUR id (PUT /workspaces/space/{space_id}/tasks/external/{external_id}). Body is the same as create_task / update_task; the route owns space_id and external_id, so a body value for either is ignored. Returns 201 with the task when created, 200 when updated. external_id: at most 256 bytes, no "/". Optional if_match (task `version`) guards an update (409 version_conflict). 409 external_id_pending: retry. 410 task_deleted: the id is permanently retired, so use a new one. Needs tasks:write on the space. See get_workspaces_reference("task-sync").',
+    {
+      space_id: z.string().describe('Space id (uppercased form)'),
+      external_id: z.string().describe('Your id for the task; no "/", at most 256 bytes of UTF-8'),
+      task: taskPayload,
+      if_match: ifMatch,
+      skip_local_validation: z.boolean().default(false),
+    },
+    async ({ space_id, external_id, task, if_match, skip_local_validation }) => {
+      const problem = externalIdProblem(external_id);
+      if (problem) throw new Error(problem);
+      const path = `/workspaces/space/${encodeURIComponent(space_id)}/tasks/external/${encodeURIComponent(external_id)}`;
+      return withValidation('task', task, false, skip_local_validation, () => client.put(path, task, undefined, ifMatchHeader(if_match)), 'upserted');
+    }
+  );
+
+  tool(
+    'list_space_changes',
+    'Read a space\'s change feed (GET /workspaces/space/{space_id}/changes). Read-only. Returns { events[], next_cursor, has_more, retention_days }; each event carries event_type, origin, changed_fields and the whole task after-state. Page with cursor = the last next_cursor and store it even when events is empty; has_more true means call again. since (RFC 3339) is used only without a cursor. limit 1 to 500, default 100. 410 cursor_expired after 30 days: reconcile with list_tasks. The feed includes your own writes. Needs tasks:read on the space.',
+    {
+      space_id: z.string().describe('Space id (uppercased form)'),
+      cursor: z.string().optional().describe('next_cursor from a previous page; wins over since'),
+      since: z.string().optional().describe('RFC 3339 start time; used only when there is no cursor'),
+      limit: z.number().int().min(1).max(500).optional().describe('1 to 500, default 100'),
+    },
+    async ({ space_id, cursor, since, limit }) =>
+      client.get(`/workspaces/space/${encodeURIComponent(space_id)}/changes`, { cursor, since, limit })
   );
 
   tool(
@@ -365,13 +407,14 @@ export function registerTools(server, client, { prefix = '' } = {}) {
 
   tool(
     'delete_task',
-    'Delete a task by id (also purges its comments and reactions). With delete_subtasks: true every sub-task goes too; without it they are left behind. Returns { message: "success" }. Irreversible.',
+    'Delete a task by id (also purges its comments and reactions). With delete_subtasks: true every sub-task goes too; without it they are left behind. Returns { message: "success" }. Irreversible. Optional if_match (the task `version`) refuses a stale delete with 409 version_conflict.',
     {
       id: z.string().describe('Task id'),
       delete_subtasks: z.boolean().optional().describe('Also delete every sub-task, archived ones included'),
+      if_match: ifMatch,
     },
-    async ({ id, delete_subtasks }) =>
-      client.delete(`/workspaces/task/${encodeURIComponent(id)}`, delete_subtasks ? { delete_subtasks: 'true' } : undefined)
+    async ({ id, delete_subtasks, if_match }) =>
+      client.delete(`/workspaces/task/${encodeURIComponent(id)}`, delete_subtasks ? { delete_subtasks: 'true' } : undefined, ifMatchHeader(if_match))
   );
 
   // ---------------------------------------------------------------------------
