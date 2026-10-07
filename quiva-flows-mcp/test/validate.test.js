@@ -665,6 +665,16 @@ check('email, verify-signature and sign-envelope are known node types', () => {
   }
 });
 
+check('connector is a known node type with a validated operation', () => {
+  assert.ok(NODE_TYPES.connector, 'connector missing from node-docs');
+  noErrors(one({ id: 'C', node_type: 'connector', operation: 'sync_apply', payload: { connection: 'x', binding_id: 'b', item: '$.trigger' } }));
+  noErrors(one({ id: 'C', node_type: 'connector', operation: 'sync_push', payload: { connection: 'x', binding_id: 'b', event: '$.trigger' } }));
+  hasError(one({ id: 'C', node_type: 'connector', payload: { connection: 'x' } }), 'needs data.operation');
+  hasError(one({ id: 'C', node_type: 'connector', operation: 'sync_everything', payload: {} }), 'unknown connector operation');
+  hasError(one({ id: 'C', node_type: 'connector', operation: 'sync_apply', payload: { connection: 'x', item: '$.trigger' } }), 'requires "binding_id"');
+  hasError(one({ id: 'C', node_type: 'connector', operation: 'sync_push', payload: { connection: 'x', binding_id: 'b' } }), '"task_id" or "event"');
+});
+
 check('email: a list in "to" is refused (one email per recipient)', () => {
   hasError(one({ id: 'E', node_type: 'email', payload: { to: ['a@example.com'], subject: 's', text: 't' } }), 'ONE address');
 });
