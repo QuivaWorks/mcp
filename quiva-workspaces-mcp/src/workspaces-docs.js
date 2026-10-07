@@ -546,6 +546,8 @@ const REFERENCE = {
       invalid_request: '400, malformed body, a bad external_id, or a bad limit or since',
       integration_not_allowed: '403, integration bearer outside the workspaces routes',
     },
+    connector_sync:
+      'A task subscription can also deliver to a connector sync ingress. Two-way tracker sync is a connection: installing its sync package creates the ingress, mapping and subscription, and runs with no generated flows. Add your own steps with the flows `connector` node (get_node_type_reference("connector") in quiva-flows-mcp).',
     not_exposed: 'Integration admin (creating integrations, secrets, webhook subscriptions), copy-structure and reset are not in this MCP. Use the app (Account, Connections, API integrations) or the API.',
   },
   'endpoints': {
