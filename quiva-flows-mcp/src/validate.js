@@ -32,6 +32,7 @@ const AGENT_SUB_NODE_PREFIX = 'agent_';
 
 const TASK_OPERATIONS = Object.keys(NODE_TYPES.task.operations);
 const EMAIL_OPERATIONS = ['send_email'];
+const CONNECTOR_OPERATIONS = Object.keys(NODE_TYPES.connector.operations);
 
 // Exact mirror of hub-service/handler/create-workflow.go graphIDBadChars (".*>@ \t\n"); refused on every write.
 const GRAPH_ID_BAD_CHARS = /[.*>@ \t\n]/;
@@ -331,6 +332,10 @@ function validateNodePayload(type, data, label, errors, warnings) {
       checkTaskNode(data, payload, isObj, label, errors);
       break;
 
+    case 'connector':
+      checkConnectorNode(data, payload, isObj, label, errors);
+      break;
+
     case 'email':
       checkEmailNode(data, payload, isObj, label, errors);
       break;
@@ -480,6 +485,36 @@ function checkEmailNode(data, payload, isObj, label, errors) {
   if (!hasValue(payload.subject)) errors.push(`node ${label}: email payload requires "subject"`);
   if (!hasValue(payload.html) && !hasValue(payload.text)) {
     errors.push(`node ${label}: email payload has no body — give "html", "text" or both`);
+  }
+}
+
+// hub-service/runner/connector_node.go and hub-service/data/connector_endpoints.go.
+function checkConnectorNode(data, payload, isObj, label, errors) {
+  if (!data.operation) {
+    errors.push(`node ${label}: a connector node needs data.operation, one of ${CONNECTOR_OPERATIONS.join(', ')}`);
+    return;
+  }
+  if (!CONNECTOR_OPERATIONS.includes(data.operation)) {
+    errors.push(`node ${label}: unknown connector operation "${data.operation}": expected one of ${CONNECTOR_OPERATIONS.join(', ')}`);
+    return;
+  }
+  if (!isObj) {
+    errors.push(`node ${label}: connector payload must be an object`);
+    return;
+  }
+  const required = {
+    run_operation: ['connection', 'operation'],
+    lookup: ['connection', 'operation'],
+    sync_normalise: ['connection', 'binding_id', 'event'],
+    sync_plan: ['connection', 'binding_id', 'direction'],
+    sync_apply: ['connection', 'binding_id', 'item'],
+    sync_push: ['connection', 'binding_id'],
+  }[data.operation];
+  for (const key of required) {
+    if (!hasValue(payload[key])) errors.push(`node ${label}: connector ${data.operation} payload requires "${key}"`);
+  }
+  if (data.operation === 'sync_push' && !hasValue(payload.task_id) && !hasValue(payload.event)) {
+    errors.push(`node ${label}: connector sync_push needs "task_id" or "event", one of the two`);
   }
 }
 

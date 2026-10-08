@@ -5,17 +5,13 @@
         "info": {
             "title": "Workspaces Service API",
             "version": "1.0.1",
-            "description": "API for managing workspaces, tasks, and comments with comprehensive CRUD operations and collaboration features.\n\nEngine-truth notes (corrected against the workspaces-service source and verified live on staging; see per-operation descriptions):\n- Every response is wrapped in `{ \"status_code\": N, \"body\": {...} }`; the schemas below describe the inner `body`. Errors carry the message under `body.error`.\n- Deletes return 200 `{ \"message\": \"success\" }`, NOT 204/no-body. Comment delete is a soft delete.\n- Space `id` is required on create, must match `^\\w+$` (letters/numbers/underscore only), and is UPPERCASED server-side. Duplicate id -> 409.\n- Task ids are server-generated (`{SPACEID}-{n}` or `t_<nanoid>`); comment ids are `c_<nanoid>`. Any id you send is ignored.\n- Updates are PATCH (partial merge). Build payloads from scratch; do not echo nested objects from a GET.\n- Auth: an API key alone drives the core CRUD, but attribution fields (space owner, task created_by, comment author) and comment reactions are only populated with a Bearer JWT. Prefer bearer auth.\n- `due_date` / `scheduled_at` are RFC3339 date-times, not date-only.\n- Tasks carry `time_tracking` ({ estimate?, logs[] }). On update `logs` REPLACES the stored array rather than appending, so adding an entry is read-modify-write; omitting `logs` entirely is safe. Totals/remaining/progress are derived in the browser and must never be sent. All four merge cases verified live 2026-07-29.\n- create_task with no `status` now inherits the space's `default_status` (only when `space_id` is set). A status-less task used to sit outside every board column.\n- Task ACTIONS (the per-task checklist) are WRITE-ONLY: PUT and DELETE work, but the GET on the same path is mapped at the write resource and always 400s, and the real list handler has no route. Nothing about a task action can be verified after writing. See /workspaces/task/{task_id}/action.\n- Routes this spec deliberately does not model (files/folders, file approvals, client folders) are inventoried under `x-gateway-routes-not-in-this-spec` with a note on which were probed live.\n\nMAINTENANCE NOTE: this file is a sourced `{name, schema}` tool-spec copy referenced by no build — edits here may be overwritten by whatever regenerates it. Apply the same corrections at the real source of truth.",
+            "description": "API for managing workspaces, tasks, and comments with comprehensive CRUD operations and collaboration features.\n\nEngine-truth notes (corrected against the workspaces-service source and verified live on staging; see per-operation descriptions):\n- On the mesh, every workspaces-service response is wrapped in `{ \"status_code\": N, \"body\": {...} }`; the gateway at api.quiva.ai unwraps it for every route (HTTP status = `status_code`, HTTP body = `body`), so an HTTPS caller never sees the envelope. The schemas below describe that `body`. Errors carry the message under `error`.\n- Deletes return 200 `{ \"message\": \"success\" }`, NOT 204/no-body. Comment delete is a soft delete.\n- Space `id` is required on create, must match `^\\w+$` (letters/numbers/underscore only), and is UPPERCASED server-side. Duplicate id -> 409.\n- Task ids are server-generated (`{SPACEID}-{n}` or `t_<nanoid>`); comment ids are `c_<nanoid>`. Any id you send is ignored.\n- Updates are PATCH (partial merge). Build payloads from scratch; do not echo nested objects from a GET.\n- Auth: an API key alone drives the core CRUD, but attribution fields (space owner, task created_by, comment author) and comment reactions are only populated with a Bearer JWT. Prefer bearer auth.\n- `due_date` / `scheduled_at` are RFC3339 date-times, not date-only.\n- Tasks carry `time_tracking` ({ estimate?, logs[] }). On update `logs` REPLACES the stored array rather than appending, so adding an entry is read-modify-write; omitting `logs` entirely is safe. Totals/remaining/progress are derived in the browser and must never be sent. All four merge cases verified live 2026-07-29.\n- create_task with no `status` now inherits the space's `default_status` (only when `space_id` is set). A status-less task used to sit outside every board column.\n- Task ACTIONS (the per-task checklist) are WRITE-ONLY: PUT and DELETE work, but the GET on the same path is mapped at the write resource and always 400s, and the real list handler has no route. Nothing about a task action can be verified after writing. See /workspaces/task/{task_id}/action.\n- Task sync routes (`/workspaces/space/{space_id}/changes`, `.../tasks/external/{external_id}`, `If-Match` on task PATCH/DELETE) follow the same rule: the object itself over HTTPS. Their errors are `{ error, code }`; branch on `code`.\n- Routes this spec deliberately does not model (files/folders, file approvals, client folders) are inventoried under `x-gateway-routes-not-in-this-spec` with a note on which were probed live.\n\nMAINTENANCE NOTE: this file is a sourced `{name, schema}` tool-spec copy referenced by no build — edits here may be overwritten by whatever regenerates it. Apply the same corrections at the real source of truth.",
             "x-oauth-provider": "workspacesServiceApi"
         },
         "servers": [
             {
                 "url": "https://api.quiva.ai",
                 "description": "Production API server"
-            },
-            {
-                "url": "https://api.microstrate.io",
-                "description": "Staging server"
             }
         ],
         "security": [
@@ -299,7 +295,7 @@
                     "tags": [
                         "Tasks"
                     ],
-                    "description": "Retrieves all tasks within a specific space with their current status and metadata. Use this to display task lists, filter by status, or synchronize task data.",
+                    "description": "Retrieves all tasks within a specific space with their current status and metadata. Use this to display task lists, filter by status, or synchronize task data. `sort_by=activity_at` orders by last activity. The reply also carries `has_more`.",
                     "parameters": [
                         {
                             "$ref": "#/components/parameters/SpaceIdPath"
@@ -425,6 +421,14 @@
                             "name": "scheduled_at",
                             "in": "query",
                             "description": "Filter by scheduled date. Use a single date or a range as `{start_date},{end_date}`",
+                            "schema": {
+                                "type": "string"
+                            }
+                        },
+                        {
+                            "name": "external_id",
+                            "in": "query",
+                            "description": "Exact match on the task's external_id.",
                             "schema": {
                                 "type": "string"
                             }
@@ -611,10 +615,13 @@
                     "tags": [
                         "Tasks"
                     ],
-                    "description": "Updates task fields (PATCH merge). Use minimal structures: status='statusId', priority='level', assignees=['userId1'], title='text', due_date=RFC3339 (e.g. '2024-06-15T00:00:00Z'). Also accepts archived, scheduled_at, order, tags.",
+                    "description": "Updates task fields (PATCH merge). Use minimal structures: status='statusId', priority='level', assignees=['userId1'], title='text', due_date=RFC3339 (e.g. '2024-06-15T00:00:00Z'). Also accepts archived, scheduled_at, order, tags. Optional `If-Match` makes the write compare-and-set.",
                     "parameters": [
                         {
                             "$ref": "#/components/parameters/TaskId"
+                        },
+                        {
+                            "$ref": "#/components/parameters/IfMatch"
                         }
                     ],
                     "requestBody": {
@@ -656,6 +663,9 @@
                         },
                         "404": {
                             "$ref": "#/components/responses/NotFound"
+                        },
+                        "409": {
+                            "$ref": "#/components/responses/Conflict"
                         }
                     }
                 },
@@ -667,10 +677,13 @@
                     "tags": [
                         "Tasks"
                     ],
-                    "description": "Deletes a task and associated data. Use this to remove completed or no-longer-needed tasks from the workspace.",
+                    "description": "Deletes a task and associated data. Use this to remove completed or no-longer-needed tasks from the workspace. Optional `If-Match` refuses a stale delete (409 `version_conflict`).",
                     "parameters": [
                         {
                             "$ref": "#/components/parameters/TaskId"
+                        },
+                        {
+                            "$ref": "#/components/parameters/IfMatch"
                         }
                     ],
                     "responses": {
@@ -686,6 +699,9 @@
                         },
                         "404": {
                             "$ref": "#/components/responses/NotFound"
+                        },
+                        "409": {
+                            "$ref": "#/components/responses/Conflict"
                         }
                     }
                 }
@@ -1188,6 +1204,149 @@
                         }
                     }
                 }
+            },
+            "/workspaces/space/{space_id}/tasks/external/{external_id}": {
+                "put": {
+                    "summary": "Upsert task by external id",
+                    "operationId": "upsertTaskByExternalId",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.workspaces.put.task-external",
+                    "tags": [
+                        "Tasks"
+                    ],
+                    "description": "Creates the task if no task in this space has this external id (201), otherwise updates it (200). The route owns `space_id` and `external_id`; a body value for either is ignored. `external_id` is at most 256 bytes of UTF-8 and must not contain `/`; percent-encode it in the path. Needs `tasks:write` on the space. 409 `external_id_pending`: retry. 410 `task_deleted`: the id is permanently retired.",
+                    "parameters": [
+                        {
+                            "$ref": "#/components/parameters/SpaceIdPath"
+                        },
+                        {
+                            "name": "external_id",
+                            "in": "path",
+                            "required": true,
+                            "description": "Your id for the task. No `/`, at most 256 bytes.",
+                            "schema": {
+                                "type": "string",
+                                "maxLength": 256
+                            },
+                            "example": "crm-9142"
+                        },
+                        {
+                            "$ref": "#/components/parameters/IfMatch"
+                        }
+                    ],
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UpdateTaskRequest"
+                                },
+                                "examples": {
+                                    "upsertExample": {
+                                        "summary": "Create or update by external id",
+                                        "value": {
+                                            "title": "Renewal follow-up",
+                                            "status": "todo"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Task updated.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/Task"
+                                    }
+                                }
+                            }
+                        },
+                        "201": {
+                            "description": "Task created.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/Task"
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "$ref": "#/components/responses/BadRequest"
+                        },
+                        "409": {
+                            "$ref": "#/components/responses/Conflict"
+                        },
+                        "410": {
+                            "$ref": "#/components/responses/Gone"
+                        }
+                    }
+                }
+            },
+            "/workspaces/space/{space_id}/changes": {
+                "get": {
+                    "summary": "List space changes",
+                    "operationId": "listSpaceChanges",
+                    "x-resource-type": "service",
+                    "x-resource": "microstrate.workspaces.get.task-changes",
+                    "tags": [
+                        "Tasks"
+                    ],
+                    "description": "The space's change feed, in stream order. Page with `cursor` set to the last `next_cursor`; an empty page still returns one, so store it. `since` is used only without a cursor. Retention is 30 days: an older cursor answers 410 `cursor_expired`. The feed includes your own writes (skip events whose `origin` is you). Needs `tasks:read` on the space.",
+                    "parameters": [
+                        {
+                            "$ref": "#/components/parameters/SpaceIdPath"
+                        },
+                        {
+                            "name": "cursor",
+                            "in": "query",
+                            "description": "Opaque string from a previous `next_cursor`. Wins over `since`. Not a number: 400 `invalid_cursor`.",
+                            "schema": {
+                                "type": "string"
+                            }
+                        },
+                        {
+                            "name": "since",
+                            "in": "query",
+                            "description": "RFC 3339. Used only when there is no cursor.",
+                            "schema": {
+                                "type": "string",
+                                "format": "date-time"
+                            }
+                        },
+                        {
+                            "name": "limit",
+                            "in": "query",
+                            "description": "1 to 500, default 100.",
+                            "schema": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 500
+                            }
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "A page of events.",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/SpaceChanges"
+                                    }
+                                }
+                            }
+                        },
+                        "400": {
+                            "$ref": "#/components/responses/BadRequest"
+                        },
+                        "410": {
+                            "$ref": "#/components/responses/Gone"
+                        }
+                    }
+                }
             }
         },
         "components": {
@@ -1241,6 +1400,16 @@
                         "type": "string"
                     },
                     "example": "comment_001"
+                },
+                "IfMatch": {
+                    "name": "If-Match",
+                    "in": "header",
+                    "required": false,
+                    "description": "The task `version` you last read (a quoted value is accepted; 0 matches a legacy task with no version). A mismatch answers 409 `version_conflict` with the current task; a non-integer answers 400 `bad_if_match`. Omit for last-writer-wins.",
+                    "schema": {
+                        "type": "string"
+                    },
+                    "example": "3"
                 }
             },
             "schemas": {
@@ -1448,6 +1617,10 @@
                             "example": [
                                 "config_001"
                             ]
+                        },
+                        "staging": {
+                            "type": "boolean",
+                            "description": "Marks a staging (sandbox) space. Root or admin only; 403 for anyone else, including integrations."
                         }
                     }
                 },
@@ -1548,6 +1721,10 @@
                         "default_view": {
                             "type": "string",
                             "description": "Default board/list view for the space."
+                        },
+                        "staging": {
+                            "type": "boolean",
+                            "description": "Marks a staging (sandbox) space. Root or admin only; 403 for anyone else, including integrations."
                         }
                     }
                 },
@@ -1791,6 +1968,25 @@
                                 }
                             ],
                             "description": "Effort estimate plus logged entries. On update, `logs` REPLACES the stored array rather than appending — read the task first and send the complete set. See the TimeTracking schema for all four merge cases."
+                        },
+                        "version": {
+                            "type": "integer",
+                            "readOnly": true,
+                            "description": "1 on create, +1 on every task write. Use it as `If-Match`. Comments, time logs and action add/delete move `activity_at` instead.",
+                            "example": 3
+                        },
+                        "external_id": {
+                            "type": "string",
+                            "maxLength": 256,
+                            "description": "Your id for the task (no `/`). Set through the upsert route it is unique per space; set through create or update it is a plain indexed attribute.",
+                            "example": "crm-9142"
+                        },
+                        "activity_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "readOnly": true,
+                            "description": "Last activity: equals `updated_at` after a task write; comment, time-log and action writes also stamp it.",
+                            "example": "2026-10-06T09:15:00Z"
                         }
                     }
                 },
@@ -1889,6 +2085,12 @@
                                 }
                             ],
                             "description": "Effort estimate plus logged entries. On update, `logs` REPLACES the stored array rather than appending — read the task first and send the complete set. See the TimeTracking schema for all four merge cases."
+                        },
+                        "external_id": {
+                            "type": "string",
+                            "maxLength": 256,
+                            "description": "Your id for the task (no `/`). Set through the upsert route it is unique per space; set through create or update it is a plain indexed attribute.",
+                            "example": "crm-9142"
                         }
                     }
                 },
@@ -1975,6 +2177,12 @@
                                 }
                             ],
                             "description": "Effort estimate plus logged entries. On update, `logs` REPLACES the stored array rather than appending — read the task first and send the complete set. See the TimeTracking schema for all four merge cases."
+                        },
+                        "external_id": {
+                            "type": "string",
+                            "maxLength": 256,
+                            "description": "Your id for the task (no `/`). Set through the upsert route it is unique per space; set through create or update it is a plain indexed attribute.",
+                            "example": "crm-9142"
                         }
                     }
                 },
@@ -2345,6 +2553,111 @@
                             "description": "Platform resources linked from this action."
                         }
                     }
+                },
+                "SpaceChanges": {
+                    "type": "object",
+                    "properties": {
+                        "events": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/SpaceChangeEvent"
+                            }
+                        },
+                        "next_cursor": {
+                            "type": "string",
+                            "description": "Opaque. Pass as `cursor` for the next page."
+                        },
+                        "has_more": {
+                            "type": "boolean"
+                        },
+                        "retention_days": {
+                            "type": "integer",
+                            "example": 30
+                        }
+                    }
+                },
+                "SpaceChangeEvent": {
+                    "type": "object",
+                    "properties": {
+                        "event_id": {
+                            "type": "string"
+                        },
+                        "event_type": {
+                            "type": "string",
+                            "enum": [
+                                "task-created",
+                                "task-updated",
+                                "task-status-changed",
+                                "task-moved",
+                                "task-deleted",
+                                "task-action-added",
+                                "task-action-completed",
+                                "task-action-deleted",
+                                "comment-created",
+                                "comment-updated",
+                                "comment-deleted"
+                            ]
+                        },
+                        "occurred_at": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "account_id": {
+                            "type": "string"
+                        },
+                        "space_id": {
+                            "type": "string"
+                        },
+                        "folder": {
+                            "type": "string"
+                        },
+                        "origin": {
+                            "type": "object",
+                            "properties": {
+                                "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                        "distribution",
+                                        "integration",
+                                        "api_key",
+                                        "flow",
+                                        "user",
+                                        "system"
+                                    ]
+                                },
+                                "id": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "actor": {
+                            "type": "string"
+                        },
+                        "task": {
+                            "$ref": "#/components/schemas/Task"
+                        },
+                        "changed_fields": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "status_from": {
+                            "type": "string"
+                        },
+                        "old_space_id": {
+                            "type": "string"
+                        },
+                        "comment": {
+                            "type": "object",
+                            "nullable": true
+                        },
+                        "action": {
+                            "type": "object",
+                            "nullable": true
+                        }
+                    },
+                    "description": "`task` is always the whole after-state, never a delta."
                 }
             },
             "responses": {
@@ -2376,6 +2689,26 @@
                                         "example": "Space not found with id: space_001"
                                     }
                                 }
+                            }
+                        }
+                    }
+                },
+                "Conflict": {
+                    "description": "Conflict. `version_conflict` (If-Match mismatch, with the current `task`), `external_id_pending` (retry), or `external_id_immutable`. Body `{ error, code }`.",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Error"
+                            }
+                        }
+                    }
+                },
+                "Gone": {
+                    "description": "Gone. `task_deleted` (the external id is permanently retired) or `cursor_expired` (carries `next_cursor` and `retention_days`). Body `{ error, code }`.",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Error"
                             }
                         }
                     }

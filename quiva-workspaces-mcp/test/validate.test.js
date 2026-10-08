@@ -5,7 +5,7 @@ import { validate, verticalRouting } from '../src/validate.js';
 import { harvestedPayloads, getExample } from '../src/examples.js';
 import {
   TIME_LOG_EXAMPLE, TIME_TRACKING_EXAMPLE, TASK_ACTION_EXAMPLE, CREATE_SPACE_EXAMPLE, CREATE_CONTACT_EXAMPLE,
-  TASK_TEMPLATE_EXAMPLE, SPACE_UPDATE_FIELDS, VERTICAL_CONFIG_TYPES, VERTICAL_NON_DEPLOYING_FOLDERS,
+  TASK_TEMPLATE_EXAMPLE, SPACE_UPDATE_FIELDS, getReference, VERTICAL_CONFIG_TYPES, VERTICAL_NON_DEPLOYING_FOLDERS,
 } from '../src/workspaces-docs.js';
 import { decodeFileKey, fileKeyOf, digestMatches, sha256OfContent } from '../src/client.js';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -1044,6 +1044,71 @@ check('every file in src/ is syntactically valid', () => {
     assert.match(text(missing), /not indexed, or the meetings index did not answer/);
   });
   check('list_meetings says an empty list is not proof', () => assert.match(tools.list_meetings.meta.description, /meetings index fails/));
+}
+
+// --- task sync ---
+check('validator: staging must be a boolean and warns', () => {
+  assert.ok(validate('space', { id: 'OPS', name: 'Ops', staging: 'yes' }).errors.some((e) => /staging must be a boolean/.test(e)));
+  assert.ok(validate('space', { id: 'OPS', name: 'Ops', staging: true }).warnings.some((w) => /root\/admin only/.test(w)));
+  assert.ok(SPACE_UPDATE_FIELDS.includes('staging'));
+});
+check('validator: external_id rules and read-only version/activity_at', () => {
+  assert.ok(validate('task', { title: 'x', external_id: 'a/b' }).errors.some((e) => /"\/"/.test(e)));
+  assert.ok(validate('task', { title: 'x', external_id: 'é'.repeat(129) }).errors.some((e) => /256 bytes/.test(e)));
+  assert.equal(validate('task', { title: 'x', external_id: 'crm:ext.9' }).valid, true);
+  assert.ok(validate('task', { title: 'x', version: 3 }).warnings.some((w) => /version/.test(w)));
+});
+check('task-sync reference topic and auth fix', () => {
+  const t = getReference('task-sync');
+  for (const k of ['version', 'if_match', 'external_ids', 'activity_at', 'changes_feed', 'strict_ids', 'error_codes']) assert.ok(t[k], k);
+  assert.ok(t.error_codes.version_conflict && t.error_codes.cursor_expired);
+  assert.match(getReference('auth').integration_tokens.what, /QUIVA_BEARER_TOKEN/);
+  assert.match(getReference('auth').integration_tokens.what, /NOT an API key/);
+  assert.ok(getReference('endpoints').task_sync.some((l) => /tasks\/external/.test(l)));
+  assert.ok(getReference('spaces').staging);
+});
+
+{
+  const { registerTools } = await import('../src/index.js');
+  const tools = {};
+  const calls = [];
+  const fake = (method) => async (path, a, b, h) => { calls.push({ method, path, a, b, h }); return { id: 'OPS-1', version: 2 }; };
+  const client = { get: fake('GET'), post: fake('POST'), put: fake('PUT'), patch: fake('PATCH'), delete: fake('DELETE') };
+  registerTools({ registerTool: (n, meta, fn) => (tools[n] = { meta, fn }) }, client);
+  const text = (r) => r.content[0].text;
+
+  await tools.upsert_task_by_external_id.fn({ space_id: 'OPS', external_id: 'crm:9 a', task: { title: 'Sync me' }, if_match: 3, skip_local_validation: false });
+  check('upsert PUTs the encoded external id route with If-Match', () => {
+    assert.deepEqual([calls[0].method, calls[0].path], ['PUT', '/workspaces/space/OPS/tasks/external/crm%3A9%20a']);
+    assert.deepEqual(calls[0].h, { 'If-Match': '3' });
+  });
+  calls.length = 0;
+  await tools.upsert_task_by_external_id.fn({ space_id: 'OPS', external_id: 'x', task: { title: 'T' }, skip_local_validation: false });
+  check('upsert sends no If-Match header when if_match is omitted', () => assert.equal(calls[0].h, undefined));
+  calls.length = 0;
+  const bad = await tools.upsert_task_by_external_id.fn({ space_id: 'OPS', external_id: 'a/b', task: { title: 'T' }, skip_local_validation: false });
+  check('upsert refuses a "/" in external_id and sends nothing', () => {
+    assert.equal(bad.isError, true);
+    assert.match(text(bad), /must not contain "\/"/);
+    assert.equal(calls.length, 0);
+  });
+  await tools.update_task.fn({ id: 'OPS-1', task: { title: 'New' }, if_match: '4', skip_local_validation: false });
+  await tools.delete_task.fn({ id: 'OPS-1', delete_subtasks: true, if_match: 4 });
+  await tools.delete_task.fn({ id: 'OPS-2' });
+  check('update_task and delete_task send If-Match only when given', () => {
+    assert.deepEqual(calls[0].h, { 'If-Match': '4' });
+    assert.deepEqual([calls[1].a, calls[1].b], [{ delete_subtasks: 'true' }, { 'If-Match': '4' }]);
+    assert.equal(calls[2].b, undefined);
+  });
+  calls.length = 0;
+  await tools.list_space_changes.fn({ space_id: 'OPS', cursor: '1842', limit: 50 });
+  check('list_space_changes GETs the feed with cursor and limit', () => {
+    assert.deepEqual([calls[0].method, calls[0].path], ['GET', '/workspaces/space/OPS/changes']);
+    assert.deepEqual(calls[0].a, { cursor: '1842', since: undefined, limit: 50 });
+  });
+  check('no integration-admin, reset or copy tools exist', () => {
+    for (const n of Object.keys(tools)) assert.ok(!/integration|reset|copy_structure/.test(n), n);
+  });
 }
 
 check('push-example.mjs header comment is at most 3 lines', () => {

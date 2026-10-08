@@ -17,7 +17,7 @@ const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 // Read-only / server-set fields that should never be sent in a create/update
 // body (the engine ignores them; echoing a GET response back is the #1 mistake).
 const SPACE_READONLY = ['owner', 'created_at', 'updated_at', 'url'];
-const TASK_READONLY = ['created_at', 'updated_at', 'created_by', 'url', 'watchers', 'muted', 'subtasks', 'task_actions', 'base_record_skipped'];
+const TASK_READONLY = ['created_at', 'updated_at', 'created_by', 'url', 'watchers', 'muted', 'subtasks', 'task_actions', 'base_record_skipped', 'version', 'activity_at'];
 const COMMENT_READONLY = ['author', 'created_at', 'updated_at', 'url', 'reactions'];
 
 const VALID_KINDS = ['space', 'task', 'multi_task', 'comment', 'reaction', 'task_action', 'time_log', 'contact', 'task_template', 'folder', 'file'];
@@ -95,6 +95,11 @@ function validateSpace(p, required, errors, warnings) {
   if (p.custom_tab !== undefined) validateCustomTab(p.custom_tab, p, errors, warnings);
   if (p.hidden_tabs !== undefined) validateHiddenTabs(p.hidden_tabs, errors, warnings);
   if (p.view !== undefined && !isObject(p.view)) errors.push('view must be an object { tasks: { board: { card: { fields: {...} } } } }');
+
+  if (p.staging !== undefined) {
+    if (typeof p.staging !== 'boolean') errors.push('staging must be a boolean');
+    else warnings.push('staging is root/admin only (403 for anyone else, and for an integration). A staging space can be reset and is a safe place to test task sync.');
+  }
 
   if (p.editing_disabled !== undefined) {
     if (typeof p.editing_disabled !== 'boolean') {
@@ -259,7 +264,19 @@ function validateTask(p, required, errors, warnings) {
   validatePipelineFields(p, errors, warnings);
   validateIdentity(p, required, errors, warnings);
   if (p.suppress_events !== undefined && typeof p.suppress_events !== 'boolean') errors.push('suppress_events must be a boolean');
+  if (p.external_id !== undefined) {
+    const msg = externalIdProblem(p.external_id);
+    if (msg) errors.push(msg);
+  }
   warnReadonly(p, TASK_READONLY, warnings);
+}
+
+// Mirrors the server rule: at most 256 bytes of UTF-8, no "/".
+export function externalIdProblem(id) {
+  if (typeof id !== 'string' || id === '') return 'external_id must be a non-empty string';
+  if (id.includes('/')) return 'external_id must not contain "/"';
+  if (Buffer.byteLength(id, 'utf8') > 256) return 'external_id must be at most 256 bytes of UTF-8';
+  return null;
 }
 
 // handler/tasks.go validateParent: one level, must exist, not self.

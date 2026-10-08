@@ -65,6 +65,7 @@ export const GOTCHAS = [
   'task nodes: "operation" is a NODE-LEVEL property (data.operation), not a payload field; the server refuses payload.operation, a missing operation and an unknown one (13 operations, see get_node_type_reference("task")). Omitting space_id is not neutral — it falls back to the ESCALATE space. An empty assignees list CLEARS assignees (only an absent field is no-change), and a mapped value resolving to nothing sends exactly that. status/priority/tags are free strings server-side, so a value the space does not define is stored and then matches no filter, and the task vanishes from every board.',
   'email nodes send ONE email to ONE recipient ("to" must be a single address, not a list) through the account\'s verified sending domain. The result {msg_id, accepted, status: "queued"} means accepted for sending, not delivered: suppression and consent are applied later. There is no retry, so do not wrap it in options.attempts.',
   'verify-signature is the opposite of verify-challenge: a failed check REFUSES the run (401 "unauthorized", run status "refused") instead of returning a result to branch on. Map headers/body as "$.env.headers" / "$.trigger" with NO leading pipe; a pipe turns the object into a string and every call fails.',
+  'connector nodes: "operation" is a NODE-LEVEL property (data.operation), one of run_operation, lookup, sync_normalise, sync_plan, sync_apply, sync_push; the node refuses an unknown one. The sync operations need a binding_id and a root, admin or developer role. Results carry an "outcome" (including skipped, conflict and failed): branch on it. Inbound sync = webhook trigger -> sync_normalise -> condition on empty items -> per-item child flow via quiva-endpoint on microstrate.hub.post.workflow-run -> sync_apply; outbound = task trigger -> sync_push. Installing a sync package syncs without any flow (see get_node_type_reference("connector")).',
   'input / human-in-the-loop payload is {title, description, message, priority, assignees} (assignees = comma-separated user ids). The spec\'s "notify" email/slack block is not read by the current engine.',
   'Prefer the task node\'s list_tasks for a filtered task lookup over a quiva-endpoint node on microstrate.workspaces.get.tasks. A quiva-endpoint node sends no filters or space_id on that subject and silently queries the default space. See get_node_type_reference("quiva-endpoint").header_lift.',
 ];
@@ -759,6 +760,41 @@ export const NODE_TYPES = {
       'task_id is authored in the payload for every operation; the node moves it onto a header or renames it to "id" as each operation needs (hub-service/runner/task_node.go). ' +
       'complete_task_action reads the action back before writing it, because the underlying endpoint replaces the stored action wholesale: a blind write drops the action\'s resources, and is refused outright without a description. That means it costs two calls, and it fails with "task has no action <id>" if the id is wrong. ' +
       'The node reaches nothing the quiva-endpoint node could not — the same allowlist and secrets guard applies.',
+  },
+
+  connector: {
+    summary:
+      'Run one operation of a connected data source or two-way tracker sync, with the flow run\'s own identity. (Not in the OpenAPI spec.) The operation selects the endpoint and sits on data.operation, not in the payload; the payload is the request body. Installing a sync package already syncs without any flow, so use the sync operations only to add your own steps around it.',
+    required: ['id', 'node_type', 'operation', 'payload'],
+    nodeLevelProps: {
+      operation:
+        'REQUIRED, on data.operation, NOT in the payload. One of the six in `operations` below (hub-service/data/connector_endpoints.go). The node refuses an unknown one with the list of valid operations (hub-service/runner/connector_node.go). run_operation and lookup also take a payload field named "operation": that is the CONNECTION operation to run, a different thing.',
+    },
+    operations: {
+      run_operation: 'Required: connection, operation. Optional: params, binding_id, config_id, record_id. Runs one operation of the connection and stores its result.',
+      lookup: 'Required: connection, operation. Optional: params, query, limit. Returns options as value, text and note.',
+      sync_normalise: 'Required: connection, binding_id, event. Turns a tracker event into { items }. Writes nothing.',
+      sync_plan: 'Required: connection, binding_id, direction. Optional: item or task_id. Reports what a sync would change. Writes nothing.',
+      sync_apply: 'Required: connection, binding_id, item. Creates or updates the task for one tracker item. A replay updates the same task.',
+      sync_push: 'Required: connection, binding_id, and one of task_id or event. Creates or updates the tracker item for a task.',
+    },
+    optional: {
+      connection: 'The connection definition to use. In every operation.',
+      binding_id: 'The install\'s sync binding, which pairs a tracker with a task space. Required by the four sync operations.',
+    },
+    example: {
+      id: 'APPLY_ITEM',
+      data: {
+        id: 'APPLY_ITEM',
+        node_type: 'connector',
+        operation: 'sync_apply',
+        payload: { connection: 'example-tracker', binding_id: 'BINDING_ID', item: '$.trigger' },
+      },
+    },
+    notes:
+      'The sync operations need the root, admin or developer role. Results carry "outcome" (applied, created, linked, in_step, skipped, conflict, deleted, pushed, archived, failed) and, for a skip, a "reason": branch on it rather than assuming success. ' +
+      'INBOUND (tracker to task): a webhook trigger with a signature block -> connector sync_normalise (event mapped from $.trigger) -> a condition that skips when $.<ID>.items is empty -> a quiva-endpoint node on microstrate.hub.post.workflow-run with { subject: "<child flow>", triggers: "$.<ID>.items" } (one child run per item) -> in the child, a connector sync_apply with item mapped from $.trigger. The child must not use static nodes. ' +
+      'OUTBOUND (task to tracker): a task trigger -> connector sync_push with event mapped from $.trigger (or task_id).',
   },
 
   'verify-challenge': {

@@ -64,6 +64,10 @@ flowchart TB
 | `input` / `human-in-the-loop` | Pauses the run for human input / assignment (≈ **workspaces** task) |
 | `eval` / `map` / `static` | Data plumbing (JS eval, reshape, literals) |
 | `delay` / `schedule` | Timing (pause; schedule a later run) |
+| `task` | Performs a task operation (create, update, find, ...) → **workspaces** |
+| `connector` | Runs a connected data source or two-way tracker sync operation (`sync_normalise`, `sync_apply`, `sync_push`, ...) → **connections** |
+| `email` | Sends one email through the account's verified domain |
+| `verify-signature` / `sign-envelope` | Check an inbound signed envelope / sign an outbound one |
 | `flow` | Runs a sub-workflow by subject |
 | `error` | Terminate the flow with a status code |
 | `trigger` | Editor metadata; skipped at runtime |
