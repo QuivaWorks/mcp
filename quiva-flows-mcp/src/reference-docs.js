@@ -196,6 +196,12 @@ THREE THINGS NAMED "TASK" — pick the right one
   write; never watches events. This is what a model reaches for by habit when
   it actually wants the task trigger above.
 
+The connector NODE (node_type: "connector") is how a flow reaches a tracker:
+its sync_push operation is the outbound half of a task trigger, and
+sync_normalise + sync_apply are the inbound half of a webhook trigger. Installing
+a sync package already does both with no flow. See
+get_node_type_reference("connector").
+
 Check node_type vs trigger_type, not the English word, to tell the first two
 apart in a config you are reading — they are different JSON fields that
 happen to share a name.

@@ -59,7 +59,7 @@ claude mcp add quiva-flows \
 ## Tools
 
 **Reference / validation** (no API call)
-- `list_node_types` — all 23 node types + JSONPath guide + gotchas
+- `list_node_types` — all 24 node types + JSONPath guide + gotchas
 - `get_node_type_reference` — required/optional props and a correct example per type
 - `list_reference_topics` / `get_flows_reference` — cross-cutting contracts:
   **`rules-syntax`** (the condition/rules DSL — read this first), `jsonpath`,
@@ -158,8 +158,12 @@ engine disagree:
   `{message, title, description, priority, assignees}`; the spec's `notify`
   block is not read by the engine.
 - Extra engine node types not in the spec: `rules`, `jsonlogic`, `http`,
-  `error`, `quiva-endpoint`, `task`, `verify-challenge`, `email`,
+  `error`, `quiva-endpoint`, `task`, `connector`, `verify-challenge`, `email`,
   `verify-signature`, `sign-envelope`.
+- **`connector`** runs one operation of a connected data source or two-way
+  tracker sync. `operation` is node-level (`run_operation`, `lookup`,
+  `sync_normalise`, `sync_plan`, `sync_apply`, `sync_push`); sync results carry
+  an `outcome` to branch on. Installing a sync package syncs with no flow.
 - **`email`** sends one email to one recipient (`to` is a single address) from
   the account's verified domain. The result says `queued`, not delivered, and
   the node never retries.

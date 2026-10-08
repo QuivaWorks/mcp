@@ -66,7 +66,7 @@ const SPACE_UPDATE_FIELDS = [
   'priorities', 'tags', 'logo', 'logo_bg_color', 'default_view',
   'records', 'tasks', 'files',
   'base_record', 'organisation_record',
-  'modules', 'custom_tab', 'hidden_tabs', 'view',
+  'modules', 'custom_tab', 'hidden_tabs', 'view', 'staging',
   'upsert_statuses', 'remove_statuses',
   'upsert_priorities', 'remove_priorities',
   'upsert_tags', 'remove_tags',
@@ -75,7 +75,7 @@ const TASK_UPDATE_FIELDS = [
   'title', 'description', 'assignees', 'attachments', 'priority', 'folder',
   'reporter', 'status', 'space_id', 'due_date', 'scheduled_at', 'order',
   'archived', 'tags', 'time_tracking', 'parent', 'move_subtasks',
-  'source', 'source_detail', 'value', 'currency', 'expected_close', 'suppress_events',
+  'source', 'source_detail', 'value', 'currency', 'expected_close', 'suppress_events', 'external_id',
 ];
 
 // Roles a status may carry (model/api.go StatusRole). Automation resolves a
@@ -252,6 +252,8 @@ const REFERENCE = {
       rule: 'Built-in tabs this space does not offer. `overview` can never be hidden, and an unknown key is refused (400). Sending the list replaces it whole; `[]` offers every tab again.',
       source: 'workspaces-service/model/api.go ValidateHiddenTabs',
     },
+    staging:
+      'Boolean. Root or admin only (403 otherwise, and for an integration token). Marks a space as a sandbox for testing task sync; the flag is settable on create_space and update_space. Resetting or copying a staging space is done in the app or API, not through this MCP.',
     view: 'Board card layout: `{ tasks: { board: { card: { fields: { title, task_id, priority, assignees, tags, subtasks_progress, actions_progress } } } } }`, each `{ visible, display? }`. priority.display.type is "icon" or "icon_and_text".',
     editing_disabled:
       'CREATE-ONLY and irreversible: a space created with `editing_disabled: true` refuses every update and delete (403), and there is no unlock. It is absent from UpdateSpaceRequest, so sending it on update does nothing.',
@@ -459,6 +461,94 @@ const REFERENCE = {
   'auth': {
     summary:
       'An API key alone drives the core CRUD, but attribution (owner/created_by/author) and reactions need a Bearer JWT. Configure QUIVA_API_KEY, or (preferred) QUIVA_BEARER_TOKEN or QUIVA_EMAIL/QUIVA_PASSWORD.',
+    integration_tokens: {
+      what:
+        'A task-sync integration authenticates with client credentials (POST /oauth/token, no Authorization header) and receives a 1-hour bearer with no refresh token. Pass it as QUIVA_BEARER_TOKEN. It is NOT an API key: x-api-key refuses it, and QUIVA_API_KEY takes precedence over QUIVA_BEARER_TOKEN, so leave the key unset.',
+      limits:
+        'It works only on the workspaces routes granted to the integration by space and scope (tasks:read, tasks:write, comments:write, space:configure); elsewhere the gateway answers 403 integration_not_allowed, and a route outside its scope answers 403 scope_denied. It cannot open a WebSocket, so it cannot use the remote MCP, which forwards only X-Api-Key.',
+      expiry: 'After an hour the session is gone and the gateway answers a bare 401 with no body. This MCP does not re-mint: set a fresh QUIVA_BEARER_TOKEN and restart the server.',
+      see: 'get_workspaces_reference("task-sync")',
+    },
+  },
+  'task-sync': {
+    summary:
+      'Keep Quiva tasks and an external system in step: every task carries a `version`, writes can be conditional (If-Match), an external id maps your record to one task (upsert_task_by_external_id), and list_space_changes reads a space\'s change feed.',
+    envelope:
+      'Like every workspaces route, the task-sync routes answer `{ status_code, body }` on the mesh and the gateway unwraps it, so an HTTPS caller gets the object itself. This client unwraps either shape, so tool results look the same. Errors are `{ error, code }`; the `code` is in the error detail.',
+    version: {
+      what: 'Integer on every task: 1 on create, +1 on every task write (a status change from an action tick included).',
+      not_bumped:
+        'Comments, time logs, adding or deleting an action, and activity stamps move `activity_at` instead. Writes to a task with a `sync_key` (a distribution lineage) do not bump it either.',
+      readonly: 'Server-owned. Never send `version` or `activity_at` in a body.',
+    },
+    if_match: {
+      where: 'Optional `if_match` argument on update_task, delete_task and upsert_task_by_external_id; sent as the If-Match header.',
+      value: 'The integer `version` you last read. A quoted value ("3") is accepted. 0 matches a legacy task with no version.',
+      results: [
+        'Match, or no header: the write proceeds. No header means last writer wins.',
+        '409 version_conflict: mismatch. The error detail carries the current `task`; re-read the changes, merge and retry.',
+        '400 bad_if_match: the value is not an integer.',
+      ],
+      notes: [
+        'A conditional PATCH is compare-and-set and never overwrites. A conditional DELETE is check-then-purge: a delete racing an update can lose the update.',
+        'A write with no If-Match that loses five compare-and-set rounds to concurrent writers also answers 409 version_conflict. Retry it.',
+      ],
+    },
+    external_ids: {
+      rule: 'Your id for a task: at most 256 bytes of UTF-8, any characters except "/". `:` and `.` are fine. This MCP percent-encodes it in the path and refuses a "/" locally.',
+      upsert:
+        'upsert_task_by_external_id (PUT /workspaces/space/{space_id}/tasks/external/{external_id}) takes the same body as create or update. The route owns space_id and external_id; a body value for either is ignored. Needs tasks:write on the space.',
+      outcomes: [
+        '201: no task for this id in this space, so it was created (base_record_skipped appears when a requested base-record link was not made).',
+        '200: the task exists and was updated; honours if_match.',
+        '409 external_id_pending: another request is creating it. Retry.',
+        '410 task_deleted: the task was deleted. Permanent: the id is tombstoned and never recreated. Use a new id, or create_task.',
+      ],
+      scope: 'The map is keyed by account, caller, space and external id. The same id in another space is another task.',
+      immutable: 'Once mapped, a PATCH that changes or clears external_id answers 409 external_id_immutable. The same value is a no-op.',
+      plain_attribute: 'external_id set through create_task or update_task, not the upsert, is an indexed attribute only: no map entry, no uniqueness. list_tasks has an exact-match external_id filter.',
+    },
+    activity_at:
+      'Equals updated_at after a task write; comment, time-log and action writes also stamp it. Indexed: list_tasks sort_by=activity_at orders by it. Tasks created before this feature fall back to updated_at.',
+    changes_feed: {
+      tool: 'list_space_changes (GET /workspaces/space/{space_id}/changes). Read-only.',
+      params: [
+        'cursor: opaque string from a previous next_cursor. Wins over since. Not a number: 400 invalid_cursor.',
+        'since: RFC 3339, used only when there is no cursor. With neither, the feed starts at the oldest retained event.',
+        'limit: 1 to 500, default 100.',
+      ],
+      response: '{ events[], next_cursor, has_more, retention_days: 30 }. has_more true: call again with next_cursor. An empty page still returns a next_cursor: store it.',
+      retention: 'A cursor older than 30 days answers 410 cursor_expired with next_cursor and retention_days. Events in the gap are gone: reconcile by listing the space.',
+      event: '{ event_id, event_type, occurred_at, account_id, space_id, folder, origin: { kind, id }, actor, task (the whole after-state), changed_fields[], status_from, old_space_id, comment, action }.',
+      event_types: ['task-created', 'task-updated', 'task-status-changed', 'task-moved', 'task-deleted', 'task-action-added', 'task-action-completed', 'task-action-deleted', 'comment-created', 'comment-updated', 'comment-deleted'],
+      notes: [
+        'Deletes appear as task-deleted events; there is no tombstone query.',
+        'The feed does not hide your own writes: skip events whose origin is your integration.',
+        'A space-scoped feed also receives task-moved when a task leaves the space.',
+        'Needs tasks:read on the space. Account members (not portal clients) can read it too.',
+      ],
+    },
+    strict_ids:
+      'For an integration, an unknown status, an unknown priority (when the space defines priorities) or an unknown tag is refused: 400 unknown_status, unknown_priority, unknown_tag. Ids are compared, not names; an empty value clears the field. A space with no statuses or tags refuses any non-empty status or tag. People keep the lenient behaviour.',
+    error_codes: {
+      version_conflict: '409, If-Match mismatch or lost compare-and-set rounds; carries the current task',
+      bad_if_match: '400, If-Match is not an integer',
+      external_id_pending: '409, upsert: another request is creating it',
+      task_deleted: '410, upsert of a tombstoned id',
+      external_id_immutable: '409, PATCH changed or cleared a mapped external_id',
+      cursor_expired: '410, feed cursor past retention; carries next_cursor and retention_days',
+      invalid_cursor: '400, cursor is not a sequence',
+      scope_denied: '403, missing scope, route not open to integrations, or a space field outside space:configure',
+      token_revoked: '401, the integration was edited, disabled or deleted, or the token is malformed; an expired token or a dropped session answers a bare 401 from the gateway instead',
+      unknown_status: '400, strict ids',
+      unknown_priority: '400, strict ids',
+      unknown_tag: '400, strict ids',
+      invalid_request: '400, malformed body, a bad external_id, or a bad limit or since',
+      integration_not_allowed: '403, integration bearer outside the workspaces routes',
+    },
+    connector_sync:
+      'A task subscription can also deliver to a connector sync ingress. Two-way tracker sync is a connection: installing its sync package creates the ingress, mapping and subscription, and runs with no generated flows. Add your own steps with the flows `connector` node (get_node_type_reference("connector") in quiva-flows-mcp).',
+    not_exposed: 'Integration admin (creating integrations, secrets, webhook subscriptions), copy-structure and reset are not in this MCP. Use the app (Account, Connections, API integrations) or the API.',
   },
   'endpoints': {
     summary: 'The workspaces-service surface exposed by this MCP (REST path → engine route key).',
@@ -476,6 +566,13 @@ const REFERENCE = {
       'GET    /workspaces/task/{id}              → get.task   (task + watchers[] + muted[] + task_actions[] + hydrated time_tracking)',
       'PATCH  /workspaces/task/{id}              → patch.task (merge; parent, move_subtasks, pipeline fields)',
       'DELETE /workspaces/task/{id}              → delete.task ({message:success}; ?delete_subtasks=true)',
+    ],
+    task_sync: [
+      'PUT    /workspaces/space/{space_id}/tasks/external/{external_id} → upsert by external id (201 created, 200 updated; optional If-Match)',
+      'GET    /workspaces/space/{space_id}/changes → changes feed (?cursor=&since=&limit=)',
+      'PATCH  /workspaces/task/{id}, DELETE /workspaces/task/{id} → optional If-Match header (409 version_conflict)',
+      'GET    /workspaces/space/{space_id}/tasks → also takes external_id, sort_by=activity_at; returns has_more',
+      'See get_workspaces_reference("task-sync"). Integration admin, copy-structure and reset routes are not exposed here.',
     ],
     time_logs: [
       'PUT    /workspaces/task/{task_id}/time-log → put.task-time-log   (one entry; server owns id/user/timestamps; returns hydrated time_tracking)',
