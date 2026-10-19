@@ -24,6 +24,8 @@ Recipe:
    list_granted_products — what a distributor may work under one publisher.
 4. validate_payload, then create_product / update_product — publish a version.
 5. amend_distribution (confirm: true) — change a grant's status or products.
+   sync_distribution_products (confirm: true) — push a product's record sets, entity_config and front page
+   layouts into the grants already carrying it; read every step. list_connected_accounts — who a product reaches.
 6. list_distribution_invites / list_invite_inbox / withdraw_distribution_invite.
    Minting, sending and redeeming invitations are not exposed (topic "not-exposed").
 
@@ -232,7 +234,7 @@ export function registerTools(server, client, { prefix = '' } = {}) {
     async ({ code, version }) => orRefusal(() => client.get('/accounts/distribution-product', { code, version }))
   );
 
-  const productArg = jsonValue.describe('{ code, name, active?, record_configs: [{ id, label }], actions: { <record_config_id>: [{ type, label?, icon? }] } }. See get_example("create-product").');
+  const productArg = jsonValue.describe('{ code, name, active?, record_configs: [{ id, label }], actions: { <record_config_id>: [{ type, label?, icon? }] }, sla_business_days?, entity_config?: { config_id, identity_fields, label?, display_fields? }, distributor_front_page_layouts?: [{ id, config_id, ... }] }. See get_example("create-product") and get_example("create-product-with-entity").');
 
   async function publish(method, raw, skip) {
     const product = parseJson(raw);
@@ -258,6 +260,49 @@ export function registerTools(server, client, { prefix = '' } = {}) {
     'Publish the NEXT version of an existing product. Send the WHOLE definition: it is not a merge. Every grant that does not pin a version moves to the new one at once. A code never created is refused with product_not_found (404). Do not echo a get_product response back unchanged: stored versions can carry action types the current engine refuses. Reads the version back before reporting success. Needs root or admin.',
     { product: productArg, skip_local_validation: z.boolean().optional() },
     async ({ product, skip_local_validation }) => publish('patch', product, skip_local_validation)
+  );
+
+  tool(
+    'sync_distribution_products',
+    'Push this publisher\'s products into the grants already carrying them: record sets, the distributor space\'s entity_config (base record) and its front page layouts. Publishing a version does not do this for an existing distributor. Optional product_id limits it to live grants carrying that product actively; optional distributor_account_id to one counterparty. Requires confirm: true because it writes into OTHER accounts. Always answers 200: the result is { ok, failed[], synced, skipped, steps[] }, so read failed[] (every step with done: false), not the status. Re-run to recover from a failed step. Needs root or admin. See get_distribution_reference("product-sync").',
+    {
+      product_id: z.string().optional().describe('Only grants carrying this product actively. Omit for every live grant.'),
+      distributor_account_id: z.string().optional().describe('Narrow to one counterparty.'),
+      confirm: z.boolean().optional().describe('Must be true. Nothing is sent otherwise.'),
+    },
+    async ({ product_id, distributor_account_id, confirm }) => {
+      if (confirm !== true) {
+        return { sent: false, reason: 'confirm: true is required. The sync writes into every live distributor account in scope.' };
+      }
+      const body = {};
+      if (product_id) body.product_id = product_id;
+      if (distributor_account_id) body.distributor_account_id = distributor_account_id;
+      const result = await client.post('/accounts/distribution-products-sync', body);
+      const steps = Array.isArray(result?.steps) ? result.steps : null;
+      if (!steps) {
+        return { ok: false, warning: 'The response carried no steps[], so nothing can be confirmed. Check get_distribution_status for each grant.', response: result };
+      }
+      const failed = steps.filter((st) => st?.done !== true);
+      return {
+        ok: failed.length === 0,
+        failed,
+        synced: result.synced,
+        skipped: result.skipped,
+        product_id: result.product_id || undefined,
+        steps,
+        ...(result.synced === 0 ? { note: 'No grant was in scope, so nothing was written.' } : {}),
+      };
+    }
+  );
+
+  tool(
+    'list_connected_accounts',
+    'As a PUBLISHER: the distributors you can send a record to under one product: live grants carrying product_id actively, with a landing space. Returns { product_id, results[{ distribution_id, account_id, name, space_id, product_id, product_version? }], results_total }, sorted by name. A grant that is pending, suspended, revoked, has the product withdrawn or has no space is absent without a reason. Needs root or admin.',
+    { product_id: z.string().min(1).describe('The product the accounts are connected under. Required.') },
+    async ({ product_id }) => {
+      if (typeof product_id !== 'string' || product_id.trim() === '') throw new Error('product_id is required.');
+      return client.get('/accounts/distribution-connected-accounts', { product_id: product_id.trim() });
+    }
   );
 
   tool(

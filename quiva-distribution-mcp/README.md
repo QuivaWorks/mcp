@@ -68,6 +68,8 @@ A role that is too low answers **401**, the same as a bad credential.
 | `update_product` | `PATCH /accounts/distribution-product` | write |
 | `list_granted_products` | `GET /accounts/distribution-granted-products` | read |
 | `list_product_definition_versions` | `GET /accounts/product-definitions` | read |
+| `sync_distribution_products` | `POST /accounts/distribution-products-sync` | write into other accounts, needs `confirm: true`; returns every step |
+| `list_connected_accounts` | `GET /accounts/distribution-connected-accounts` | read, `product_id` required |
 
 **Invitations**
 
@@ -78,7 +80,7 @@ A role that is too low answers **401**, the same as a bad credential.
 | `withdraw_distribution_invite` | `DELETE /accounts/distribution-invite` | write, needs `confirm: true` |
 
 Minting, sending, re-sending and redeeming invitations, cross-account messages,
-catalogue publishing, sync and re-provisioning are deliberately not exposed.
+catalogue publishing and re-provisioning are deliberately not exposed.
 `get_distribution_reference("not-exposed")` says why for each.
 
 ## Gotchas
@@ -88,6 +90,9 @@ catalogue publishing, sync and re-provisioning are deliberately not exposed.
 - `list_granted_products` drops a product with no published definition and names it only in `notices[]`.
 - `update_product` publishes a whole new version. Grants that do not pin a version move to it at once. There is no delete.
 - `revoked` is terminal.
+- Publishing a product version does not change an existing distributor's space. `entity_config` and front page layouts arrive only through `sync_distribution_products`, which answers 200 even when a grant failed: read `failed[]`.
+- `"list"` is no longer an accepted action type; `create`, `rate`, `bind`, `mta` and `cancellation` are.
+- `entity_config`, `distributor_front_page_layouts` and `sla_business_days` (and the `revoke` / `revoke-result` kinds, `filing`, `distribution_delivery_failure`) come from evari-olympus PR #1560. Layout bodies are validated by the workspaces server, not here.
 - Some field and message-kind names (`brokerage_name`, `abn`, `afsl_number`, `quote_config`, `rate`, `bind`, `mta`, `cancellation`) are identifiers the platform defined. Send them as named.
 
 The full list is in `list_reference_topics`.

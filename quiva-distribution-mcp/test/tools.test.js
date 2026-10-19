@@ -43,6 +43,7 @@ const EXPECTED = [
   'list_distributions', 'get_distribution', 'get_distribution_status', 'amend_distribution',
   'list_products', 'get_product', 'create_product', 'update_product', 'list_granted_products',
   'list_product_definition_versions', 'list_distribution_invites', 'list_invite_inbox', 'withdraw_distribution_invite',
+  'sync_distribution_products', 'list_connected_accounts',
 ];
 
 check('registers exactly the expected tools', () => {
@@ -195,6 +196,53 @@ check('withdraw_distribution_invite needs confirm, then verifies by listing', as
   const r = await h.call('withdraw_distribution_invite', { invite_id: 'i1', confirm: true });
   assert.deepEqual(h.calls[0], { method: 'DELETE', path: '/accounts/distribution-invite', arg: { id: 'i1' } });
   assert.equal(r.data.withdrawn, true);
+});
+
+check('sync_distribution_products sends nothing without confirm', async () => {
+  const h = harness();
+  const r = await h.call('sync_distribution_products', { product_id: 'p' });
+  assert.equal(r.data.sent, false);
+  assert.equal(h.calls.length, 0);
+});
+
+check('sync_distribution_products POSTs the scope and surfaces failed steps', async () => {
+  const steps = [
+    { name: 'distribution_products_synced', done: true, detail: 'x' },
+    { name: 'distributor_product_synced', done: true, detail: 'A (1): ok' },
+    { name: 'distributor_front_page_synced', done: false, detail: 'A (1): the front page was not changed' },
+  ];
+  const h = harness(() => ({ product_id: 'p', synced: 1, skipped: 2, steps }));
+  const r = await h.call('sync_distribution_products', { product_id: 'p', distributor_account_id: 'd', confirm: true });
+  assert.deepEqual(h.calls[0], { method: 'POST', path: '/accounts/distribution-products-sync', arg: { product_id: 'p', distributor_account_id: 'd' } });
+  assert.equal(r.data.ok, false);
+  assert.deepEqual(r.data.failed.map((st) => st.name), ['distributor_front_page_synced']);
+  assert.equal(r.data.steps.length, 3);
+  assert.equal(r.data.synced, 1);
+});
+
+check('sync_distribution_products with no product_id sends an empty body, and ok when every step is done', async () => {
+  const h = harness(() => ({ product_id: '', synced: 0, skipped: 3, steps: [{ name: 'distribution_products_synced', done: true, detail: 'nothing was written' }] }));
+  const r = await h.call('sync_distribution_products', { confirm: true });
+  assert.deepEqual(h.calls[0].arg, {});
+  assert.equal(r.data.ok, true);
+  assert.ok(r.data.note.includes('nothing was written'));
+});
+
+check('sync_distribution_products does not call a stepless answer ok', async () => {
+  const h = harness(() => ({ synced: 1 }));
+  const r = await h.call('sync_distribution_products', { confirm: true });
+  assert.equal(r.data.ok, false);
+  assert.ok(r.data.warning);
+});
+
+check('list_connected_accounts requires product_id and GETs the route', async () => {
+  const h = harness(() => ({ product_id: 'p', results: [], results_total: 0 }));
+  assert.ok((await h.call('list_connected_accounts', {})).isError);
+  assert.ok((await h.call('list_connected_accounts', { product_id: '' })).isError);
+  assert.equal(h.calls.length, 0);
+  const r = await h.call('list_connected_accounts', { product_id: 'p' });
+  assert.deepEqual(h.calls[0], { method: 'GET', path: '/accounts/distribution-connected-accounts', arg: { product_id: 'p' } });
+  assert.equal(r.data.results_total, 0);
 });
 
 check('validate_payload parses a JSON string payload', async () => {
