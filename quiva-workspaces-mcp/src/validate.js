@@ -20,14 +20,14 @@ const SPACE_READONLY = ['owner', 'created_at', 'updated_at', 'url'];
 const TASK_READONLY = ['created_at', 'updated_at', 'created_by', 'url', 'watchers', 'muted', 'subtasks', 'task_actions', 'base_record_skipped', 'version', 'activity_at'];
 const COMMENT_READONLY = ['author', 'created_at', 'updated_at', 'url', 'reactions'];
 
-const VALID_KINDS = ['space', 'task', 'multi_task', 'comment', 'reaction', 'task_action', 'time_log', 'contact', 'task_template', 'folder', 'file'];
+const VALID_KINDS = ['space', 'task', 'multi_task', 'comment', 'reaction', 'task_action', 'time_log', 'contact', 'task_template', 'folder', 'file', 'case_folder'];
 
 // Server-owned on a time log (handler/task_time_logs.go AddTaskTimeLogHandler).
 const TIME_LOG_SERVER_FIELDS = ['id', 'user', 'created_at', 'updated_at'];
 // Response-only on time_tracking (model/api.go TimeTracking, hydrateTimeTracking).
 const TIME_TRACKING_HYDRATED = ['logs', 'spent', 'remaining', 'progress_percent'];
 
-export function validate(kind, payload, { requireRequired = true } = {}) {
+export function validate(kind, payload, { requireRequired = true, current } = {}) {
   const errors = [];
   const warnings = [];
 
@@ -39,7 +39,7 @@ export function validate(kind, payload, { requireRequired = true } = {}) {
   }
 
   switch (kind) {
-    case 'space': validateSpace(payload, requireRequired, errors, warnings); break;
+    case 'space': validateSpace(payload, requireRequired, errors, warnings); if (current) warnBaseRecordSwap(payload, current, warnings); break;
     case 'task': validateTask(payload, requireRequired, errors, warnings); break;
     case 'multi_task': validateMultiTask(payload, errors, warnings); break;
     case 'comment': validateComment(payload, requireRequired, errors, warnings); break;
@@ -50,6 +50,7 @@ export function validate(kind, payload, { requireRequired = true } = {}) {
     case 'task_template': validateTaskTemplate(payload, requireRequired, errors, warnings); break;
     case 'folder': validateFolder(payload, errors, warnings); break;
     case 'file': validateFile(payload, errors, warnings); break;
+    case 'case_folder': validateCaseFolder(payload, errors, warnings); break;
   }
 
   return { valid: errors.length === 0, errors, warnings };
@@ -95,6 +96,7 @@ function validateSpace(p, required, errors, warnings) {
   if (p.custom_tab !== undefined) validateCustomTab(p.custom_tab, p, errors, warnings);
   if (p.hidden_tabs !== undefined) validateHiddenTabs(p.hidden_tabs, errors, warnings);
   if (p.view !== undefined && !isObject(p.view)) errors.push('view must be an object { tasks: { board: { card: { fields: {...} } } } }');
+  else if (isObject(p.view) && p.view.front_page !== undefined) validateFrontPage(p.view.front_page, errors, warnings, { update: !required });
 
   if (p.staging !== undefined) {
     if (typeof p.staging !== 'boolean') errors.push('staging must be a boolean');
@@ -178,8 +180,36 @@ function validateBaseRecord(b, label, errors, warnings) {
   if (label === 'base_record' && (b.parent_config_id !== undefined || b.parent_label !== undefined)) {
     warnings.push('base_record.parent_config_id / parent_label is the legacy way to name the organisation. Declare organisation_record instead — it keys the firm on its own identity fields.');
   }
-  if (b.legacy_config_ids !== undefined) {
-    warnings.push(`${label}.legacy_config_ids is carried server-side on update — do not send it.`);
+  validateLegacyConfigIds(b, label, errors, warnings);
+}
+
+// workspaces-service/handler/space_resolve.go carryLegacyConfigIDs (lands with evari-olympus #1560).
+function validateLegacyConfigIds(b, label, errors, warnings) {
+  if (b.legacy_config_ids === undefined) return;
+  if (!Array.isArray(b.legacy_config_ids) || b.legacy_config_ids.some((id) => typeof id !== 'string')) {
+    errors.push(`${label}.legacy_config_ids must be an array of config ids ([] clears; omit to fold the previous config in)`);
+    return;
+  }
+  if (b.legacy_config_ids.length === 0) {
+    warnings.push(`${label}.legacy_config_ids: [] CLEARS the list — the previous config is no longer folded in, so entities stored under it stop being found by this base record. Intended only when swapping the base config on purpose.`);
+  } else if (b.legacy_config_ids.includes(b.config_id)) {
+    warnings.push(`${label}.legacy_config_ids names config_id itself — it adds nothing.`);
+  }
+}
+
+// Base-record swap: an omitted legacy_config_ids folds the previous config (and its legacy ids)
+// into the new one on every update; only an explicit [] stops that. `current` is the stored space.
+function warnBaseRecordSwap(p, current, warnings) {
+  for (const key of ['base_record', 'organisation_record']) {
+    const next = p[key];
+    const previous = current?.[key];
+    if (!isObject(next) || !next.config_id || !isObject(previous) || !previous.config_id) continue;
+    if (next.config_id !== previous.config_id && next.legacy_config_ids === undefined) {
+      warnings.push(`${key}.config_id changes from "${previous.config_id}" to "${next.config_id}" without legacy_config_ids: [] — the server FOLDS "${previous.config_id}" (and its legacy ids) into the new base record's legacy list. Send legacy_config_ids: [] to drop it, or leave it out to keep old entities findable.`);
+    }
+  }
+  if (isObject(p.base_record) && isObject(current?.base_record)) {
+    warnings.push('base_record is REPLACED WHOLESALE on update — send every field the space keeps (label, display_fields, parent_label, icons), copied from get_space, or they are cleared.');
   }
 }
 
@@ -875,4 +905,257 @@ function warnReadonly(p, keys, warnings) {
   if (present.length > 0) {
     warnings.push(`server-set/read-only field(s) ${present.join(', ')} are ignored by the engine — build the payload from scratch, do not echo a GET response.`);
   }
+}
+
+// --- view.front_page.layouts ---------------------------------------------------
+// Mirrors workspaces-service/handler/front_page_layouts_validate.go (lands with
+// evari-olympus #1560). Structural rules are errors. Anything that needs the record
+// schemas (paths, config/form ids, index fields) is a warning: the server checks it.
+export const LAYOUT_LIMITS = { layouts: 20, headerFields: 30, actions: 12, tabs: 12, tabFields: 50, tabColumns: 12, pageSize: 100 };
+export const LAYOUT_TONES = ['neutral', 'info', 'success', 'warning', 'danger'];
+export const LAYOUT_TAB_TYPES = ['fields', 'tasks', 'files', 'records', 'form', 'list', 'comments', 'history'];
+const LAYOUT_SCHEMA_NOTE = 'paths, config/form ids and index-field checks are made by the server against the record configs (it answers 400 with the failing path).';
+
+// Which tab types may carry each field. Anything else is refused: a setting that did not take.
+const TAB_FIELD_HOMES = {
+  fields: ['fields'],
+  config_id: ['records', 'form'],
+  record_id_path: ['form'],
+  columns: ['records', 'list'],
+  page_size: ['records'],
+  latest_by: ['records'],
+  date_field: ['records'],
+  search_fields: ['records'],
+  scope: ['records'],
+  form_id: ['form'],
+  highlight_field: ['form'],
+  path: ['list'],
+  task_external_id_template: ['comments', 'history'],
+  task_source: ['comments', 'history'],
+  metadata_key: ['tasks', 'files'],
+};
+
+const isSet = (v) => v !== undefined && v !== null && v !== '' && v !== 0 && !(Array.isArray(v) && v.length === 0);
+
+export function validateFrontPage(frontPage, errors, warnings, { update = false } = {}) {
+  if (frontPage === null && update) { warnings.push('view.front_page: null CLEARS the whole front page, layouts included.'); return; }
+  if (!isObject(frontPage)) { errors.push('view.front_page must be an object'); return; }
+  if (update && frontPage.sections === undefined && frontPage.metrics === undefined && frontPage.people === undefined) {
+    warnings.push('view.front_page is REPLACED WHOLESALE on update (handler/space_view.go mergeView): this payload carries no sections, metrics or people, so any the space has are DELETED. Copy them from get_space beside layouts.');
+  }
+  if (frontPage.layouts === undefined) return;
+  const before = errors.length;
+  validateLayouts(frontPage.layouts, errors, warnings);
+  if (Array.isArray(frontPage.layouts) && frontPage.layouts.length && errors.length === before) {
+    warnings.push(`view.front_page.layouts: ${LAYOUT_SCHEMA_NOTE}`);
+  }
+}
+
+function validateLayouts(layouts, errors, warnings) {
+  const at = 'view.front_page.layouts';
+  if (!Array.isArray(layouts)) { errors.push(`${at} must be an array`); return; }
+  if (layouts.length > LAYOUT_LIMITS.layouts) { errors.push(`${at}: too many layouts (max ${LAYOUT_LIMITS.layouts})`); return; }
+  const ids = new Set();
+  const keys = new Map();
+  layouts.forEach((layout, i) => {
+    const lp = `${at}[${i}]`;
+    if (!isObject(layout)) { errors.push(`${lp} must be an object`); return; }
+    if (!layout.id) errors.push(`${lp}.id is required`);
+    else if (ids.has(layout.id)) errors.push(`${lp}.id "${layout.id}" is a duplicate`);
+    ids.add(layout.id);
+    if (!layout.config_id) errors.push(`${lp}.config_id is required`);
+    if (!layout.variant_field !== !layout.variant_value) {
+      errors.push(`${lp}.variant_field and variant_value are set together or not at all`);
+    }
+    const key = `${layout.config_id ?? ''}\u0000${layout.variant_value ?? ''}`;
+    if (keys.has(key)) errors.push(`${lp}: layouts[${keys.get(key)}] already covers this config_id and variant_value — the first match wins, so the later one never shows`);
+    keys.set(key, i);
+    validateLayoutHeader(`${lp}.header`, layout.header, errors);
+    validateLayoutActions(`${lp}.actions`, layout.actions, errors);
+    validateLayoutTabs(`${lp}.tabs`, layout.tabs, errors);
+  });
+}
+
+function layoutFields(path, fields, max, errors) {
+  if (fields === undefined) return;
+  if (!Array.isArray(fields)) { errors.push(`${path} must be an array of { path, label?, group? }`); return; }
+  if (fields.length > max) { errors.push(`${path}: too many fields (max ${max})`); return; }
+  fields.forEach((f, i) => {
+    if (!isObject(f) || typeof f.path !== 'string' || !f.path) errors.push(`${path}[${i}].path is required`);
+  });
+}
+
+function validateLayoutHeader(path, header, errors) {
+  if (header === undefined) return;
+  if (!isObject(header)) { errors.push(`${path} must be an object { fields?, status? }`); return; }
+  layoutFields(`${path}.fields`, header.fields, LAYOUT_LIMITS.headerFields, errors);
+  const status = header.status;
+  if (status === undefined || status === null) return;
+  if (!isObject(status)) { errors.push(`${path}.status must be an object { path, tones? }`); return; }
+  if (typeof status.path !== 'string' || !status.path) errors.push(`${path}.status.path is required`);
+  if (status.tones !== undefined) {
+    if (!isObject(status.tones)) errors.push(`${path}.status.tones must map a field value to a tone`);
+    else for (const [value, tone] of Object.entries(status.tones)) {
+      if (!LAYOUT_TONES.includes(tone)) errors.push(`${path}.status.tones[${value}]: unknown tone "${tone}" — one of ${LAYOUT_TONES.join(', ')}`);
+    }
+  }
+}
+
+function validateLayoutActions(path, actions, errors) {
+  if (actions === undefined) return;
+  if (!Array.isArray(actions)) { errors.push(`${path} must be an array`); return; }
+  if (actions.length > LAYOUT_LIMITS.actions) { errors.push(`${path}: too many actions (max ${LAYOUT_LIMITS.actions})`); return; }
+  const all = new Set(actions.map((a) => a?.id));
+  const seen = new Set();
+  actions.forEach((a, i) => {
+    const ap = `${path}[${i}]`;
+    if (!isObject(a)) { errors.push(`${ap} must be an object`); return; }
+    if (!a.id) errors.push(`${ap}.id is required`);
+    else if (seen.has(a.id)) errors.push(`${ap}.id "${a.id}" is a duplicate`);
+    seen.add(a.id);
+    if (typeof a.label !== 'string' || !a.label.trim()) errors.push(`${ap}.label is required`);
+    if (a.placement !== 'primary' && a.placement !== 'more') errors.push(`${ap}.placement must be primary or more`);
+    if (a.kind === 'form') {
+      if (!a.form_id) errors.push(`${ap}.form_id is required for a form action`);
+      if (isSet(a.flow_ref)) errors.push(`${ap}.flow_ref is not used by a form action`);
+      for (const k of ['preview', 'refer_action', 'input_config_id']) {
+        if (a[k]) errors.push(`${ap}.${k} is only used by a flow action`);
+      }
+    } else if (a.kind === 'flow') {
+      if (!a.flow_ref) errors.push(`${ap}.flow_ref is required for a flow action`);
+      if (isSet(a.form_id)) errors.push(`${ap}.form_id is not used by a flow action`);
+      if (a.refer_action && a.refer_action === a.id) errors.push(`${ap}.refer_action cannot name the action itself`);
+      else if (a.refer_action && !all.has(a.refer_action)) errors.push(`${ap}.refer_action "${a.refer_action}" does not name an action of this layout`);
+      if (a.preview !== undefined && typeof a.preview !== 'boolean') errors.push(`${ap}.preview must be a boolean`);
+    } else {
+      errors.push(`${ap}.kind must be form or flow`);
+    }
+    if (a.disabled_when !== undefined && a.disabled_when !== null && !isObject(a.disabled_when)) {
+      errors.push(`${ap}.disabled_when must be a json-logic object`);
+    }
+    for (const k of ['requires', 'confirm']) {
+      if (a[k] !== undefined && typeof a[k] !== 'string') errors.push(`${ap}.${k} must be a string`);
+    }
+  });
+}
+
+function validateLayoutTabs(path, tabs, errors) {
+  if (tabs === undefined) return;
+  if (!Array.isArray(tabs)) { errors.push(`${path} must be an array`); return; }
+  if (tabs.length > LAYOUT_LIMITS.tabs) { errors.push(`${path}: too many tabs (max ${LAYOUT_LIMITS.tabs})`); return; }
+  const seen = new Set();
+  tabs.forEach((tab, i) => {
+    const tp = `${path}[${i}]`;
+    if (!isObject(tab)) { errors.push(`${tp} must be an object`); return; }
+    if (!tab.id) errors.push(`${tp}.id is required`);
+    else if (seen.has(tab.id)) errors.push(`${tp}.id "${tab.id}" is a duplicate`);
+    seen.add(tab.id);
+    if (typeof tab.label !== 'string' || !tab.label.trim()) errors.push(`${tp}.label is required`);
+    if (!LAYOUT_TAB_TYPES.includes(tab.type)) {
+      errors.push(`${tp}.type "${tab.type}" is unknown — one of ${LAYOUT_TAB_TYPES.join(', ')}`);
+      return;
+    }
+    for (const [field, homes] of Object.entries(TAB_FIELD_HOMES)) {
+      if (isSet(tab[field]) && !homes.includes(tab.type)) errors.push(`${tp}.${field} is only used by a ${homes.join(' or ')} tab`);
+    }
+    const t = tab.type;
+    if (t === 'fields') {
+      if (!Array.isArray(tab.fields) || tab.fields.length === 0) errors.push(`${tp}.fields is required`);
+      layoutFields(`${tp}.fields`, tab.fields, LAYOUT_LIMITS.tabFields, errors);
+    } else if (t === 'records') {
+      if (!tab.config_id) errors.push(`${tp}.config_id is required`);
+      if (Array.isArray(tab.columns) && tab.columns.length > LAYOUT_LIMITS.tabColumns) errors.push(`${tp}.columns: too many columns (max ${LAYOUT_LIMITS.tabColumns})`);
+      if (tab.latest_by !== undefined && tab.latest_by !== null) {
+        if (!isObject(tab.latest_by)) errors.push(`${tp}.latest_by must be { group_field, order_field }`);
+        else for (const k of ['group_field', 'order_field']) {
+          if (typeof tab.latest_by[k] !== 'string' || !tab.latest_by[k]) errors.push(`${tp}.latest_by.${k} is required`);
+        }
+      }
+      if (tab.scope !== undefined && tab.scope !== '' && tab.scope !== 'case' && tab.scope !== 'parent') errors.push(`${tp}.scope must be case or parent`);
+      if (tab.page_size !== undefined && (!Number.isInteger(tab.page_size) || tab.page_size < 0 || tab.page_size > LAYOUT_LIMITS.pageSize)) {
+        errors.push(`${tp}.page_size must be 0-${LAYOUT_LIMITS.pageSize}`);
+      }
+    } else if (t === 'form') {
+      if (!tab.form_id) errors.push(`${tp}.form_id is required`);
+      if (!tab.config_id !== !tab.record_id_path) errors.push(`${tp}.record_id_path and config_id are set together or not at all`);
+    } else if (t === 'list') {
+      if (!tab.path) errors.push(`${tp}.path is required`);
+      if (!Array.isArray(tab.columns) || tab.columns.length === 0) errors.push(`${tp}.columns is required`);
+      else if (tab.columns.length > LAYOUT_LIMITS.tabColumns) errors.push(`${tp}.columns: too many columns (max ${LAYOUT_LIMITS.tabColumns})`);
+    } else if (t === 'comments' || t === 'history') {
+      if (t === 'comments' && !tab.task_external_id_template && !tab.task_source) {
+        errors.push(`${tp}.task_external_id_template is required (or task_source) on a comments tab`);
+      }
+      if (tab.task_external_id_template) {
+        const problem = taskTemplateProblem(tab.task_external_id_template);
+        if (problem) errors.push(`${tp}.task_external_id_template: ${problem}`);
+      }
+    }
+    for (const k of ['count']) if (tab[k] !== undefined && typeof tab[k] !== 'boolean') errors.push(`${tp}.${k} must be a boolean`);
+  });
+}
+
+// {path} tokens must balance and not nest; whether each resolves is the server's check.
+function taskTemplateProblem(tmpl) {
+  for (let rest = String(tmpl); ;) {
+    const open = rest.search(/[{}]/);
+    if (open < 0) return null;
+    if (rest[open] === '}') return 'unbalanced braces';
+    const end = rest.indexOf('}', open);
+    if (end < 0) return 'unbalanced braces';
+    if (rest.slice(open + 1, end).includes('{')) return 'unbalanced braces';
+    rest = rest.slice(end + 1);
+  }
+}
+
+// --- case-folder -----------------------------------------------------------------
+// Mirrors workspaces-service/handler/case_folder.go validateCaseFolderRequest (lands with
+// evari-olympus #1560). Whether identity keys are the base record's identity_fields, and
+// display keys its display_fields, needs the space, so the server checks those.
+const CASE_ID_REGEX = /^[a-zA-Z0-9_-]+$/;
+const CASE_RESERVED_METADATA = ['type', 'case_id', 'primary_config', 'primary_record_id', 'created_at', 'created_by'];
+export const CASE_FOLDER_LIMITS = { metadataKeys: 20, valueLength: 512 };
+
+function validateCaseFolder(p, errors, warnings) {
+  if (typeof p.space_id !== 'string' || !p.space_id) errors.push('space_id is required');
+  if (!isObject(p.identity) || Object.keys(p.identity).length === 0) {
+    errors.push('identity is required: { <identity field>: <value> } using the space base_record\'s identity_fields');
+  } else {
+    if (Object.values(p.identity).some((v) => typeof v !== 'string')) errors.push('identity values must be strings (a number is refused, and an ABN-style id must not lose leading zeros)');
+    else if (!Object.values(p.identity).some((v) => v.trim())) errors.push('identity has no value');
+  }
+  if (p.email !== undefined && p.email !== '' && !(typeof p.email === 'string' && CONTACT_EMAIL_REGEX.test(p.email.trim().toLowerCase()))) {
+    errors.push(`email "${p.email}" is not a valid email address`);
+  }
+  if (typeof p.case_config_id !== 'string' || !CASE_ID_REGEX.test(p.case_config_id)) {
+    errors.push('case_config_id is required and may hold only letters, digits, underscores and hyphens');
+  }
+  const key = p.case_key;
+  if (!isObject(key) || typeof key.field !== 'string' || !CASE_ID_REGEX.test(key.field) || typeof key.value !== 'string' || !key.value.trim()) {
+    errors.push('case_key needs a field name (letters, digits, _ -) and a non-blank string value: it is hashed into the case folder id');
+  }
+  if (!p.primary_config !== !p.primary_record_id) errors.push('primary_config and primary_record_id are set together or not at all');
+  for (const k of ['primary_config', 'primary_record_id']) {
+    if (p[k] && !CASE_ID_REGEX.test(p[k])) errors.push(`${k} "${p[k]}" is not a valid id`);
+  }
+  if (p.metadata !== undefined) {
+    if (!isObject(p.metadata)) errors.push('metadata must be an object of string values');
+    else {
+      const keys = Object.keys(p.metadata);
+      if (keys.length > CASE_FOLDER_LIMITS.metadataKeys) errors.push(`too many metadata keys (max ${CASE_FOLDER_LIMITS.metadataKeys})`);
+      for (const k of keys) {
+        if (typeof p.metadata[k] !== 'string') errors.push(`metadata.${k} must be a string (the marker is a map[string]string)`);
+        else if (p.metadata[k].length > CASE_FOLDER_LIMITS.valueLength) errors.push(`metadata.${k} is too long (max ${CASE_FOLDER_LIMITS.valueLength} characters)`);
+        if (CASE_RESERVED_METADATA.includes(k) || k === key?.field) errors.push(`metadata key "${k}" is reserved (the server sets ${CASE_RESERVED_METADATA.join(', ')} and the case_key field)`);
+      }
+    }
+  }
+  if (p.display !== undefined) {
+    if (!isObject(p.display)) errors.push('display must be an object of string values keyed by the base record\'s display_fields');
+    else for (const [k, v] of Object.entries(p.display)) {
+      if (typeof v !== 'string' || v.length > CASE_FOLDER_LIMITS.valueLength) errors.push(`display.${k} must be a string of at most ${CASE_FOLDER_LIMITS.valueLength} characters`);
+    }
+  }
+  warnings.push('identity keys must be identity fields of the space\'s base_record and display keys its display_fields; the server checks both (400 otherwise).');
+  warnings.push('an existing case marker is NEVER rewritten — a repeat call returns created_case: false and keeps the original primary_* and metadata.');
 }
