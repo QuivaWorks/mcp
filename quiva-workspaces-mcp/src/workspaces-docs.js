@@ -50,6 +50,8 @@ export const GOTCHAS = [
   'create_contact (POST /workspaces/client) can CREATE A PORTAL SIGN-IN: when the space\'s `base_record.create_login_on_create` is true and the contact has an email, the handler also creates a `client`-role user for that address (handler/contact_login.go). Check the space first, and use an obviously fake example.com address for any test. The response reports `login_created` / `login_skipped`.',
   // Foreign endpoint.
   'list_users hits /accounts/users/list — that is the ACCOUNTS service (microstrate.accounts.get.list-users-by-account), not workspaces. It is included only to resolve user ids for assignees/reporters. It returns `{ data: [ {id, email, first_name, last_name, role, ...} ] }`.',
+  // Base-record swap and front page replacement (evari-olympus #1560).
+  'Swapping a space\'s base_record config folds the OLD config into `legacy_config_ids` unless you send `legacy_config_ids: []`; an omitted list always folds (handler/space_resolve.go carryLegacyConfigIDs). `base_record` and `view.front_page` are REPLACED whole on update_space, not merged - send everything the space keeps. See get_workspaces_reference("spaces"), ("front-page-layouts") and ("case-folder").',
   // Meetings index failure is a 200.
   'An empty list_meetings (or "no transcript entry" from get_meeting_transcript) means not indexed, or the meetings index did not answer: workspaces-service/handler/meetings.go:78-84 answers 200 with no results when the index query fails.',
 ];
@@ -232,8 +234,12 @@ const REFERENCE = {
       enable_distribution: 'ORGANISATION record only. When true, creating a firm also grants it distribution.',
       no_omitempty: 'Both flags are sent even when false, so turning one off sticks — an absent key would keep the stored value.',
       legacy_parent: '`parent_config_id` / `parent_label` on base_record is the older way to name the organisation. A space with no organisation_record reads it as one. Prefer organisation_record.',
-      legacy_config_ids: 'Read-compat ids, carried server-side on update. Do not send them.',
-      source: 'workspaces-service/model/api.go BaseRecord; handler/client.go; handler/contact_login.go',
+      legacy_config_ids:
+        'Config ids the entity may still be stored under, so older records are found. On update the server FOLDS the base record being replaced (its config_id and its own legacy ids) into the incoming one\'s list (carryLegacyConfigIDs). OMITTED = fold. An EXPLICIT EMPTY LIST `[]` = do not fold (the swap in contract 08 §4 sends it so the old config is not carried). A non-empty list is kept and the previous config is still appended. Per record: the client and organisation each fold only their own previous.',
+      replaced_wholesale: 'base_record, organisation_record and custom_tab are REPLACED, not merged, on update (handler/space_replace.go replacedSpaceDocument): send every field the space keeps (label, display_fields, parent_label, icons), copied from get_space.',
+      swap_warning: 'validate_payload warns when base_record.config_id differs from the stored one and legacy_config_ids is omitted (update_space does that check against the stored space).',
+      locked_spaces: 'An editing_disabled space refuses PATCH space. Its base record and layouts are set by internal subjects microstrate.workspaces.patch.space-base-record and microstrate.workspaces.patch.space-front-page, root token only and NOT gateway-mapped: not callable by MCP users (handler/space_base_record.go, handler/space_front_page_layouts.go).',
+      source: 'workspaces-service/model/api.go BaseRecord; handler/client.go; handler/contact_login.go; handler/space_resolve.go carryLegacyConfigIDs (lands with evari-olympus #1560)',
     },
     modules: '{ files?, tasks?, records?, chats?, meetings? } — booleans switching each module on or off.',
     custom_tab: {
@@ -254,6 +260,7 @@ const REFERENCE = {
     },
     staging:
       'Boolean. Root or admin only (403 otherwise, and for an integration token). Marks a space as a sandbox for testing task sync; the flag is settable on create_space and update_space. Resetting or copying a staging space is done in the app or API, not through this MCP.',
+    view_front_page: 'view.front_page holds the entity front page: sections/metrics/people and, new, `layouts` (see get_workspaces_reference("front-page-layouts")). Sending view.front_page REPLACES it whole (handler/space_view.go mergeView); `null` clears it. Writing it needs an internal role: client and collaborator tokens get 403 (layoutWriteRefused).',
     view: 'Board card layout: `{ tasks: { board: { card: { fields: { title, task_id, priority, assignees, tags, subtasks_progress, actions_progress } } } } }`, each `{ visible, display? }`. priority.display.type is "icon" or "icon_and_text".',
     editing_disabled:
       'CREATE-ONLY and irreversible: a space created with `editing_disabled: true` refuses every update and delete (403), and there is no unlock. It is absent from UpdateSpaceRequest, so sending it on update does nothing.',
@@ -550,6 +557,63 @@ const REFERENCE = {
       'A task subscription can also deliver to a connector sync ingress. Two-way tracker sync is a connection: installing its sync package creates the ingress, mapping and subscription, and runs with no generated flows. Add your own steps with the flows `connector` node (get_node_type_reference("connector") in quiva-flows-mcp).',
     not_exposed: 'Integration admin (creating integrations, secrets, webhook subscriptions), copy-structure and reset are not in this MCP. Use the app (Account, Connections, API integrations) or the API.',
   },
+  'front-page-layouts': {
+    summary:
+      'view.front_page.layouts: a per-record-config front page (header, status badge, action buttons, tabs). The first layout whose config_id (and variant) matches the open record wins; the front page sections are the fallback. Engine: workspaces-service/handler/front_page_layouts_validate.go and model/api.go FrontPageLayout (both land with evari-olympus #1560). validate_payload checks the structure locally; paths and ids need the record configs, so the server checks those.',
+    where: 'update_space / create_space body: { view: { front_page: { layouts: [...] , sections?, metrics?, people? } } }. update_space REPLACES view.front_page whole - copy sections/metrics/people from get_space or they are deleted. Not valid on a dashboard (view.dashboard).',
+    limits: { layouts: 20, header_fields: 30, actions: 12, tabs: 12, tab_fields: 50, tab_columns: 12, page_size: '0-100' },
+    layout: '{ id (unique), config_id, variant_field?, variant_value? (both or neither), header: { fields: [{ path, label?, group? }], status?: { path, tones: { <value>: neutral|info|success|warning|danger } } }, actions?[], tabs?[] }. One layout per (config_id, variant_value).',
+    action: {
+      shape: '{ id (unique), label, placement: "primary"|"more", kind: "form"|"flow", requires?, disabled_when?, confirm?, ...kind fields }',
+      form: 'form_id (required: a record config id whose form opens). flow_ref, preview, refer_action, input_config_id are refused on a form action.',
+      flow: 'flow_ref (required: the published flow\'s subject; see list_workflows in the flows MCP). Flow-only: preview (dry run first), refer_action (another action id of THIS layout, offered when the preview is beyond the user\'s authority; not itself), input_config_id (a record config whose form opens first, prefilled from the page record; its values run as the flow\'s `inputs`). form_id is refused.',
+      requires: '"edit", "manage_clients", or an account role (admins hold every role). Anything else hides the action (microstrate record-layout-actions.ts).',
+      disabled_when: 'A json-logic OBJECT over the page record. A rule that cannot be evaluated disables the action.',
+    },
+    tabs: {
+      shape: '{ id (unique), label, type, count?, empty_text?, ...type fields }',
+      by_type: {
+        fields: 'fields[{ path, label?, group? }] (required, max 50).',
+        tasks: 'metadata_key? (filter tasks on that metadata key).',
+        files: 'metadata_key?.',
+        records: 'config_id (required); columns (max 12), page_size (0-100), latest_by { group_field, order_field } (both required; order_field a sortable index field), date_field (a date index field, created_at or updated_at), search_fields (text/keyword index fields), scope: "case" (default) | "parent" (across the page folder\'s parent entity folder). These feed the records query params of get_records_reference("query-views").',
+        form: 'form_id (required); highlight_field (page-record path); config_id + record_id_path TOGETHER to show another record (record_id_path is a page-record path holding its id; form_id is then a form of config_id).',
+        list: 'path (required: page-record array path) and columns (required, max 12: keys of its items).',
+        comments: 'task_external_id_template (required unless task_source): a task external_id with {page.record.path} tokens; braces must balance.',
+        history: 'task_external_id_template? / task_source? find the same task.',
+      },
+      misplaced_fields: 'A field on the wrong tab type is REFUSED (400), not ignored: fields only on fields; config_id on records/form; record_id_path, form_id, highlight_field on form; columns on records/list; page_size, latest_by, date_field, search_fields, scope on records; path on list; task_* on comments/history; metadata_key on tasks/files.',
+    },
+    checked_by_server_only: [
+      'header/tab field paths, status.path, variant_field, columns, record_id_path, highlight_field, list path and {tokens} exist in the page record\'s schema',
+      'layout config_id, action form_id/input_config_id, tab config_id/form_id exist as record configs of the space',
+      'latest_by.order_field is sortable, search_fields text/keyword, date_field a date index field',
+      'The server answers 400 { errors: [{ path, reason }] }; validate_payload reports these as one warning.',
+    ],
+    locked_spaces: 'For an editing_disabled space the layouts go through the internal subject microstrate.workspaces.patch.space-front-page (root token only, not gateway-mapped): not callable by MCP users.',
+    example: 'get_example("policy-view-layout")',
+    source: 'workspaces-service/handler/front_page_layouts_validate.go; workspaces-service/model/api.go FrontPageLayout, LayoutAction, LayoutTab; workspaces-service/handler/space_view.go mergeView',
+  },
+  'case-folder': {
+    summary:
+      'file_case_folder (POST /workspaces/case-folder): resolve or create the base-record entity from its identity, then open a case folder under it. Lands with evari-olympus #1560 (gateway route created on staging; it answers 404 until workspaces-service is deployed from it).',
+    request: '{ space_id, identity: { <identity field>: <string> }, case_key: { field, value }, case_config_id, name?, email?, display?: { <display field>: <string> }, primary_config?, primary_record_id?, metadata? }',
+    response: '{ entity_folder, case_folder, created_entity, created_case }',
+    rules: [
+      'The space must declare a base_record. identity keys must be its identity fields (at least one non-blank value).',
+      'case_folder = DeriveFolder(case_config_id, { case_key.field: case_key.value }): the same key always gives the same folder, in any account. case_config_id and case_key.field hold only letters, digits, _ and -; case_key.value is non-blank.',
+      'primary_config and primary_record_id are both set or neither, each a plain id.',
+      'metadata: max 20 keys, values max 512 chars; type, case_id, primary_config, primary_record_id, created_at, created_by and the case_key field are reserved.',
+      'display keys must be the base_record\'s display_fields. name, email and display are written only when THIS call creates the entity, and only into empty fields.',
+      'Role "client" gets 403. An existing case marker is never rewritten: a repeat returns created_case: false and keeps the original primary_* and metadata.',
+    ],
+    marker: 'A folder marker spaces.<SPACE>.<entity folder path>.<case folder>.__meta__.json with metadata { type: "case", case_id: <case folder>, <case_key.field>: <value>, primary_*?, ...metadata }. The entity folder path is <parent>.<entity> when the base record has a parent, so the response alone does not give the marker key: file_case_folder finds it in the file index by case folder id.',
+    concurrency: '409 with code `case_being_filed`: another caller holds the CAS claim and no marker exists yet. Retry. The claim goes stale after twice the downstream request timeout, and a failed marker write releases it.',
+    card_filing: 'custom_tab cards: effect.filing { identity: { <identity field>: <path in the card record> } (at least one, no blanks), name_path?, email_path? } tells the frontend which record fields feed the entity the case is filed under (model/api.go CardActionEffect.Filing, validateCardFiling).',
+    internal_subjects: 'microstrate.workspaces.patch.space-base-record and microstrate.workspaces.patch.space-front-page set a LOCKED (editing_disabled) space\'s base record and layouts. Root token only, not gateway-mapped: not callable by MCP users.',
+    verify: 'The response is not proof. file_case_folder reads the file index for the marker and its content; `verified: false` means it did not appear within the wait.',
+    source: 'workspaces-service/handler/case_folder.go (CaseFolderRequest, validateCaseFolderRequest, fileCase); workspaces-service/service/service.go',
+  },
   'endpoints': {
     summary: 'The workspaces-service surface exposed by this MCP (REST path → engine route key).',
     spaces: [
@@ -593,6 +657,10 @@ const REFERENCE = {
     ],
     contacts: [
       'POST   /workspaces/client                → post.client-folder (create_contact; may create a portal sign-in)',
+      'POST   /workspaces/case-folder           → post.case-folder (file_case_folder; lands with evari-olympus #1560; see get_workspaces_reference("case-folder"))',
+    ],
+    internal_only: [
+      'microstrate.workspaces.patch.space-base-record and microstrate.workspaces.patch.space-front-page: root token, not gateway-mapped. They set a locked space\'s base record / layouts. Not callable by MCP users.',
     ],
     meetings: [
       'GET    /workspaces/meetings              → get.meetings (list_meetings)',

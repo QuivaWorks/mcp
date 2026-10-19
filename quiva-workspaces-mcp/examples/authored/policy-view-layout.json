@@ -1,0 +1,114 @@
+{
+  "slug": "policy-view-layout",
+  "kind": "write-payloads",
+  "not_evidence": "HAND-WRITTEN with placeholder ids and generic labels. It passes the local validator, which proves only the structural rules. Whether the server accepts it depends on the record configs, forms and flow it names existing in the account: push it to a staging space and read the layouts back (get_space) before relying on it.",
+  "teaches": [
+    "view.front_page.layouts: the layout whose config_id (and variant) matches the open record wins; sections are the fallback",
+    "header.status colours a badge: tones maps a field VALUE to neutral, info, success, warning or danger",
+    "a form action opens a record config's form (form_id); a flow action runs a published flow (flow_ref, its subject)",
+    "a flow action may open input_config_id's form first, prefilled from the page record, and run with the values as `inputs`",
+    "preview: true dry-runs the flow first; refer_action names another action of the SAME layout offered when the preview is beyond the user's authority",
+    "disabled_when is a json-logic rule over the page record; requires is 'edit', 'manage_clients' or an account role",
+    "one tab of every type: fields, tasks, files, records (latest_by, search_fields, date_field, scope), form (own record or another via config_id + record_id_path), list, comments, history",
+    "update_space REPLACES view.front_page wholesale: copy the existing sections, metrics and people beside layouts"
+  ],
+  "update_space": {
+    "id": "OPS",
+    "space": {
+      "view": {
+        "front_page": {
+          "layouts": [
+            {
+              "id": "agreement_default",
+              "config_id": "agreement",
+              "header": {
+                "fields": [
+                  { "path": "reference", "label": "Reference" },
+                  { "path": "customer_name", "label": "Customer", "group": "Parties" },
+                  { "path": "owner", "label": "Owner", "group": "Parties" },
+                  { "path": "start_date", "label": "Starts" },
+                  { "path": "amount", "label": "Amount" }
+                ],
+                "status": {
+                  "path": "status",
+                  "tones": { "draft": "neutral", "pending_approval": "info", "active": "success", "on_hold": "warning", "cancelled": "danger" }
+                }
+              },
+              "actions": [
+                { "id": "edit_details", "label": "Edit details", "placement": "primary", "kind": "form", "form_id": "agreement", "requires": "edit" },
+                {
+                  "id": "approve",
+                  "label": "Approve",
+                  "placement": "primary",
+                  "kind": "flow",
+                  "flow_ref": "agreement_approval_flow",
+                  "input_config_id": "approval_input",
+                  "preview": true,
+                  "refer_action": "request_review",
+                  "confirm": "Approve this agreement?",
+                  "disabled_when": { "==": [{ "var": "status" }, "cancelled"] }
+                },
+                { "id": "request_review", "label": "Request review", "placement": "more", "kind": "flow", "flow_ref": "agreement_review_flow" },
+                { "id": "log_change", "label": "Log a change", "placement": "more", "kind": "form", "form_id": "change_request", "requires": "manage_clients" }
+              ],
+              "tabs": [
+                {
+                  "id": "summary",
+                  "label": "Summary",
+                  "type": "fields",
+                  "fields": [
+                    { "path": "reference", "label": "Reference" },
+                    { "path": "terms", "label": "Terms", "group": "Details" },
+                    { "path": "renewal_date", "label": "Renews", "group": "Details" }
+                  ]
+                },
+                { "id": "tasks", "label": "Tasks", "type": "tasks", "count": true, "empty_text": "No tasks yet", "metadata_key": "case_id" },
+                { "id": "documents", "label": "Documents", "type": "files", "metadata_key": "case_id" },
+                {
+                  "id": "changes",
+                  "label": "Changes",
+                  "type": "records",
+                  "config_id": "change_request",
+                  "columns": ["reference", "status", "requested_on"],
+                  "search_fields": ["reference", "reason"],
+                  "date_field": "requested_on",
+                  "page_size": 25
+                },
+                {
+                  "id": "latest_invoices",
+                  "label": "Latest invoices",
+                  "type": "records",
+                  "config_id": "invoice_row",
+                  "columns": ["invoice_ref", "status", "amount"],
+                  "latest_by": { "group_field": "source_record_id", "order_field": "version_seq" },
+                  "scope": "case",
+                  "count": true
+                },
+                { "id": "details_form", "label": "Details", "type": "form", "form_id": "agreement", "highlight_field": "status" },
+                { "id": "approval_form", "label": "Approval", "type": "form", "form_id": "approval_input", "config_id": "approval_input", "record_id_path": "approval_id" },
+                {
+                  "id": "schedule",
+                  "label": "Schedule",
+                  "type": "list",
+                  "path": "schedule_items",
+                  "columns": ["item", "due_on", "amount"]
+                },
+                { "id": "discussion", "label": "Discussion", "type": "comments", "task_external_id_template": "agreement-{reference}" },
+                { "id": "activity", "label": "Activity", "type": "history", "task_source": "agreements" }
+              ]
+            },
+            {
+              "id": "agreement_premium",
+              "config_id": "agreement",
+              "variant_field": "tier",
+              "variant_value": "premium",
+              "header": { "fields": [{ "path": "reference" }, { "path": "customer_name" }], "status": { "path": "status", "tones": { "active": "success" } } },
+              "tabs": [{ "id": "summary", "label": "Summary", "type": "fields", "fields": [{ "path": "reference" }, { "path": "tier" }] }]
+            }
+          ]
+        }
+      }
+    },
+    "note": "The existing sections, metrics and people are NOT shown. A real call copies them from get_space into front_page beside layouts, or they are deleted."
+  }
+}
