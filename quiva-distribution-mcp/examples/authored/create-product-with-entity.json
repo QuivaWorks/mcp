@@ -1,0 +1,46 @@
+{
+  "slug": "create-product-with-entity",
+  "of": "product",
+  "teaches": "A product that shapes the distributor's space: entity_config names the record set the space keys its entities on (one of THIS product's record_configs, never a bundle config), distributor_front_page_layouts installs front page layouts (only id and config_id are checked at publish; the body is the workspaces server's), and sla_business_days overrides the default of 2. None of it reaches an existing distributor until sync_distribution_products runs.",
+  "payload": {
+    "code": "support-plan",
+    "name": "Support plan",
+    "active": true,
+    "record_configs": [
+      {
+        "id": "support_request_config",
+        "label": "Requests"
+      },
+      {
+        "id": "customer_config",
+        "label": "Customers"
+      }
+    ],
+    "actions": {
+      "support_request_config": [
+        {
+          "type": "create",
+          "label": "New request"
+        }
+      ]
+    },
+    "sla_business_days": 5,
+    "entity_config": {
+      "config_id": "customer_config",
+      "identity_fields": [
+        "email"
+      ],
+      "label": "Customer",
+      "display_fields": [
+        "name",
+        "email"
+      ]
+    },
+    "distributor_front_page_layouts": [
+      {
+        "id": "requests-overview",
+        "config_id": "support_request_config"
+      }
+    ]
+  }
+}
