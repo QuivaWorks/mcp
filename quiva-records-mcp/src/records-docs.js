@@ -30,7 +30,7 @@ export const GOTCHAS = [
   // Update method + semantics.
   'Both record configs and records are updated with PUT (not PATCH). Config update applies only the fields you send; record update merges `data` key-by-key (or swaps it whole with `replace: true`, the only way to remove a key) and re-validates the merged result against the CURRENT schema. Pass the `revision` from a read to make the update compare-and-swap (409 if the record moved).',
   // Query-records requirements.
-  'GET /records (query-records) is the ONLY records list route. It requires `folder` OR `space_id` and derives the tenant from the caller\'s JWT (an API key works: the gateway swaps it for one). It also takes `config_id` (comma-separated), `parent_folder`, `filter`, `sort_by` (default created_at), `fields` (projection) and `limit` (default 25, max 1000)/`offset`, and returns `total_hits` — the full match count, not the page size (records-service/handler/records.go QueryRecordsHandler; bellerophon-indexer/request/query_index.go:13-14).',
+  'GET /records (query-records) is the ONLY records list route. It requires `folder`, `space_id` OR `scope_folder` (the last from evari-olympus #1560, with search, a date window and latest_by: get_records_reference("query-views")) and derives the tenant from the caller\'s JWT (an API key works: the gateway swaps it for one). It also takes `config_id` (comma-separated), `parent_folder`, `filter`, `sort_by` (default created_at), `fields` (projection) and `limit` (default 25, max 1000)/`offset`, and returns `total_hits` — the full match count, not the page size (records-service/handler/records.go QueryRecordsHandler; bellerophon-indexer/request/query_index.go:13-14).',
   // Removed list route.
   'GET /records/{config_id} is still gateway-mapped but its handler (get.records) was deleted (2927d7e9a, #1283), so it answers 500 "no responders". list_records is rebuilt on query-records and fans out over spaces when no scope is given (records-service/service/service.go).',
   // Schema-change semantics.
@@ -716,6 +716,27 @@ const REFERENCE = {
     unset_views:
       '`unset_views: ["form" | "table" | "forms" | "tables" | "flow"]` clears view keys outright on update — JSON cannot tell an absent key from null, so this is the only way. Applied after the merge, so one call can drop a flow and the forms it used.',
   },
+  'query-views': {
+    summary:
+      'The table-shaped half of query_records (GET /records): scope_folder, search, a date window and latest_by. Engine: records-service/handler/record_query_view.go and QueryRecordsHandler in handler/records.go. These land with evari-olympus #1560 (branch antipodean-policy-view); a records-service built before it ignores the params and returns unfiltered rows.',
+    params: {
+      scope_folder: 'Records whose folder OR parent_folder equals it. Counts as the required scope beside folder and space_id. ANDed with the other scope, never replacing it.',
+      search: 'Words, ANDed (the first 5 are used). Each word is ORed across search_fields: text fields match by PREFIX (lower-cased), keyword fields exactly.',
+      search_fields: 'Comma-separated declared text or keyword index fields. Omitted, every declared text field of the config. 400 on an undeclared or non-text/keyword field, or when no field remains.',
+      date_field: 'created_at, updated_at, or a declared date index field of the config. Needs date_from or date_to.',
+      date_from_to: 'RFC3339 or YYYY-MM-DD. A bare date_to covers its whole day (to 23:59:59Z). Either needs date_field.',
+      latest_by: '{ "group_field": "...", "order_field": "..." } (JSON). Per group_field value, keep the row with the highest order_field. order_field must be a declared SORTABLE index field (number, date or text_sortable): 400 otherwise.',
+    },
+    needs_one_config: 'search, a payload date_field and latest_by are checked against the config\'s index_fields, so they need EXACTLY one config_id (400 otherwise). scope_folder and the built-in date fields do not.',
+    latest_by_semantics: [
+      'The service reads ONE page of at most 1000 rows, highest order_field first, and keeps the first row of each group. It does not page deeper: offset paging on a non-unique sort key reorders ties across the boundary.',
+      '`truncated: true` in the reply means the scope held more than that page, so a group whose rows all sit past the cut is missing. It is absent (not false) otherwise.',
+      '`total_hits` counts GROUPS found in that page, not rows and not all groups that exist. `results_total` is this page.',
+      'limit defaults to 25 and is capped at 200 (not 1000) with latest_by; offset slices the collapsed rows. sort_by reorders the collapsed rows after the collapse.',
+      'A row with no group_field value is its own group.',
+    ],
+    source: 'records-service/handler/record_query_view.go (parseQueryView, latestRows, pageOf); records-service/handler/records.go QueryRecordsHandler',
+  },
   'endpoints': {
     summary:
       'The records-service HTTP surface (path → engine subject). Mapping status probed on production and staging 2026-09-27 against the gateway store and each environment\'s $SRV.INFO.',
@@ -738,6 +759,9 @@ const REFERENCE = {
       'POST   /records/export-records    → post.export-records',
       'DELETE /records/{config_id}/purge → delete.purge-records',
       'POST   /records/reindex           → post.reindex  (no tool; see index-fields)',
+    ],
+    internal_only: [
+      'microstrate.records.delete.record-if ({ config_id, id, unset_field } -> 200 deleted | 404 gone | 409 delete_refused (field set) | 409 record_conflict (revision moved)) deletes a record only while data[unset_field] is unset. It is registered in records-service/service/service.go but has NO gateway mapping (records-service/handler/record_delete_if.go: "Internal only"); trigger-service/distribution/revoke.go calls it over the mesh. Not reachable over HTTP, so this MCP has no tool for it. Lands with evari-olympus #1560.',
     ],
     dead_or_unsupported: [
       'GET /records/{config_id} is mapped but its handler (get.records) was deleted: 500 "no responders". Use query_records or list_records.',

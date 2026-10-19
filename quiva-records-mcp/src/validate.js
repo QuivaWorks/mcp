@@ -1335,3 +1335,48 @@ export function queryFilterWarnings(filter) {
   walk(Array.isArray(filter) ? filter : filter?.conditions, 'filter');
   return warnings;
 }
+
+const QUERY_FIELD_REGEX = /^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)*$/;
+const RECORD_OWN_FIELDS = ['folder', 'parent_folder', 'space_id', 'created_at', 'updated_at', 'config_id'];
+const BOUND_REGEX = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2}))?$/;
+
+// Mirrors records-service/handler/record_query_view.go parseQueryView (lands with
+// evari-olympus #1560). Errors are what the service answers 400 to; whether a field is a
+// declared index field needs the config, so the server checks that.
+export function queryViewProblems(args) {
+  const errors = [];
+  const warnings = [];
+  const configIds = [].concat(args.config_id ?? []).flatMap((c) => String(c).split(',')).map((c) => c.trim()).filter(Boolean);
+  const search = typeof args.search === 'string' ? args.search.trim() : '';
+  const latest = args.latest_by;
+
+  if (latest !== undefined) {
+    if (latest === null || typeof latest !== 'object' || Array.isArray(latest)) {
+      errors.push('latest_by must be an object { group_field, order_field }');
+    } else {
+      for (const key of ['group_field', 'order_field']) {
+        if (typeof latest[key] !== 'string' || !QUERY_FIELD_REGEX.test(latest[key])) {
+          errors.push(`latest_by.${key} is required: a field name of letters, digits and underscores, dotted for depth`);
+        }
+      }
+      for (const key of Object.keys(latest)) {
+        if (key !== 'group_field' && key !== 'order_field') warnings.push(`latest_by.${key} is not read — only group_field and order_field are`);
+      }
+      warnings.push('latest_by.order_field must be a SORTABLE declared index field (number, date or text_sortable) of the config — the server checks this against the config.');
+    }
+  }
+  if (args.date_field !== undefined && !QUERY_FIELD_REGEX.test(args.date_field)) errors.push(`date_field "${args.date_field}" is not a usable field name`);
+  if ((args.date_from || args.date_to) && !args.date_field) errors.push('date_from and date_to need date_field');
+  if (args.date_field && !args.date_from && !args.date_to) errors.push('date_field needs date_from or date_to');
+  for (const key of ['date_from', 'date_to']) {
+    if (args[key] !== undefined && !BOUND_REGEX.test(String(args[key]))) errors.push(`${key} "${args[key]}" is neither RFC3339 nor YYYY-MM-DD`);
+  }
+  if (args.search_fields !== undefined && !search) warnings.push('search_fields is ignored without search.');
+  if (search && search.split(/\s+/).length > 5) warnings.push('search uses only the first 5 words.');
+  const payloadDate = args.date_field && !RECORD_OWN_FIELDS.includes(args.date_field);
+  if ((search || latest !== undefined || payloadDate) && configIds.length !== 1) {
+    errors.push('search, a payload date_field and latest_by need exactly one config_id — they are checked against that config\'s index_fields');
+  }
+  if (latest !== undefined && args.limit > 200) warnings.push('limit is capped at 200 when latest_by is set.');
+  return { errors, warnings };
+}

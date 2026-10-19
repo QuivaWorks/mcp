@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { QuivaClient } from './client.js';
 import { getExample, listExamples } from './examples.js';
 import { GOTCHAS, listReferenceTopics, getReference } from './records-docs.js';
-import { validate, queryFilterWarnings } from './validate.js';
+import { validate, queryFilterWarnings, queryViewProblems } from './validate.js';
 
 export const instructions = `
 Tools for creating and managing Quiva records. A "record config" defines a
@@ -121,9 +121,13 @@ const fieldsField = z
   .optional()
   .describe('Projection: payload paths each row keeps (array or comma-separated, max 100). Any path, declared or not. Projected rows are partial — never write one back.');
 
+const LATEST_BY_SCAN_CAP = 1000;
+
 // Query-string params shared by query_records and list_records.
-function recordQuery({ folder, space_id, parent_folder, config_id, filter, sort_by, fields, limit, offset }) {
-  const query = { folder, space_id, parent_folder, limit, offset, sort_by };
+function recordQuery({ folder, space_id, parent_folder, config_id, filter, sort_by, fields, limit, offset, scope_folder, search, search_fields, date_field, date_from, date_to, latest_by }) {
+  const query = { folder, space_id, parent_folder, limit, offset, sort_by, scope_folder, search, date_field, date_from, date_to };
+  if (search_fields !== undefined) query.search_fields = Array.isArray(search_fields) ? search_fields.join(',') : search_fields;
+  if (latest_by !== undefined) query.latest_by = JSON.stringify(latest_by);
   if (config_id !== undefined) query.config_id = Array.isArray(config_id) ? config_id.join(',') : config_id;
   // A bare array is the service's shorthand for "just the conditions".
   if (filter !== undefined) query.filter = JSON.stringify(filter);
@@ -383,7 +387,7 @@ export function registerTools(server, client, { prefix = '' } = {}) {
 
   tool(
     'query_records',
-    'Search records (index-backed, GET /records). Requires folder OR space_id. Narrow by config_id(s), parent_folder, and a payload `filter` over DECLARED index_fields; sort with sort_by (default created_at); keep only some payload paths with `fields`. Page with limit (default 25, max 1000) and offset: `total_hits` is the full match count, `results_total` only this page. A filter on an undeclared field returns an empty page, not an error.',
+    'Search records (index-backed, GET /records). Requires folder, space_id OR scope_folder. Narrow by config_id(s), parent_folder, and a payload `filter` over DECLARED index_fields; sort with sort_by (default created_at); keep only some payload paths with `fields`. Page with limit (default 25, max 1000) and offset: `total_hits` is the full match count, `results_total` only this page. A filter on an undeclared field returns an empty page, not an error. Table-view params (need records-service from evari-olympus #1560; all but scope_folder need exactly ONE config_id): scope_folder (records filed in that folder or directly under it), search + search_fields (words ANDed, each ORed over the fields; text fields match by prefix, keyword exactly; default = the config\'s text index fields), date_field + date_from/date_to (RFC3339 or YYYY-MM-DD; a bare date_to covers its whole day), and latest_by { group_field, order_field } (the newest row per group: ONE page of at most 1000 rows, `truncated: true` when the scope held more, `total_hits` then counts GROUPS, limit capped at 200). See get_records_reference("query-views").',
     {
       folder: z.string().optional().describe('Folder id (folder or space_id required)'),
       space_id: z.string().optional().describe('Space id (folder or space_id required)'),
@@ -395,15 +399,27 @@ export function registerTools(server, client, { prefix = '' } = {}) {
       filter: filterField,
       sort_by: z.string().optional().describe('Record field or declared index field to sort by, "-field" to reverse'),
       fields: fieldsField,
-      limit: z.number().int().positive().max(1000).optional(),
+      limit: z.number().int().positive().max(1000).optional().describe('Default 25, max 1000; with latest_by max 200'),
       offset: z.number().int().nonnegative().optional(),
+      scope_folder: z.string().optional().describe('Only records filed in this folder or directly under it (folder or parent_folder equals it). Counts as the required scope.'),
+      search: z.string().optional().describe('Words ANDed (first 5 used); needs exactly one config_id'),
+      search_fields: z.union([z.array(z.string()), z.string()]).optional().describe('Declared text or keyword index fields search matches (array or comma-separated); default the config\'s text index fields'),
+      date_field: z.string().optional().describe('created_at, updated_at, or a declared date index field of the one config_id; needs date_from or date_to'),
+      date_from: z.string().optional().describe('RFC3339 or YYYY-MM-DD'),
+      date_to: z.string().optional().describe('RFC3339 or YYYY-MM-DD; a bare date covers that whole day'),
+      latest_by: jsonValue.optional().describe('{ group_field, order_field }: keep, per group_field value, the row with the highest order_field. order_field must be a declared SORTABLE index field. One page of at most 1000 rows; see `truncated`.'),
     },
     async (args) => {
-      if (!args.folder && !args.space_id) {
-        throw new Error('folder or space_id is required for query_records');
+      if (!args.folder && !args.space_id && !args.scope_folder) {
+        throw new Error('folder, space_id or scope_folder is required for query_records');
       }
-      const warnings = queryFilterWarnings(args.filter);
+      const view = queryViewProblems(args);
+      if (view.errors.length) return { queried: false, validation: { valid: false, errors: view.errors, warnings: view.warnings } };
+      const warnings = [...queryFilterWarnings(args.filter), ...view.warnings];
       const res = await client.get('/records', recordQuery(args));
+      if (res?.truncated) {
+        warnings.push(`truncated: latest_by read only the first ${LATEST_BY_SCAN_CAP} rows (newest ${args.latest_by?.order_field} first) of a larger scope, so a group whose rows all sit past the cut is MISSING. total_hits counts the groups found, not the groups that exist. Narrow the scope (scope_folder, date window, filter).`);
+      }
       return warnings.length ? { ...res, warnings } : res;
     }
   );

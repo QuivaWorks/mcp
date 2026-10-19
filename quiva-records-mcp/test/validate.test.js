@@ -1233,6 +1233,82 @@ await checkAsync('query_records: fields, parent_folder and filter reach the quer
   assert.equal(q.filter, JSON.stringify([{ field: 'status', keyword: 'open' }]));
 });
 
+await checkAsync('query_records: view params reach the query string (latest_by as JSON, search_fields joined)', async () => {
+  const h = harness(() => ({ results: [], results_total: 0, total_hits: 0 }));
+  await h.run('query_records', {
+    scope_folder: 'case-1', config_id: 'policy_row', search: 'acme', search_fields: ['name', 'ref'],
+    date_field: 'created_at', date_from: '2026-01-01', date_to: '2026-03-31',
+    latest_by: { group_field: 'source_id', order_field: 'seq' },
+  });
+  const q = h.calls[0].query;
+  assert.equal(q.scope_folder, 'case-1');
+  assert.equal(q.search, 'acme');
+  assert.equal(q.search_fields, 'name,ref');
+  assert.equal(q.date_field, 'created_at');
+  assert.equal(q.date_from, '2026-01-01');
+  assert.equal(q.latest_by, JSON.stringify({ group_field: 'source_id', order_field: 'seq' }));
+});
+
+await checkAsync('query_records: scope_folder alone satisfies the scope; nothing at all is refused', async () => {
+  const h = harness(() => ({ results: [], total_hits: 0 }));
+  await h.run('query_records', { scope_folder: 'case-1' });
+  assert.equal(h.calls.length, 1);
+  assert.equal((await h.raw('query_records', {})).isError, true);
+  assert.equal(h.calls.length, 1);
+});
+
+await checkAsync('query_records: a malformed view is refused locally and sends nothing', async () => {
+  const h = harness(() => ({ results: [] }));
+  const bad = [
+    { config_id: 'c', latest_by: { group_field: 'a' } },
+    { config_id: 'c', latest_by: { group_field: 'a b', order_field: 'c' } },
+    { config_id: 'c', latest_by: 'newest' },
+    { config_id: 'c', date_from: '2026-01-01' },
+    { config_id: 'c', date_field: 'created_at' },
+    { config_id: 'c', date_field: 'created_at', date_from: 'yesterday' },
+    { config_id: ['a', 'b'], search: 'x' },
+    { config_id: ['a', 'b'], latest_by: { group_field: 'g', order_field: 'o' } },
+  ];
+  for (const extra of bad) {
+    const out = await h.run('query_records', { space_id: 'OPS', ...extra });
+    assert.equal(out.queried, false, JSON.stringify(extra));
+  }
+  const noConfig = await h.run('query_records', { space_id: 'OPS', search: 'x' });
+  assert.equal(noConfig.queried, false);
+  assert.match(noConfig.validation.errors[0], /exactly one config_id/);
+  assert.equal(h.calls.length, 0);
+});
+
+await checkAsync('query_records: built-in date field and scope need no config; payload date field does', async () => {
+  const h = harness(() => ({ results: [] }));
+  await h.run('query_records', { space_id: 'OPS', date_field: 'updated_at', date_to: '2026-03-31T00:00:00Z' });
+  assert.equal(h.calls.length, 1);
+  const out = await h.run('query_records', { space_id: 'OPS', date_field: 'renewal_date', date_to: '2026-03-31' });
+  assert.equal(out.queried, false);
+});
+
+await checkAsync('query_records: a truncated latest_by reply is flagged, total_hits counts groups', async () => {
+  const h = harness(() => ({ results: [{ id: '1' }], results_total: 1, total_hits: 1, truncated: true }));
+  const out = await h.run('query_records', { space_id: 'OPS', config_id: 'c', latest_by: { group_field: 'g', order_field: 'seq' }, limit: 500 });
+  assert.ok(out.warnings.some((w) => /truncated.*MISSING/.test(w)));
+  assert.ok(out.warnings.some((w) => /capped at 200/.test(w)));
+  assert.ok(out.warnings.some((w) => /SORTABLE/.test(w)));
+  const plain = await harness(() => ({ results: [], total_hits: 0 })).run('query_records', { space_id: 'OPS' });
+  assert.equal(plain.warnings, undefined);
+});
+
+check('query-views reference documents truncated/total_hits, and delete_record_if is documented internal-only', () => {
+  const r = getReference('query-views');
+  assert.match(r.latest_by_semantics.join(' '), /truncated: true/);
+  assert.match(r.latest_by_semantics.join(' '), /GROUPS/);
+  assert.match(JSON.stringify(getReference('endpoints').internal_only), /record-if.*NO gateway mapping/);
+});
+
+await checkAsync('no delete_record_if tool exists (the subject is internal-only)', async () => {
+  const h = harness(() => ({}));
+  await assert.rejects(async () => h.raw('delete_record_if', {}), TypeError);
+});
+
 await checkAsync('purge_records: refuses without confirm: true and sends nothing', async () => {
   const h = harness(() => ({ purged: 0 }));
   assert.equal((await h.raw('purge_records', { config_id: 'tasks', confirm: false })).isError, true);
