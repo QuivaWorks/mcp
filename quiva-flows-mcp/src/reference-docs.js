@@ -56,6 +56,12 @@ WORKFLOW LIFECYCLE
    list_workflows(version="published").
 4. run_workflow executes it; await=true returns results synchronously.
 5. Updating a published workflow creates a new draft — publish again to go live.
+6. unpublish_workflow deletes only the PUBLISHED version (DELETE ?draft=false) and
+   keeps the draft; delete_workflow (draft=true) removes both versions and both
+   list entries (hub-service/handler/delete-subject.go DeleteWorkflowHandler).
+   Neither unschedules schedule triggers (only publish and the unschedule-flow
+   route do), and both are refused 409 for a flow bound by a distribution
+   contract (hub-service/handler/workflow-contract.go refuseContractedSubject).
 
 Notes
 - update_workflow must send the DRAFT subject in the request body; path params
@@ -85,12 +91,70 @@ Roles
   root, admin or developer role: other roles get 403 "changing a flow needs the
   root, admin or developer role" (hub-service/handler/account_role.go).
 
+The awaited answer (hub-service/runner/graph.go waitForCompletion)
+- An awaited run answers { tracking_id?, result } on success. tracking_id is
+  absent only for a run started from the gateway; status is added beside result
+  when the flow sets no Result.
+- result is the flow's own resolved Result (the jPath in the flow's result
+  setting) when it sets one: that is the designed answer, and the only thing a
+  gateway caller gets. With no Result set, result is the per-node results map.
+- A failed run answers an error status with { tracking_id?, result?, status_code }.
+- A run NOT awaited answers { tracking_id } only.
+
 Awaited runs on queued accounts (hub-service/handler/run_queue.go)
 - 429 + Retry-After: the account's run limit is full. Wait and retry.
 - 504: not finished before the gateway timeout. It may still complete; check
   search_run_logs before re-running.
 - 409: the same run attempt is already queued.
 - 503 + Retry-After: the queue could not take the run. Retry.
+`.trim();
+
+const LAYOUT_ACTIONS = `
+LAYOUT ACTIONS — the flow side of a front page "flow" action
+=============================================================
+
+The page runs the flow AWAITED, with the page record as the trigger and the
+protocol in the run CONTEXT (run_workflow's context parameter, read in nodes as
+$.context). The consumer is microstrate/src/components/spaces/front-page/
+record-layout/record-layout-action-preview.ts parseActionOutcome and
+record-layout-action-runner.svelte.ts (on evari-olympus PR #1560).
+
+Request
+  { subject, trigger: <the page record>, await: true,
+    context: { preview?: true|false, inputs?: {...} } }
+- preview: sent only by an action configured to preview. true = DRY RUN: answer
+  what would change and WRITE NOTHING. false = the confirmed run: commit.
+  Absent = an ordinary run.
+- inputs: the values of the action's inputs form. They arrive in the context,
+  not in the trigger. A flow may keep a fallback in trigger.input, and values
+  that are JSON strings need parsing.
+- A preview run reads inputs too, so it prices the same change the commit will.
+
+Answer. The hub wraps an awaited run as { tracking_id?, result }; the page
+reads result first, then the top level. The flow's own Result should be one of:
+- Preview:  { before: {...}, after: {...} } — flat objects keyed by field; the
+  page shows a row per key and highlights those that differ. Both must be
+  objects or the page reports "returned nothing to compare".
+- Done:     { ok: true, ... }. Anything that is not a refusal counts as done.
+- Refusal:  { ok: false, code, reason } — shown to the user, nothing changed.
+  The page also reads a non-empty string error, a status field used as the
+  code, or a code in beyond_authority, concurrent_decision, error, failed as a
+  refusal.
+- Beyond authority: { ok: false, code: "beyond_authority", reason } or
+  { beyond_authority: true, reason }. The UI offers a refer-up action instead of
+  a plain error.
+
+Rules for the flow
+- Check the preview flag BEFORE any write. A preview that writes is the bug;
+  context.preview is false/absent only on the committing run.
+- Refuse, do not throw. A thrown error becomes an error status and the page says
+  only "This action could not be run." — the reason is lost.
+- On a refusal that came after a preview, the committing run can still refuse
+  (for example concurrent_decision when the record moved): re-check on commit.
+- Keep a flow's HTTP error statuses for timer and gateway runs if it serves them
+  too, and answer the { ok, code, reason } shape only for a page run.
+- Set the flow's Result to the answer object. Without a Result, result is the
+  whole node map and the page finds no before/after.
 `.trim();
 
 const TRIGGERS = `
@@ -231,6 +295,10 @@ const TOPICS = {
   lifecycle: {
     summary: 'Collections, draft vs published subjects, publish, run, resume, and the update-creates-a-draft rule.',
     body: () => LIFECYCLE,
+  },
+  'layout-actions': {
+    summary: 'How a front page layout action runs a flow: run context preview / inputs, the { before, after } preview answer, and { ok:false, code, reason } refusals incl. beyond_authority.',
+    body: () => LAYOUT_ACTIONS,
   },
   gotchas: {
     summary: 'Every known spec-vs-engine trap, as a list.',

@@ -75,7 +75,7 @@ claude mcp add quiva-flows \
 **Collections**: `list_collections`, `create_collection`
 
 **Workflows**: `list_workflows`, `get_workflow`, `create_workflow`,
-`update_workflow`, `publish_workflow`, `delete_workflow`, `get_workflow_history`
+`update_workflow`, `publish_workflow`, `unpublish_workflow` (removes the published version, keeps the draft), `delete_workflow`, `get_workflow_history`
 
 **Execution / debugging**: `run_workflow` (sync/async, batch, resume paused
 runs), `list_paused_workflows`, `list_errored_workflows`, `search_run_logs`

@@ -864,6 +864,139 @@ check('every file in src/ is syntactically valid', () => {
   });
 }
 
+// --- unpublish_workflow, delete read-back, run context ------------------------
+{
+  const { registerTools } = await import('../src/index.js');
+  const { getReference, listReferenceTopics } = await import('../src/reference-docs.js');
+  // exists = { published, draft }; a DELETE with draft=false clears published, draft=true clears both.
+  function stub(exists, { deleteFails } = {}) {
+    const calls = [];
+    const gone = () => Object.assign(new Error('not found'), { status: 404 });
+    const client = {
+      get: async (path, q) => {
+        calls.push({ method: 'GET', path, query: q });
+        if (!(q.draft === 'true' ? exists.draft : exists.published)) throw gone();
+        return { subject: 'x' };
+      },
+      post: async (path, body) => { calls.push({ method: 'POST', path, body }); return { tracking_id: 't' }; },
+      delete: async (path, q) => {
+        calls.push({ method: 'DELETE', path, query: q });
+        if (deleteFails) throw Object.assign(new Error('this flow is bound by the distribution contract'), { status: 409 });
+        exists.published = false;
+        if (q.draft === 'true') exists.draft = false;
+        return { message: 'success' };
+      },
+    };
+    const tools = {};
+    registerTools({ registerTool: (n, meta, fn) => (tools[n] = { meta, fn }) }, client);
+    const call = async (name, args) => {
+      const r = await tools[name].fn(args);
+      return { isError: Boolean(r.isError), body: r.isError ? r.content[0].text : JSON.parse(r.content[0].text) };
+    };
+    return { calls, call, tools };
+  }
+  const flow = 'ms.hub.config.workflow.published.abc.def';
+  const deletes = (calls) => calls.filter((c) => c.method === 'DELETE');
+
+  const refused = stub({ published: true, draft: true });
+  const r0 = await refused.call('unpublish_workflow', { subject: flow });
+  check('unpublish_workflow refuses without confirm: true and sends nothing', () => {
+    assert.equal(r0.isError, true);
+    assert.match(r0.body, /confirm: true/);
+    assert.equal(refused.calls.length, 0);
+  });
+
+  const ok = stub({ published: true, draft: true });
+  const r1 = await ok.call('unpublish_workflow', { subject: flow, confirm: true });
+  check('unpublish_workflow deletes with draft=false only and reads both versions back', () => {
+    assert.equal(deletes(ok.calls).length, 1);
+    assert.deepEqual(deletes(ok.calls)[0], { method: 'DELETE', path: '/hub/workflows/abc/def', query: { draft: 'false' } });
+    assert.equal(r1.body.unpublished, true);
+    assert.equal(r1.body.draft_kept, true);
+    assert.equal(r1.body.warning, undefined);
+  });
+  check('unpublish_workflow reads the published version before and after the delete', () => {
+    const order = ok.calls.map((c) => `${c.method}:${c.query?.draft}`);
+    assert.deepEqual(order, ['GET:false', 'DELETE:false', 'GET:false', 'GET:true']);
+  });
+
+  const draftSubject = stub({ published: true, draft: true });
+  await draftSubject.call('unpublish_workflow', { subject: 'ms.hub.config.workflow.draft.abc.def', confirm: true });
+  check('unpublish_workflow with a draft subject still sends draft=false', () => {
+    assert.equal(deletes(draftSubject.calls)[0].query.draft, 'false');
+  });
+
+  const nothing = stub({ published: false, draft: true });
+  const r2 = await nothing.call('unpublish_workflow', { subject: flow, confirm: true });
+  check('unpublish_workflow with no published version deletes nothing', () => {
+    assert.equal(deletes(nothing.calls).length, 0);
+    assert.equal(r2.body.unpublished, false);
+    assert.equal(r2.body.draft_exists, true);
+  });
+
+  const noDraft = stub({ published: true, draft: false });
+  const r3 = await noDraft.call('unpublish_workflow', { subject: flow, confirm: true });
+  check('unpublish_workflow warns when no draft remains to republish', () => {
+    assert.equal(r3.body.unpublished, true);
+    assert.equal(r3.body.draft_kept, false);
+    assert.match(r3.body.warning, /no draft/);
+  });
+
+  const contracted = stub({ published: true, draft: true }, { deleteFails: true });
+  const r4 = await contracted.call('unpublish_workflow', { subject: flow, confirm: true });
+  check('unpublish_workflow surfaces the contract refusal as an error', () => {
+    assert.equal(r4.isError, true);
+    assert.match(r4.body, /contract/);
+  });
+
+  check('unpublish_workflow says what it keeps and what it does not unschedule', () => {
+    const d = ok.tools.unpublish_workflow.meta.description;
+    assert.match(d, /keep the draft/);
+    assert.match(d, /draft=false/);
+    assert.match(d, /NOT unschedule/);
+  });
+
+  const del = stub({ published: true, draft: true });
+  const d1 = await del.call('delete_workflow', { subject: flow, confirm: true });
+  check('delete_workflow reads both versions back and verifies they are gone', () => {
+    assert.equal(deletes(del.calls)[0].query.draft, 'true');
+    assert.deepEqual(d1.body.remaining, { published: false, draft: false });
+    assert.equal(d1.body.verified, true);
+  });
+  const keep = stub({ published: true, draft: true });
+  const d2 = await keep.call('delete_workflow', { subject: flow, keep_draft: true, confirm: true });
+  check('delete_workflow keep_draft sends draft=false and expects the draft to remain', () => {
+    assert.equal(deletes(keep.calls)[0].query.draft, 'false');
+    assert.deepEqual(d2.body.remaining, { published: false, draft: true });
+    assert.equal(d2.body.verified, true);
+  });
+  check('delete_workflow description says the subject segment is ignored', () => {
+    assert.match(del.tools.delete_workflow.meta.description, /only its collection and flow/);
+  });
+
+  const run = stub({ published: true, draft: true });
+  await run.call('run_workflow', { subject: flow, trigger: { id: 'r1' }, context: { preview: true, inputs: { reason: 'x' } } });
+  await run.call('run_workflow', { subject: flow });
+  check('run_workflow passes context through, and omits it when absent', () => {
+    const posts = run.calls.filter((c) => c.method === 'POST');
+    assert.deepEqual(posts[0].body.context, { preview: true, inputs: { reason: 'x' } });
+    assert.equal('context' in posts[1].body, false);
+  });
+
+  check('layout-actions reference covers the preview and refusal protocol', () => {
+    assert.ok(listReferenceTopics().topics.some((t) => t.topic === 'layout-actions'));
+    const text = getReference('layout-actions').reference;
+    for (const needle of ['preview', 'inputs', '{ before: {...}, after: {...} }', 'ok: false, code, reason', 'beyond_authority', 'WRITE NOTHING', 'refer-up']) {
+      assert.ok(text.includes(needle), needle);
+    }
+  });
+  check('lifecycle reference gives the awaited answer and unpublish', () => {
+    const text = getReference('lifecycle').reference;
+    assert.match(text, /\{ tracking_id\?, result \}/);
+    assert.match(text, /unpublish_workflow deletes only the PUBLISHED version/);
+  });
+}
+
 if (failures > 0) {
   console.error(`\n${failures} failure(s)`);
   process.exit(1);
