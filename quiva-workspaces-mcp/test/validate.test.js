@@ -1111,6 +1111,297 @@ check('task-sync reference topic and auth fix', () => {
   });
 }
 
+// --- front page layouts, base-record swap, case folder ---
+const layoutExample = () => structuredClone(getExample('policy-view-layout').update_space.space);
+const withLayout = (mutate) => {
+  const space = layoutExample();
+  mutate(space.view.front_page.layouts[0], space.view.front_page.layouts);
+  return validate('space', space, { requireRequired: false });
+};
+const errs = (r) => r.errors.join(' | ');
+
+check('layouts: the authored policy-view example is valid, covers every tab type and warns the server checks paths', () => {
+  const example = getExample('policy-view-layout');
+  const r = validate('space', example.update_space.space, { requireRequired: false });
+  assert.equal(r.valid, true, errs(r));
+  const types = new Set(example.update_space.space.view.front_page.layouts[0].tabs.map((tab) => tab.type));
+  assert.deepEqual([...types].sort(), ['comments', 'fields', 'files', 'form', 'history', 'list', 'records', 'tasks']);
+  assert.ok(r.warnings.some((w) => /checked? by the server|made by the server/.test(w)));
+  assert.ok(r.warnings.some((w) => /REPLACED WHOLESALE/.test(w)), 'no sections/metrics/people sent: warn');
+  const fp = example.update_space.space.view.front_page;
+  const kept = validate('space', { view: { front_page: { ...fp, sections: [] } } }, { requireRequired: false });
+  assert.ok(!kept.warnings.some((w) => /REPLACED WHOLESALE/.test(w)));
+});
+
+check('layouts: a space with a front page and no layouts, and the harvested spaces, are untouched', () => {
+  assert.equal(validate('space', { view: { front_page: { sections: [] } } }, { requireRequired: false }).valid, true);
+  assert.equal(validate('space', { view: { front_page: { layouts: [] } } }, { requireRequired: false }).valid, true);
+  assert.ok(validate('space', { view: { front_page: null } }, { requireRequired: false }).warnings.some((w) => /CLEARS/.test(w)));
+});
+
+check('layouts: layout-level rules (id, config_id, variant pair, duplicate coverage, limits)', () => {
+  assert.match(errs(withLayout((l) => { delete l.id; })), /layouts\[0\]\.id is required/);
+  assert.match(errs(withLayout((l) => { delete l.config_id; })), /config_id is required/);
+  assert.match(errs(withLayout((l) => { delete l.variant_field; l.variant_value = 'x'; })), /variant_field and variant_value/);
+  assert.match(errs(withLayout((l, all) => { all[1].id = l.id; })), /duplicate/);
+  assert.match(errs(withLayout((l, all) => { all[1].variant_field = undefined; all[1].variant_value = undefined; })), /already covers/);
+  assert.match(errs(withLayout((l, all) => { while (all.length <= 20) all.push({ ...l, id: `l${all.length}`, variant_value: `v${all.length}`, variant_field: 'tier' }); })), /too many layouts \(max 20\)/);
+  assert.match(errs(withLayout((l) => { l.header.fields = Array.from({ length: 31 }, () => ({ path: 'a' })); })), /too many fields \(max 30\)/);
+  assert.match(errs(withLayout((l) => { l.actions = Array.from({ length: 13 }, (_, i) => ({ id: `a${i}`, label: 'x', placement: 'more', kind: 'form', form_id: 'f' })); })), /too many actions \(max 12\)/);
+  assert.match(errs(withLayout((l) => { l.tabs = Array.from({ length: 13 }, (_, i) => ({ id: `t${i}`, label: 'x', type: 'tasks' })); })), /too many tabs \(max 12\)/);
+});
+
+check('layouts: header rules (field path, status path, unknown tone)', () => {
+  assert.match(errs(withLayout((l) => { l.header.fields.push({ label: 'no path' }); })), /header\.fields\[5\]\.path is required/);
+  assert.match(errs(withLayout((l) => { delete l.header.status.path; })), /status\.path is required/);
+  assert.match(errs(withLayout((l) => { l.header.status.tones.active = 'green'; })), /unknown tone "green"/);
+  for (const tone of ['neutral', 'info', 'success', 'warning', 'danger']) {
+    assert.equal(withLayout((l) => { l.header.status.tones.active = tone; }).valid, true, tone);
+  }
+});
+
+check('layouts: action rules per kind, refer_action and disabled_when', () => {
+  const action = (l, id) => l.actions.find((a) => a.id === id);
+  assert.match(errs(withLayout((l) => { action(l, 'edit_details').placement = 'top'; })), /placement must be primary or more/);
+  assert.match(errs(withLayout((l) => { action(l, 'edit_details').kind = 'script'; })), /kind must be form or flow/);
+  assert.match(errs(withLayout((l) => { delete action(l, 'edit_details').form_id; })), /form_id is required for a form action/);
+  assert.match(errs(withLayout((l) => { action(l, 'edit_details').flow_ref = 'f'; })), /flow_ref is not used by a form action/);
+  for (const k of ['preview', 'refer_action', 'input_config_id']) {
+    assert.match(errs(withLayout((l) => { action(l, 'edit_details')[k] = k === 'preview' ? true : 'x'; })), new RegExp(`${k} is only used by a flow action`));
+  }
+  assert.match(errs(withLayout((l) => { delete action(l, 'approve').flow_ref; })), /flow_ref is required for a flow action/);
+  assert.match(errs(withLayout((l) => { action(l, 'approve').form_id = 'f'; })), /form_id is not used by a flow action/);
+  assert.match(errs(withLayout((l) => { action(l, 'approve').refer_action = 'approve'; })), /cannot name the action itself/);
+  assert.match(errs(withLayout((l) => { action(l, 'approve').refer_action = 'nope'; })), /does not name an action of this layout/);
+  assert.match(errs(withLayout((l) => { action(l, 'approve').disabled_when = 'status == x'; })), /json-logic object/);
+  assert.match(errs(withLayout((l) => { delete action(l, 'approve').label; })), /label is required/);
+  assert.match(errs(withLayout((l) => { l.actions[1].id = l.actions[0].id; })), /duplicate/);
+});
+
+check('layouts: every tab type\'s required fields', () => {
+  const tab = (l, id) => l.tabs.find((x) => x.id === id);
+  assert.match(errs(withLayout((l) => { delete tab(l, 'summary').fields; })), /fields is required/);
+  assert.match(errs(withLayout((l) => { delete tab(l, 'changes').config_id; })), /config_id is required/);
+  assert.match(errs(withLayout((l) => { delete tab(l, 'details_form').form_id; })), /form_id is required/);
+  assert.match(errs(withLayout((l) => { delete tab(l, 'schedule').path; })), /path is required/);
+  assert.match(errs(withLayout((l) => { delete tab(l, 'schedule').columns; })), /columns is required/);
+  assert.match(errs(withLayout((l) => { delete tab(l, 'discussion').task_external_id_template; })), /task_external_id_template is required/);
+  assert.equal(withLayout((l) => { delete tab(l, 'discussion').task_external_id_template; tab(l, 'discussion').task_source = 'x'; }).valid, true);
+  assert.equal(withLayout((l) => { delete tab(l, 'activity').task_source; }).valid, true, 'history needs no lookup');
+  assert.match(errs(withLayout((l) => { tab(l, 'discussion').task_external_id_template = 'a-{ref'; })), /unbalanced braces/);
+  assert.match(errs(withLayout((l) => { tab(l, 'discussion').task_external_id_template = 'a-}'; })), /unbalanced braces/);
+  assert.match(errs(withLayout((l) => { tab(l, 'summary').type = 'gallery'; })), /unknown/);
+  assert.match(errs(withLayout((l) => { delete tab(l, 'summary').label; })), /label is required/);
+  assert.match(errs(withLayout((l) => { l.tabs[1].id = l.tabs[0].id; })), /duplicate/);
+});
+
+check('layouts: both-or-neither pairs and range limits', () => {
+  const tab = (l, id) => l.tabs.find((x) => x.id === id);
+  assert.match(errs(withLayout((l) => { delete tab(l, 'approval_form').record_id_path; })), /record_id_path and config_id are set together/);
+  assert.match(errs(withLayout((l) => { delete tab(l, 'approval_form').config_id; })), /record_id_path and config_id are set together/);
+  assert.match(errs(withLayout((l) => { delete tab(l, 'latest_invoices').latest_by.order_field; })), /latest_by\.order_field is required/);
+  assert.match(errs(withLayout((l) => { delete tab(l, 'latest_invoices').latest_by.group_field; })), /latest_by\.group_field is required/);
+  assert.match(errs(withLayout((l) => { tab(l, 'changes').page_size = 101; })), /page_size must be 0-100/);
+  assert.equal(withLayout((l) => { tab(l, 'changes').page_size = 100; }).valid, true);
+  assert.match(errs(withLayout((l) => { tab(l, 'changes').columns = Array.from({ length: 13 }, (_, i) => `c${i}`); })), /too many columns \(max 12\)/);
+  assert.match(errs(withLayout((l) => { tab(l, 'schedule').columns = Array.from({ length: 13 }, (_, i) => `c${i}`); })), /too many columns \(max 12\)/);
+  assert.match(errs(withLayout((l) => { tab(l, 'summary').fields = Array.from({ length: 51 }, () => ({ path: 'a' })); })), /too many fields \(max 50\)/);
+  assert.match(errs(withLayout((l) => { tab(l, 'latest_invoices').scope = 'global'; })), /scope must be case or parent/);
+  assert.equal(withLayout((l) => { tab(l, 'latest_invoices').scope = 'parent'; }).valid, true);
+});
+
+check('layouts: a field on the wrong tab type is refused, not ignored', () => {
+  const tab = (l, id) => l.tabs.find((x) => x.id === id);
+  const cases = [
+    ['tasks', 'fields', [{ path: 'a' }], /fields is only used by a fields tab/],
+    ['tasks', 'config_id', 'x', /config_id is only used by a records or form tab/],
+    ['changes', 'record_id_path', 'x', /record_id_path is only used by a form tab/],
+    ['details_form', 'columns', ['a'], /columns is only used by a records or list tab/],
+    ['schedule', 'page_size', 10, /page_size is only used by a records tab/],
+    ['schedule', 'latest_by', { group_field: 'a', order_field: 'b' }, /latest_by is only used by a records tab/],
+    ['tasks', 'date_field', 'x', /date_field is only used by a records tab/],
+    ['tasks', 'search_fields', ['x'], /search_fields is only used by a records tab/],
+    ['tasks', 'scope', 'case', /scope is only used by a records tab/],
+    ['changes', 'form_id', 'x', /form_id is only used by a form tab/],
+    ['changes', 'highlight_field', 'x', /highlight_field is only used by a form tab/],
+    ['changes', 'path', 'x', /path is only used by a list tab/],
+    ['changes', 'task_external_id_template', 'x', /task_external_id_template is only used by a comments or history tab/],
+    ['changes', 'task_source', 'x', /task_source is only used by a comments or history tab/],
+    ['changes', 'metadata_key', 'x', /metadata_key is only used by a tasks or files tab/],
+  ];
+  for (const [id, field, value, re] of cases) {
+    assert.match(errs(withLayout((l) => { tab(l, id)[field] = value; })), re, `${id}.${field}`);
+  }
+  assert.equal(withLayout((l) => { tab(l, 'tasks').page_size = 0; }).valid, true, 'a zero page_size is unset, as in the server');
+});
+
+check('layouts: type errors on malformed JSON are errors, never exceptions', () => {
+  for (const bad of ['x', 5, [1], [null], [{ id: 'a', config_id: 'c', header: 'h' }], [{ id: 'a', config_id: 'c', actions: 'x' }], [{ id: 'a', config_id: 'c', tabs: [null] }]]) {
+    const r = validate('space', { view: { front_page: { layouts: bad } } }, { requireRequired: false });
+    assert.equal(r.valid, false, JSON.stringify(bad));
+  }
+});
+
+check('legacy_config_ids: [] clears, a list is checked, and the old "do not send it" warning is gone', () => {
+  const base = { config_id: 'insured_config', identity_fields: ['insured_key'] };
+  const cleared = validate('space', { base_record: { ...base, legacy_config_ids: [] } }, { requireRequired: false });
+  assert.equal(cleared.valid, true, errs(cleared));
+  assert.ok(cleared.warnings.some((w) => /\[\] CLEARS/.test(w)));
+  assert.ok(!cleared.warnings.some((w) => /do not send it/.test(w)));
+  assert.equal(validate('space', { base_record: { ...base, legacy_config_ids: ['contact'] } }, { requireRequired: false }).valid, true);
+  assert.match(errs(validate('space', { base_record: { ...base, legacy_config_ids: 'contact' } }, { requireRequired: false })), /array of config ids/);
+  assert.match(errs(validate('space', { base_record: { ...base, legacy_config_ids: [1] } }, { requireRequired: false })), /array of config ids/);
+  assert.equal(validate('space', { base_record: base }, { requireRequired: false }).warnings.some((w) => /legacy_config_ids/.test(w)), false);
+});
+
+check('base-record swap: warns when config_id changes against the stored space without legacy_config_ids: []', () => {
+  const current = { base_record: { config_id: 'contact', legacy_config_ids: ['broker_config'] } };
+  const swap = { base_record: { config_id: 'insured_config', identity_fields: ['insured_key'] } };
+  const warned = validate('space', swap, { requireRequired: false, current });
+  assert.ok(warned.warnings.some((w) => /changes from "contact" to "insured_config" without legacy_config_ids: \[\]/.test(w)));
+  assert.ok(warned.warnings.some((w) => /REPLACED WHOLESALE/.test(w)));
+  const clean = validate('space', { base_record: { ...swap.base_record, legacy_config_ids: [] } }, { requireRequired: false, current });
+  assert.ok(!clean.warnings.some((w) => /without legacy_config_ids/.test(w)));
+  const same = validate('space', { base_record: { config_id: 'contact', identity_fields: ['email'] } }, { requireRequired: false, current });
+  assert.ok(!same.warnings.some((w) => /without legacy_config_ids/.test(w)));
+  assert.ok(!validate('space', swap, { requireRequired: false }).warnings.some((w) => /without legacy_config_ids/.test(w)), 'no stored space, no claim');
+  const org = validate('space', { organisation_record: { config_id: 'firm_b', identity_fields: ['name'] } }, { requireRequired: false, current: { organisation_record: { config_id: 'firm_a' } } });
+  assert.ok(org.warnings.some((w) => /organisation_record\.config_id changes/.test(w)));
+});
+
+const goodCase = () => ({ space_id: 'OPS', identity: { agreement_key: 'A-1' }, case_key: { field: 'case_ref', value: 'CASE-1' }, case_config_id: 'case_config' });
+check('case_folder validator mirrors the engine rules', () => {
+  const ok = validate('case_folder', goodCase());
+  assert.equal(ok.valid, true, errs(ok));
+  const bad = (mutate) => { const p = goodCase(); mutate(p); return errs(validate('case_folder', p)); };
+  assert.match(bad((p) => { delete p.space_id; }), /space_id is required/);
+  assert.match(bad((p) => { delete p.identity; }), /identity is required/);
+  assert.match(bad((p) => { p.identity = {}; }), /identity is required/);
+  assert.match(bad((p) => { p.identity = { a: '  ' }; }), /identity has no value/);
+  assert.match(bad((p) => { p.identity = { a: 5 }; }), /must be strings/);
+  assert.match(bad((p) => { p.email = 'not-an-email'; }), /not a valid email/);
+  assert.match(bad((p) => { p.case_config_id = 'has space'; }), /case_config_id is required/);
+  assert.match(bad((p) => { delete p.case_config_id; }), /case_config_id is required/);
+  assert.match(bad((p) => { p.case_key = { field: 'f', value: ' ' }; }), /case_key needs/);
+  assert.match(bad((p) => { p.case_key = { field: 'f.g', value: 'v' }; }), /case_key needs/);
+  assert.match(bad((p) => { p.primary_config = 'quote_config'; }), /set together or not at all/);
+  assert.match(bad((p) => { p.primary_record_id = 'abc'; }), /set together or not at all/);
+  assert.match(bad((p) => { p.primary_config = 'a b'; p.primary_record_id = 'x'; }), /not a valid id/);
+  assert.match(bad((p) => { p.metadata = { type: 'case' }; }), /reserved/);
+  assert.match(bad((p) => { p.metadata = { case_ref: 'x' }; }), /reserved/);
+  assert.match(bad((p) => { p.metadata = { k: 'x'.repeat(513) }; }), /too long/);
+  assert.match(bad((p) => { p.metadata = { k: 1 }; }), /must be a string/);
+  assert.match(bad((p) => { p.metadata = Object.fromEntries(Array.from({ length: 21 }, (_, i) => [`k${i}`, 'v'])); }), /too many metadata keys/);
+  assert.match(bad((p) => { p.display = { name: 3 }; }), /display\.name/);
+  assert.equal(validate('case_folder', { ...goodCase(), primary_config: 'quote_config', primary_record_id: 'abc123', metadata: { note: 'x' } }).valid, true);
+});
+
+check('case-folder and front-page-layouts reference topics exist and cite the engine', () => {
+  const cf = getReference('case-folder');
+  assert.match(JSON.stringify(cf), /case_being_filed/);
+  assert.match(JSON.stringify(cf.internal_subjects), /space-base-record.*space-front-page|space-front-page/);
+  assert.match(cf.internal_subjects, /NOT gateway-mapped|not gateway-mapped/);
+  assert.match(cf.source, /case_folder\.go/);
+  const fp = getReference('front-page-layouts');
+  assert.match(JSON.stringify(fp.tabs.by_type), /latest_by/);
+  assert.match(fp.source, /front_page_layouts_validate\.go/);
+  assert.match(getReference('spaces').base_record.legacy_config_ids, /EXPLICIT EMPTY LIST/);
+  assert.match(getReference('spaces').base_record.locked_spaces, /not callable by MCP users/);
+});
+
+{
+  const { registerTools } = await import('../src/index.js');
+  const tools = {};
+  const calls = [];
+  let reply = () => ({});
+  const fake = (method) => async (path, a, b) => { calls.push({ method, path, a, b }); return reply(method, path, a, b); };
+  const marker = (key, body) => ({ name: key, subject: 's', ...(body ?? {}) });
+  const files = [];
+  const stored = {};
+  const client = {
+    get: fake('GET'), post: fake('POST'), put: fake('PUT'), patch: fake('PATCH'), delete: fake('DELETE'),
+    readObject: async (bucket, key) => { if (!(key in stored)) throw new Error('no file'); return { content: stored[key] }; },
+  };
+  registerTools({ registerTool: (n, meta, fn) => (tools[n] = { meta, fn }) }, client);
+  const run = async (name, args) => JSON.parse((await tools[name].fn(args)).content[0].text);
+  const keyOf = 'spaces.OPS.agreement_config-aaaa.case_config-bbbb.__meta__.json';
+
+  reply = (method, path) => {
+    if (method === 'POST') return { entity_folder: 'agreement_config-aaaa', case_folder: 'case_config-bbbb', created_entity: true, created_case: true };
+    if (path === '/workspaces/files') return { results: files };
+    return {};
+  };
+  files.length = 0;
+  files.push(marker(keyOf));
+  stored[keyOf] = JSON.stringify({ type: 'case', case_id: 'case_config-bbbb', case_ref: 'CASE-1' });
+  let out = await run('file_case_folder', { ...goodCase() });
+  check('file_case_folder POSTs the body and reads the case marker back from the file index', () => {
+    const post = calls.find((c) => c.method === 'POST');
+    assert.equal(post.path, '/workspaces/case-folder');
+    assert.deepEqual(post.a, goodCase());
+    assert.ok(calls.some((c) => c.path === '/workspaces/files' && c.a.space_id === 'OPS'));
+    assert.equal(out.verified, true);
+    assert.equal(out.marker_key, keyOf);
+    assert.equal(out.marker.type, 'case');
+    assert.equal(out.case_folder, 'case_config-bbbb');
+  });
+
+  files.length = 0;
+  files.push(marker('spaces.OPS.agreement_config-aaaa.other-cccc.__meta__.json'));
+  files.push(marker('spaces.OPS.agreement_config-zzzz.case_config-bbbb.__meta__.json'));
+  out = await run('file_case_folder', { ...goodCase(), wait_for_index: false });
+  check('file_case_folder with wait_for_index: false confirms nothing', () => {
+    assert.equal(out.verified, false);
+    assert.match(out.note, /nothing has been confirmed/);
+  });
+
+  files.length = 0;
+  files.push(marker(keyOf));
+  stored[keyOf] = JSON.stringify({ type: 'client' });
+  out = await run('file_case_folder', goodCase());
+  check('file_case_folder is not verified when the path holds a non-case marker', () => {
+    assert.equal(out.verified, false);
+    assert.match(out.note, /not a type:"case" marker/);
+  });
+
+  calls.length = 0;
+  out = await run('file_case_folder', { ...goodCase(), case_config_id: 'bad id' });
+  check('file_case_folder refuses an invalid body locally and sends nothing', () => {
+    assert.equal(out.filed, false);
+    assert.equal(out.validation.valid, false);
+    assert.equal(calls.length, 0);
+  });
+
+  reply = (method) => {
+    if (method === 'POST') { const e = new Error('409'); e.status = 409; e.body = { status_code: 409, body: { error: 'case_being_filed: x', code: 'case_being_filed' } }; throw e; }
+    return {};
+  };
+  out = await run('file_case_folder', goodCase());
+  check('file_case_folder reports 409 case_being_filed as a retry, not a failure', () => {
+    assert.equal(out.retry, true);
+    assert.equal(out.filed, false);
+    assert.equal(out.code, 'case_being_filed');
+  });
+  reply = (method) => { if (method === 'POST') { const e = new Error('409 other'); e.status = 409; e.body = { error: 'x' }; throw e; } return {}; };
+  const failed = await tools.file_case_folder.fn(goodCase());
+  check('file_case_folder surfaces any other error', () => assert.equal(failed.isError, true));
+
+  calls.length = 0;
+  reply = (method, path) => (method === 'GET' ? { id: 'OPS', base_record: { config_id: 'contact' } } : { updated: true });
+  out = await run('update_space', { id: 'OPS', space: { base_record: { config_id: 'insured_config', identity_fields: ['insured_key'] } } });
+  check('update_space warns on a base-record swap against the stored space, and still sends it', () => {
+    assert.ok(out.warnings.some((w) => /without legacy_config_ids: \[\]/.test(w)));
+    assert.ok(calls.some((c) => c.method === 'PATCH'));
+  });
+  calls.length = 0;
+  out = await run('update_space', { id: 'OPS', space: { name: 'x' } });
+  check('update_space does not fetch the stored space unless a base record is sent', () => assert.equal(calls.filter((c) => c.method === 'GET').length, 0));
+  reply = (method) => { if (method === 'GET') throw new Error('offline'); return { updated: true }; };
+  out = await run('update_space', { id: 'OPS', space: { base_record: { config_id: 'insured_config', identity_fields: ['k'] } } });
+  check('update_space still proceeds when the stored space cannot be read', () => assert.ok(out.updated || out.warnings));
+  check('no case-folder tool deletes anything', () => assert.ok(!Object.keys(tools).some((n) => /case/.test(n) && /delete/.test(n))));
+}
+
 check('push-example.mjs header comment is at most 3 lines', () => {
   const src = readFileSync(fileURLToPath(new URL('../tools/push-example.mjs', import.meta.url)), 'utf8').split('\n').slice(1);
   assert.ok(src.findIndex((l) => !l.startsWith('//')) <= 3);

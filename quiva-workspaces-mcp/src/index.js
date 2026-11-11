@@ -38,6 +38,7 @@ Spaces also hold FILES, and the space "VERTICAL" is a template library whose
 folders are deployed into an account when a vertical is added to it:
 11. get_workspaces_reference("files") / ("verticals") — the dotted-path scheme, how
    a folder is really stored, and the deployment contract.
+11a. file_case_folder — file a case under the base-record entity (identity + case_key); read back via the file index.
 12. list_files -> create_folder -> write_file — build a vertical's folder tree and
    drop configs into it. Both writes confirm against the FILE INDEX, because
    indexing is asynchronous and the index is what deployment reads.
@@ -82,10 +83,10 @@ function wrap(value) {
 
 // Run the local validator, gate the call on errors, and surface warnings
 // alongside a successful result.
-async function withValidation(kind, payload, requireRequired, skip, run, key) {
+async function withValidation(kind, payload, requireRequired, skip, run, key, extra = {}) {
   let validation = null;
   if (!skip) {
-    validation = validate(kind, payload, { requireRequired });
+    validation = validate(kind, payload, { requireRequired, ...extra });
     if (!validation.valid) {
       return { [key]: false, validation };
     }
@@ -178,7 +179,7 @@ export function registerTools(server, client, { prefix = '' } = {}) {
       const listed = await client.get('/workspaces/files', { space_id: spaceId });
       const results = listed?.results ?? [];
       entries = results.length;
-      const match = results.find((f) => fileKeyOf(f) === key);
+      const match = results.find((f) => (typeof key === 'function' ? key(fileKeyOf(f)) : fileKeyOf(f) === key));
       if (match) {
         indexed = true;
         const name_indexed = Boolean(match.name);
@@ -230,7 +231,7 @@ export function registerTools(server, client, { prefix = '' } = {}) {
     'validate_payload',
     'Validate a workspaces payload locally (no API call). Encodes engine rules: space id ^\\w+$ + uppercasing, status roles, base/organisation records, custom_tab and hidden_tabs, list edits, task title + space, sub-task parent, pipeline fields, identity, comment body-or-reply_id, reaction map shape, RFC3339 dates, time logs, task actions, contacts, task templates, and read-only-field lints. Run before create_*/update_*.',
     {
-      kind: z.enum(['space', 'task', 'multi_task', 'comment', 'reaction', 'task_action', 'time_log', 'contact', 'task_template', 'folder', 'file']).describe('Which payload shape to validate. "time_log" = an add_time_log body; "contact" = a create_contact body; "folder" = a create_folder body; "file" = { key, content } for write_file.'),
+      kind: z.enum(['space', 'task', 'multi_task', 'comment', 'reaction', 'task_action', 'time_log', 'contact', 'task_template', 'folder', 'file', 'case_folder']).describe('Which payload shape to validate. "case_folder" = a file_case_folder body; "time_log" = an add_time_log body; "contact" = a create_contact body; "folder" = a create_folder body; "file" = { key, content } for write_file.'),
       payload: jsonValue.describe('The payload object to validate'),
       mode: z.enum(['create', 'update']).default('create').describe('create = required fields enforced; update = all optional'),
     },
@@ -268,14 +269,20 @@ export function registerTools(server, client, { prefix = '' } = {}) {
 
   tool(
     'update_space',
-    'Update a space (PATCH). Merges the fields you send over the stored space — send only changed fields, built from scratch. A sent statuses/priorities/tags list REPLACES the stored one; use upsert_statuses / remove_statuses (and the priority/tag pairs) to change entries by id. Also takes base_record, organisation_record, modules, custom_tab, hidden_tabs, view. May return 202 when removing a status or priority triggers a background re-assignment. A space with editing disabled answers 403.',
+    'Update a space (PATCH). Merges the fields you send over the stored space — send only changed fields, built from scratch. A sent statuses/priorities/tags list REPLACES the stored one; use upsert_statuses / remove_statuses (and the priority/tag pairs) to change entries by id. Also takes base_record, organisation_record, modules, custom_tab, hidden_tabs, view (incl. view.front_page.layouts, validated locally: get_workspaces_reference("front-page-layouts")). base_record is REPLACED wholesale, and swapping its config_id folds the old config into legacy_config_ids unless you send legacy_config_ids: [] (get_workspaces_reference("spaces")). May return 202 when removing a status or priority triggers a background re-assignment. A space with editing disabled answers 403.',
     {
       id: z.string().describe('Space id (uppercased form)'),
       space: spacePayload,
       skip_local_validation: z.boolean().default(false),
     },
-    async ({ id, space, skip_local_validation }) =>
-      withValidation('space', space, false, skip_local_validation, () => client.patch(`/workspaces/space/${encodeURIComponent(id)}`, space), 'updated')
+    async ({ id, space, skip_local_validation }) => {
+      // Best effort: a base-record swap is only detectable against the stored space.
+      let current;
+      if (!skip_local_validation && (space?.base_record || space?.organisation_record)) {
+        try { current = await client.get(`/workspaces/space/${encodeURIComponent(id)}`); } catch { current = undefined; }
+      }
+      return withValidation('space', space, false, skip_local_validation, () => client.patch(`/workspaces/space/${encodeURIComponent(id)}`, space), 'updated', { current });
+    }
   );
 
   tool(
@@ -777,6 +784,74 @@ export function registerTools(server, client, { prefix = '' } = {}) {
           note: indexNote(verification, markerKey, { isMarker: true }),
         };
       }, 'created');
+    }
+  );
+
+  tool(
+    'file_case_folder',
+    'File a case under the space\'s base-record entity (POST /workspaces/case-folder; needs workspaces-service from evari-olympus #1560). Resolves or creates the entity from `identity`, then opens the case folder <entity>.<case> with a type:"case" marker. Idempotent: an existing case marker is never rewritten (created_case: false). 409 case_being_filed means another caller holds the claim and no marker exists yet — retry. The response is not trusted: this reads the file index back for the case marker (and its content) and reports `verified`. The marker is NOT at a path the response names, so it is found by case folder id.',
+    {
+      space_id: z.string().describe('Space whose base_record keys the entity (uppercased form)'),
+      identity: jsonValue.describe('{ <identity field>: <string value> } using the base_record\'s identity_fields. At least one non-blank value.'),
+      case_key: jsonValue.describe('{ field, value }: hashed into the case folder id with case_config_id, so the same key always gives the same folder'),
+      case_config_id: z.string().describe('Prefix of the case folder id (letters, digits, _ -); the config the key is derived against, e.g. "quote_config"'),
+      name: z.string().optional().describe('Written on the entity only when this call creates it'),
+      email: z.string().optional().describe('Written on the entity only when this call creates it'),
+      display: jsonValue.optional().describe('Values for the base_record\'s display_fields, written only on create'),
+      primary_config: z.string().optional().describe('With primary_record_id: the anchor record of the case. Both or neither.'),
+      primary_record_id: z.string().optional(),
+      metadata: jsonValue.optional().describe('Extra marker metadata, string values, max 20 keys. type, case_id, primary_*, created_* and the case_key field are reserved.'),
+      wait_for_index: z.boolean().optional().describe('Poll the file index until the marker appears (default true)'),
+      skip_local_validation: z.boolean().optional(),
+    },
+    async ({ space_id, identity, case_key, case_config_id, name, email, display, primary_config, primary_record_id, metadata, wait_for_index = true, skip_local_validation }) => {
+      const payload = { space_id, identity, case_key, case_config_id };
+      for (const [k, v] of Object.entries({ name, email, display, primary_config, primary_record_id, metadata })) {
+        if (v !== undefined) payload[k] = v;
+      }
+      return withValidation('case_folder', payload, true, skip_local_validation, async () => {
+        let response;
+        try {
+          response = await client.post('/workspaces/case-folder', payload);
+        } catch (err) {
+          const code = err?.body?.body?.code ?? err?.body?.code;
+          if (err?.status === 409 && code === 'case_being_filed') {
+            return { filed: false, retry: true, code, note: 'Another caller is filing this case and no marker exists yet. Nothing was written by this call; retry in a moment.' };
+          }
+          throw err;
+        }
+        const spaceId = String(space_id).toUpperCase();
+        const folder = response?.case_folder;
+        const entity = response?.entity_folder;
+        const result = { response, filed: true, space_id: spaceId, entity_folder: entity, case_folder: folder };
+        if (!folder) return { ...result, verified: false, note: 'The response named no case_folder, so there is nothing to read back. Treat the case as NOT filed.' };
+        if (!wait_for_index) return { ...result, verified: false, note: 'wait_for_index was false — nothing has been confirmed.' };
+
+        const tail = `.${folder}.__meta__.json`;
+        let markerKey;
+        const verification = await waitForIndex(spaceId, (key) => {
+          const hit = typeof key === 'string' && key.startsWith(`spaces.${spaceId}.`) && key.endsWith(tail) && (!entity || key.includes(`.${entity}.`));
+          if (hit) markerKey = key;
+          return hit;
+        });
+        let marker;
+        if (verification.indexed && markerKey) {
+          try { marker = JSON.parse((await client.readObject(WORKSPACES_BUCKET, markerKey)).content); } catch { marker = undefined; }
+        }
+        const typeOk = marker ? marker.type === 'case' && marker.case_id === folder : undefined;
+        return {
+          ...result,
+          marker_key: markerKey,
+          marker,
+          verified: verification.indexed && typeOk !== false,
+          verification,
+          note: !verification.indexed
+            ? `The case marker is NOT yet in the file index after ${verification.waited_ms}ms (indexing is asynchronous and can take minutes). Re-run list_files for the space before relying on it; do not treat the case as filed.`
+            : typeOk === false
+              ? `The marker at ${markerKey} exists but is not a type:"case" marker for ${folder} — something else owns this path.`
+              : indexNote(verification, markerKey, { isMarker: true }),
+        };
+      }, 'filed');
     }
   );
 
