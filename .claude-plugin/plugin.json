@@ -1,0 +1,11 @@
+{
+  "name": "quiva",
+  "displayName": "QuivaWorks",
+  "version": "0.1.0",
+  "description": "Connect Claude Code to your QuivaWorks account: the hosted MCP server plus the quiva-config skill for pulling, editing and pushing account configuration.",
+  "author": { "name": "QuivaWorks" },
+  "homepage": "https://docs.quiva.ai",
+  "repository": "https://github.com/QuivaWorks/mcp",
+  "license": "BSL-1.0",
+  "keywords": ["quiva", "mcp", "flows", "records"]
+}
