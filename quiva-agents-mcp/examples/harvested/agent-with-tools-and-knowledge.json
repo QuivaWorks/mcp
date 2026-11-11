@@ -1,0 +1,52 @@
+{
+  "slug": "agent-with-tools-and-knowledge",
+  "source": {
+    "environment": "https://api.quiva.ai",
+    "subject": "ms.hub.config.agent.00000000-0000-4000-8000-000000000001",
+    "path_id": "00000000-0000-4000-8000-000000000001",
+    "name": "Support Assistant",
+    "harvested_from": "GET /hub/agent"
+  },
+  "teaches": [
+    "tools[] as mcp:// URIs alongside has_tools",
+    "knowledge[] as obj:// URIs pointing at uploaded documents in the agent-knowledge bucket",
+    "a production-shaped agent combining both (content replaced with neutral text)"
+  ],
+  "facts": [
+    "llm_provider \"claude\" / model \"claude-haiku-4-5\"",
+    "shared: \"\"",
+    "4 tool URI(s)",
+    "2 knowledge URI(s)"
+  ],
+  "config": {
+    "name": "Support Assistant",
+    "behaviour": "\n# Acme Services Support Assistant\n\n## Role\nYou answer customer questions about Acme Services' products using the attached knowledge documents (the proposal form and the policy wording). Quote the document you relied on.\n\n## Tools\n- Use news search only for current events the customer asks about.\n- Post to Slack when a customer asks for a human.\n- Send email only when the customer asks for a copy of an answer.\n\n## Boundaries\nDo not give personal financial advice. If the documents don't answer the question, say so and offer a human handover.\n",
+    "llm_provider": "claude",
+    "model": "claude-haiku-4-5",
+    "has_tools": true,
+    "knowledge": [
+      "obj://microstrate-agent-knowledge/tr5OfJacme-proposal-form_file__Acme_Proposal_Form_r7ihrapdf",
+      "obj://microstrate-agent-knowledge/c4xLz-acme-policy-wording_file__Acme_Policy_Wording_k0pbofpdf"
+    ],
+    "tools": [
+      "mcp://brave-news-70ed6b44",
+      "mcp://slack-chat-ab0e5224",
+      "mcp://sendgrid-send-74a77011",
+      "mcp://google-sheets-0a1ee669"
+    ],
+    "timeout": 90,
+    "context_limit": 50000,
+    "message_history_limit": 200,
+    "prompt": "",
+    "ai_smart_context": true,
+    "ai_summary_threshold": 0.7,
+    "ai_summary_model": "claude-3-5-sonnet-20241022",
+    "preserve_most_recent": 5,
+    "ai_prompt": false,
+    "auth": "<<REDACTED — provide your own credential>>",
+    "api_key": "CLAUDE_API_KEY",
+    "await": true,
+    "shared": "",
+    "owner": ""
+  }
+}
