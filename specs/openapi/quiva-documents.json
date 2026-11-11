@@ -1,11 +1,11 @@
 {
   "name": "quiva_documents",
   "schema": {
-    "openapi": "3.0.3",
+    "openapi": "3.1.0",
     "info": {
-      "title": "Documents Service API",
-      "description": "A QuivaWorks service that manages document templates, documents, and e-signature workflows. All routes are served under the `/file-generator` gateway prefix.",
-      "version": "1.0.1"
+      "title": "Documents API",
+      "description": "Document templates, generated documents, e-signature requests, and checkbox approvals. Template and document routes are served under `/file-generator`, approval routes under `/workspaces/approvals`.",
+      "version": "1.2.0"
     },
     "x-agent-syntax-rules": {
       "expressions": {
@@ -100,15 +100,19 @@
     "tags": [
       {
         "name": "Templates",
-        "description": "Template lifecycle \u2014 create, read, publish, validate, trigger, and delete document templates. Templates follow a **draft \u2192 published** model: writes (`POST`, `PATCH`) always target the draft version, and `POST /templates/{key}/publish` promotes the draft. Document generation only ever uses the published version, so drafts can be edited safely without affecting production output. A template's `source` is a DOCX file containing angular-expression tags rendered at trigger time."
+        "description": "Template lifecycle — create, read, publish, validate, trigger, and delete document templates. Templates follow a **draft → published** model: writes (`POST`, `PATCH`) always target the draft version, and `POST /templates/{key}/publish` promotes the draft. Document generation only ever uses the published version, so drafts can be edited safely without affecting production output. A template's `source` is a DOCX file containing angular-expression tags rendered at trigger time."
       },
       {
         "name": "Documents",
-        "description": "Document lifecycle \u2014 read, update, and delete generated documents. A document record is created immediately when a template is triggered and is updated asynchronously: first with the generated `output.key` (an `obj://` or `kv://` storage URI) or `errors`, then with `signatures` progress as signatories sign."
+        "description": "Document lifecycle — read, update, and delete generated documents. A document record is created immediately when a template is triggered and is updated asynchronously: first with the generated `output.key` (an `obj://` or `kv://` storage URI) or `errors`, then with `signatures` progress as signatories sign."
       },
       {
         "name": "Signatures",
-        "description": "E-signature workflows powered by HelloSign (Dropbox Sign). Signature requests are created automatically when a triggered template defines `signatories`. Each signatory tracks a status lifecycle of `DRAFT \u2192 SENT \u2192 SIGNED`, with `EXPIRED` (validity window elapsed) and `FAILED` (delivery/signing error) as terminal failure states. Embedded signing URLs can be generated for signatures created in embedded mode."
+        "description": "E-signature workflows powered by HelloSign (Dropbox Sign). Signature requests are created automatically when a triggered template defines `signatories`. Each signatory tracks a status lifecycle of `DRAFT → SENT → SIGNED`, with `EXPIRED` (validity window elapsed) and `FAILED` (delivery/signing error) as terminal failure states. Embedded signing URLs can be generated for signatures created in embedded mode."
+      },
+      {
+        "name": "Approvals",
+        "description": "Checkbox approval of a workspace file, recorded as e-signature evidence."
       }
     ],
     "paths": {
@@ -118,10 +122,9 @@
             "Templates"
           ],
           "summary": "Get template",
-          "description": "Retrieve a single document template by key.\n\nPass `?draft=true` to fetch the draft version; omit it (or set `false`) to fetch the published version. A template may exist as draft only (never published), published only (draft deleted after publish), or both \u2014 the two versions are independent records.\n\nThe returned `source.key` points at the DOCX file in `microstrate-documents` object storage bucket, that's being rendered when the template is triggered. Fields such as `output.name` and `signatories[].name`/`email` may contain expression placeholders (e.g. `{client_name}`) that are resolved against the trigger payload.",
+          "description": "Retrieve a single document template by key.\n\nPass `?draft=true` to fetch the draft version; omit it (or set `false`) to fetch the published version. A template may exist as draft only (never published), published only (draft deleted after publish), or both — the two versions are independent records.\n\nThe returned `source.key` points at the DOCX file in `microstrate-documents` object storage bucket, that's being rendered when the template is triggered. Fields such as `output.name` and `signatories[].name`/`email` may contain expression placeholders (e.g. `{client_name}`) that are resolved against the trigger payload.",
           "operationId": "getTemplate",
           "x-resource-type": "service",
-          "x-resource": "microstrate.file-generator.get.template",
           "parameters": [
             {
               "$ref": "#/components/parameters/TemplateKey"
@@ -184,10 +187,9 @@
             "Templates"
           ],
           "summary": "Update template",
-          "description": "Update an existing **draft** template. Unlike `POST /templates`, this does not check for pre-existence \u2014 it will create or overwrite the draft.\n\nThis is a merge-style upsert: the supplied fields are written over the draft's event stream, so partial bodies are fine (the example below updates only `output`). To *remove* a field entirely, use `PATCH /templates/{key}/unset` instead.\n\nChanges are not visible to document generation until the draft is re-published via `POST /templates/{key}/publish`.",
+          "description": "Update an existing **draft** template. Unlike `POST /templates`, this does not check for pre-existence — it will create or overwrite the draft.\n\nThis is a merge-style upsert: the supplied fields are written over the draft's event stream, so partial bodies are fine (the example below updates only `output`). To *remove* a field entirely, use `PATCH /templates/{key}/unset` instead.\n\nChanges are not visible to document generation until the draft is re-published via `POST /templates/{key}/publish`.",
           "operationId": "updateTemplate",
           "x-resource-type": "service",
-          "x-resource": "microstrate.file-generator.patch.template",
           "parameters": [
             {
               "$ref": "#/components/parameters/TemplateKey"
@@ -241,10 +243,9 @@
             "Templates"
           ],
           "summary": "Delete template",
-          "description": "Delete a draft or published template. Set `?draft=true` to target the draft version; omit it to target the published version. Deleting one version does not affect the other.\n\nDeletion is implemented as a **poison-pill message** (`type: poison-pilled`) appended to the template's event stream \u2014 the underlying events are retained, but the aggregate resolves to deleted and the key disappears from list/get results. Deleting a published template immediately stops it from being triggerable.",
+          "description": "Delete a draft or published template. Set `?draft=true` to target the draft version; omit it to target the published version. Deleting one version does not affect the other.\n\nDeletion is implemented as a **poison-pill message** (`type: poison-pilled`) appended to the template's event stream — the underlying events are retained, but the aggregate resolves to deleted and the key disappears from list/get results. Deleting a published template immediately stops it from being triggerable.",
           "operationId": "deleteTemplate",
           "x-resource-type": "service",
-          "x-resource": "microstrate.file-generator.delete.template",
           "parameters": [
             {
               "$ref": "#/components/parameters/TemplateKey"
@@ -288,7 +289,6 @@
           "description": "List all templates. Pass `?draft=true` to list draft templates instead of published ones.\n\nThe response is paged stream-style: `results_total` is the number of items in this response, `total_messages` is the total available, and `next_sequence` is the cursor for the next page.",
           "operationId": "listTemplates",
           "x-resource-type": "service",
-          "x-resource": "microstrate.file-generator.get.templates",
           "parameters": [
             {
               "$ref": "#/components/parameters/QueryDraft"
@@ -342,10 +342,9 @@
             "Templates"
           ],
           "summary": "Create template",
-          "description": "Create a new **draft** template. Returns `402` if a template with the same key already exists (use `PATCH /templates/{key}` to update an existing draft).\n\nThe `source` object references a DOCX file already uploaded to `microstrate-documents` object storage bucket. That file is processed by replacing tags with data from payload when the template is triggered: tags inside the DOCX (e.g. `{client_name}`, `{#line_items}\u2026{/line_items}`, `{subtotal + tax}`) are evaluated against the trigger payload to produce the final output \u2014 a PDF when `output.content_type` is `application/pdf`, or a rendered DOCX. \n\nOther expression-aware fields:\n- `output.name` \u2014 output filename template, e.g. `invoice-{invoice_number}`; the extension (`.pdf`/`.docx`) is appended automatically based on `output.content_type`.\n- `signatories[].name` / `signatories[].email` \u2014 resolved against the payload before the Signature request is sent. Signatories whose rendered email is missing or invalid are skipped.\n- `sub_templates[].conditions` \u2014 rule-engine conditions evaluated against the payload; matching sub-templates are rendered and merged after the main template.\n\nIt is recommended to run `POST /templates/validate` on the DOCX content first to catch malformed tags.",
+          "description": "Create a new **draft** template. Returns `402` if a template with the same key already exists (use `PATCH /templates/{key}` to update an existing draft).\n\nThe `source` object references a DOCX file already uploaded to `microstrate-documents` object storage bucket. That file is processed by replacing tags with data from payload when the template is triggered: tags inside the DOCX (e.g. `{client_name}`, `{#line_items}…{/line_items}`, `{subtotal + tax}`) are evaluated against the trigger payload to produce the final output — a PDF when `output.content_type` is `application/pdf`, or a rendered DOCX. \n\nOther expression-aware fields:\n- `output.name` — output filename template, e.g. `invoice-{invoice_number}`; the extension (`.pdf`/`.docx`) is appended automatically based on `output.content_type`.\n- `signatories[].name` / `signatories[].email` — resolved against the payload before the Signature request is sent. Signatories whose rendered email is missing or invalid are skipped.\n- `sub_templates[].conditions` — rule-engine conditions evaluated against the payload; matching sub-templates are rendered and merged after the main template.\n\nIt is recommended to run `POST /templates/validate` on the DOCX content first to catch malformed tags.",
           "operationId": "createTemplate",
           "x-resource-type": "service",
-          "x-resource": "microstrate.file-generator.post.template",
           "requestBody": {
             "required": true,
             "content": {
@@ -425,10 +424,9 @@
             "Templates"
           ],
           "summary": "Publish template",
-          "description": "Promote a draft template to published state. The published version is what `POST /templates/trigger` uses to generate documents \u2014 draft edits have no effect on generation until published.\n\nPublishing copies the current draft aggregate to the published record; subsequent draft edits do not leak into the published version. Returns `400` if no draft exists for the key.",
+          "description": "Promote a draft template to published state. The published version is what `POST /templates/trigger` uses to generate documents — draft edits have no effect on generation until published.\n\nPublishing copies the current draft aggregate to the published record; subsequent draft edits do not leak into the published version. Returns `400` if no draft exists for the key.",
           "operationId": "publishTemplate",
           "x-resource-type": "service",
-          "x-resource": "microstrate.file-generator.post.template-publish",
           "parameters": [
             {
               "$ref": "#/components/parameters/TemplateKey"
@@ -466,10 +464,9 @@
             "Templates"
           ],
           "summary": "Validate template",
-          "description": "Validate a base64-encoded template file before storing it.\n\nThe file is checked by rendering tags with empty data, and any tag errors are returned without persisting anything. The `errors` entries are error explanations, covering problems such as unclosed loop tags, duplicate/unopened close tags, and expressions that fail to compile.\n\nValidation is **syntactic**: it confirms the tags compile, not that the payload you eventually send will contain every referenced identifier \u2014 unresolved identifiers at trigger time render as an empty string rather than failing.\n\nAlways run this before `POST /templates` / `PATCH /templates/{key}` when the source DOCX changes \u2014 a template that stores an invalid source will fail every trigger.",
+          "description": "Validate a base64-encoded template file before storing it.\n\nThe file is checked by rendering tags with empty data, and any tag errors are returned without persisting anything. The `errors` entries are error explanations, covering problems such as unclosed loop tags, duplicate/unopened close tags, and expressions that fail to compile.\n\nValidation is **syntactic**: it confirms the tags compile, not that the payload you eventually send will contain every referenced identifier — unresolved identifiers at trigger time render as an empty string rather than failing.\n\nAlways run this before `POST /templates` / `PATCH /templates/{key}` when the source DOCX changes — a template that stores an invalid source will fail every trigger.",
           "operationId": "validateTemplate",
           "x-resource-type": "service",
-          "x-resource": "microstrate.file-generator.post.template-validate",
           "requestBody": {
             "required": true,
             "content": {
@@ -536,7 +533,6 @@
           "description": "Remove specific fields from a **draft** template by dot-notation path.\n\nNOTE: although this is a field-removal operation, the gateway routes it as **POST** `/file-generator/templates/{key}/unset` (the document equivalent is PATCH). Each path is unset as its own `type: unset` event on the template stream. Re-publish for the change to affect generation.",
           "operationId": "unsetTemplatePaths",
           "x-resource-type": "service",
-          "x-resource": "microstrate.file-generator.patch.template-unset",
           "parameters": [
             {
               "$ref": "#/components/parameters/TemplateKey"
@@ -591,10 +587,9 @@
             "Templates"
           ],
           "summary": "Trigger template",
-          "description": "Generate one or more documents from **published** templates.\n\nEach entry in `list` names a template key and may override its stored `output` configuration. The shared `payload` object is the data context for **angular expression evaluation**: every key in the payload becomes an identifier available to tags inside the template's source DOCX, to the `output.name` filename template, to `signatories[].name`/`email`, and (as `<key>.value` facts) to `sub_templates[].conditions`. Expressions support nested property access (`{client.address.city}`), operators (`{subtotal + tax}`, `{is_overdue ? \"OVERDUE\" : \"\"}`), condition blocks (`{#discount > 0}\u2026{/}`), loops (`{#line_items}{description} \u2014 {qty * unit_price}{/line_items}`), and the built-in filters.\n\n**This is an asynchronous operation.** The `200` response confirms each job was queued (or reports per-template validation errors) and returns the document `subject`. A document record is created immediately with `output: null`; the trigger consumer then fetches the published template and its matching sub-templates, renders them against the payload, merges the results, and updates the record with `output.key` (the storage URI of the generated file) \u2014 or with `errors` if rendering failed. Poll `GET /documents/{key}` to observe completion. If the template defines signatories, the signature request is dispatched automatically after rendering succeeds (each signatory starts as `DRAFT`, moving to `SENT` once the request is created).\n\nThe generated file is written to `{store}://{bucket}/{filepath}` where trigger-level `output` overrides take precedence over the template's stored `output`. Buckets may target the object store (`obj://`, default) or the key-value store (`kv://`).",
+          "description": "Generate one or more documents from **published** templates.\n\nEach entry in `list` names a template key and may override its stored `output` configuration. The shared `payload` object is the data context for **angular expression evaluation**: every key in the payload becomes an identifier available to tags inside the template's source DOCX, to the `output.name` filename template, to `signatories[].name`/`email`, and (as `<key>.value` facts) to `sub_templates[].conditions`. Expressions support nested property access (`{client.address.city}`), operators (`{subtotal + tax}`, `{is_overdue ? \"OVERDUE\" : \"\"}`), condition blocks (`{#discount > 0}…{/}`), loops (`{#line_items}{description} — {qty * unit_price}{/line_items}`), and the built-in filters.\n\n**This is an asynchronous operation.** The `200` response confirms each job was queued (or reports per-template validation errors) and returns the document `subject`. A document record is created immediately with `output: null`; the trigger consumer then fetches the published template and its matching sub-templates, renders them against the payload, merges the results, and updates the record with `output.key` (the storage URI of the generated file) — or with `errors` if rendering failed. Poll `GET /documents/{key}` to observe completion. If the template defines signatories, the signature request is dispatched automatically after rendering succeeds (each signatory starts as `DRAFT`, moving to `SENT` once the request is created).\n\nThe generated file is written to `{store}://{bucket}/{filepath}` where trigger-level `output` overrides take precedence over the template's stored `output`. Buckets may target the object store (`obj://`, default) or the key-value store (`kv://`).\n\n**Built-in HTML report.** A template key starting with `builtin.` (for example `builtin.report`) is resolved from templates shipped with the platform, with no per-account setup. Built-in templates render text/html to text/html: you supply the report content, the template owns the layout, and the account's document theme supplies the brand (accent colour, fonts, footer, and the account logo, or the platform logo when the account has none). The content is sanitised: scripts, event handlers, styles, remote resources and unsafe links are removed.",
           "operationId": "triggerTemplate",
           "x-resource-type": "service",
-          "x-resource": "microstrate.file-generator.post.template-trigger",
           "requestBody": {
             "required": true,
             "content": {
@@ -637,7 +632,7 @@
           },
           "responses": {
             "200": {
-              "description": "Trigger jobs queued. The response is per-template: entries with a `subject` were queued successfully (the subject identifies the document record to poll); entries with `errors` failed validation and no job was queued for them. A `200` therefore does not guarantee every template was triggered \u2014 check each result.",
+              "description": "Trigger jobs queued. The response is per-template: entries with a `subject` were queued successfully (the subject identifies the document record to poll); entries with `errors` failed validation and no job was queued for them. A `200` therefore does not guarantee every template was triggered — check each result.",
               "content": {
                 "application/json": {
                   "schema": {
@@ -670,10 +665,9 @@
             "Documents"
           ],
           "summary": "Get document",
-          "description": "Retrieve a single document by key.\n\nDocuments created by `POST /templates/trigger` progress through states observable here:\n- **Queued**: `output: null`, `errors: null` \u2014 rendering in progress.\n- **Generated**: `output.key` set to the storage URI (`obj://bucket/path` or `kv://bucket/path`) of the rendered file.\n- **Failed**: `errors` populated with rendering errors; `output` stays null.\n- **Signing**: `signatures` array populated once a HelloSign request is sent; each signatory's `status` advances `SENT \u2192 SIGNED` (or `EXPIRED`/`FAILED`) as webhook events arrive.",
+          "description": "Retrieve a single document by key.\n\nDocuments created by `POST /templates/trigger` progress through states observable here:\n- **Queued**: `output: null`, `errors: null` — rendering in progress.\n- **Generated**: `output.key` set to the storage URI (`obj://bucket/path` or `kv://bucket/path`) of the rendered file.\n- **Failed**: `errors` populated with rendering errors; `output` stays null.\n- **Signing**: `signatures` array populated once a HelloSign request is sent; each signatory's `status` advances `SENT → SIGNED` (or `EXPIRED`/`FAILED`) as webhook events arrive.",
           "operationId": "getDocument",
           "x-resource-type": "service",
-          "x-resource": "microstrate.file-generator.get.document",
           "parameters": [
             {
               "$ref": "#/components/parameters/DocumentKey"
@@ -735,10 +729,9 @@
             "Documents"
           ],
           "summary": "Update document",
-          "description": "Create or update a document record directly. Used to manually set document metadata outside of the template trigger workflow \u2014 for example registering an externally produced file, or correcting metadata on an existing record.\n\nThe `key` is required and derives the document's storage subject. This is an upsert: it creates the record if absent and merges supplied fields if present.",
+          "description": "Create or update a document record directly. Used to manually set document metadata outside of the template trigger workflow — for example registering an externally produced file, or correcting metadata on an existing record.\n\nThe `key` is required and derives the document's storage subject. This is an upsert: it creates the record if absent and merges supplied fields if present.",
           "operationId": "upsertDocument",
           "x-resource-type": "service",
-          "x-resource": "microstrate.file-generator.patch.document",
           "parameters": [
             {
               "$ref": "#/components/parameters/DocumentKey"
@@ -791,10 +784,9 @@
             "Documents"
           ],
           "summary": "Delete document",
-          "description": "Delete a document record. Implemented as a **poison-pill message** (`type: poison-pilled`) on the document's event stream \u2014 the record disappears from get/list results.\n\nNote: this deletes the document *record* (metadata, signature state). The generated file referenced by `output.key` remains in object/KV storage and must be removed separately if required.",
+          "description": "Delete a document record. Implemented as a **poison-pill message** (`type: poison-pilled`) on the document's event stream — the record disappears from get/list results.\n\nNote: this deletes the document *record* (metadata, signature state). The generated file referenced by `output.key` remains in object/KV storage and must be removed separately if required.",
           "operationId": "deleteDocument",
           "x-resource-type": "service",
-          "x-resource": "microstrate.file-generator.delete.document",
           "parameters": [
             {
               "$ref": "#/components/parameters/DocumentKey"
@@ -832,10 +824,9 @@
             "Documents"
           ],
           "summary": "List documents",
-          "description": "List documents matching a subject query.\n\nDocument subjects live under `ms.document.document.>` and mirror the sanitised output filepath, with folders as subject tokens (a document written to `contracts/acme-nda-2024.pdf` lives under `contracts.acme-nda-2024.pdf` within that namespace). The required `query` parameter is appended to the namespace and supports stream wildcard patterns:\n- `contracts.*` \u2014 direct children of `contracts` (single level)\n- `contracts.>` \u2014 everything under `contracts` at any depth\n- `invoices.2026.*` \u2014 documents in the `invoices/2026` folder\n\nMissing `query` returns `400` with `` `query` query param is required ``.",
+          "description": "List documents matching a subject query.\n\nDocument subjects live under `ms.document.document.>` and mirror the sanitised output filepath, with folders as subject tokens (a document written to `contracts/acme-nda-2024.pdf` lives under `contracts.acme-nda-2024.pdf` within that namespace). The required `query` parameter is appended to the namespace and supports stream wildcard patterns:\n- `contracts.*` — direct children of `contracts` (single level)\n- `contracts.>` — everything under `contracts` at any depth\n- `invoices.2026.*` — documents in the `invoices/2026` folder\n\nMissing `query` returns `400` with `` `query` query param is required ``.",
           "operationId": "listDocuments",
           "x-resource-type": "service",
-          "x-resource": "microstrate.file-generator.get.documents",
           "parameters": [
             {
               "name": "query",
@@ -901,7 +892,6 @@
           "description": "Remove specific fields from a document record by dot-notation path. Each path is unset as its own `type: unset` event. A common use is clearing `errors` and `output` before re-triggering generation for the same document key.",
           "operationId": "unsetDocumentPaths",
           "x-resource-type": "service",
-          "x-resource": "microstrate.file-generator.patch.document-unset",
           "parameters": [
             {
               "$ref": "#/components/parameters/DocumentKey"
@@ -956,10 +946,9 @@
             "Signatures"
           ],
           "summary": "Get document signature URL",
-          "description": "Generate an embedded signing URL for a specific signature on a document, suitable for loading in an iframe.\n\nOnly available for signatures created in **embedded signing mode** (`request.is_embedded: true` on the document's signatory record). Embedded mode is an account-level configuration \u2014 all signatures of a request share it. Requesting a URL for an unknown `signature_id` or a non-embedded signature returns a `500` with the error message (e.g. `Signature url is only available in embedded mode: \u2026`).\n\nEmbedded URLs are short-lived; generate one immediately before presenting the signing UI rather than storing it.",
+          "description": "Generate an embedded signing URL for a specific signature on a document, suitable for loading in an iframe.\n\nOnly available for signatures created in **embedded signing mode** (`request.is_embedded: true` on the document's signatory record). Embedded mode is an account-level configuration — all signatures of a request share it. Requesting a URL for an unknown `signature_id` or a non-embedded signature returns a `500` with the error message (e.g. `Signature url is only available in embedded mode: …`).\n\nEmbedded URLs are short-lived; generate one immediately before presenting the signing UI rather than storing it.",
           "operationId": "getDocumentSignatureUrl",
           "x-resource-type": "service",
-          "x-resource": "microstrate.file-generator.get.document-signature-url",
           "parameters": [
             {
               "$ref": "#/components/parameters/DocumentKey"
@@ -1007,11 +996,10 @@
             "Signatures"
           ],
           "summary": "HelloSign callback",
-          "description": "Webhook endpoint for HelloSign signature events. **Called by the HelloSign platform, not by internal services** \u2014 configure it as the callback URL in the HelloSign app settings. The event arrives as a multipart form field named `json`.\n\nHandled event types:\n- `signature_request_signed` \u2014 one signatory signed; their status on the document becomes `SIGNED` (matched by signer name + email).\n- `signature_request_all_signed` \u2014 all signatories signed; the fully executed PDF is downloaded from HelloSign and written back over the document's output location in storage.\n- `signature_request_invalid` \u2014 the request failed; affected signatories are marked `FAILED` with the `error` field populated.\n\nUnrecognised event types are silently ignored. Each event's `event_hash` is verified as HMAC-SHA256(`event_time` + `event_type`) using the account's HelloSign API key; events with a hash mismatch are discarded. The endpoint **always** responds `200 Hello API Event Received` regardless of processing outcome.",
+          "description": "Webhook endpoint for HelloSign signature events. **Called by the HelloSign platform, not by internal services** — configure it as the callback URL in the HelloSign app settings. The event arrives as a multipart form field named `json`.\n\nHandled event types:\n- `signature_request_signed` — one signatory signed; their status on the document becomes `SIGNED` (matched by signer name + email).\n- `signature_request_all_signed` — all signatories signed; the fully executed PDF is downloaded from HelloSign and written back over the document's output location in storage.\n- `signature_request_invalid` — the request failed; affected signatories are marked `FAILED` with the `error` field populated.\n\nUnrecognised event types are silently ignored. Each event's `event_hash` is verified as HMAC-SHA256(`event_time` + `event_type`) using the account's HelloSign API key; events with a hash mismatch are discarded. The endpoint **always** responds `200 Hello API Event Received` regardless of processing outcome.",
           "operationId": "hellosignCallback",
           "x-is-public": true,
           "x-resource-type": "service",
-          "x-resource": "microstrate.file-generator.post.hellosign-callback",
           "security": [],
           "requestBody": {
             "required": true,
@@ -1031,7 +1019,7 @@
           },
           "responses": {
             "200": {
-              "description": "Event received. The body is the plain string `Hello API Event Received`. The handler responds `200` even when event processing fails (hash mismatch, unknown account, lookup errors) so that HelloSign does not retry \u2014 processing errors are logged server-side only.",
+              "description": "Event received. The body is the plain string `Hello API Event Received`. The handler responds `200` even when event processing fails (hash mismatch, unknown account, lookup errors) so that HelloSign does not retry — processing errors are logged server-side only.",
               "content": {
                 "application/json": {
                   "schema": {
@@ -1055,21 +1043,652 @@
             }
           ]
         }
+      },
+      "/file-generator/assigned-files": {
+        "get": {
+          "summary": "List files assigned to me",
+          "description": "Generated documents and workspace files assigned to the signed-in user, in one list. Backs the client documents portal.",
+          "operationId": "listAssignedFiles",
+          "tags": [
+            "Documents"
+          ],
+          "responses": {
+            "200": {
+              "description": "Assigned files",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Unauthorized",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          },
+          "x-resource-type": "service"
+        }
+      },
+      "/file-generator/brand-extract": {
+        "post": {
+          "summary": "Read fonts and colours from an Office file",
+          "description": "Reads the fonts and colour scheme out of an Office document already in an object store, to seed the account's document theme. Allowed theme fonts include Aptos and Arial Narrow; converted previews substitute Liberation Sans Narrow for Arial Narrow, and Aptos falls back to another font outside Microsoft 365.",
+          "operationId": "extractBrand",
+          "tags": [
+            "Documents"
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "bucket",
+                    "key"
+                  ],
+                  "properties": {
+                    "bucket": {
+                      "type": "string"
+                    },
+                    "key": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Fonts and colours",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Bad request",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Unauthorized",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          },
+          "x-resource-type": "service"
+        }
+      },
+      "/workspaces/approvals": {
+        "get": {
+          "summary": "List approvals for a file",
+          "operationId": "listApprovals",
+          "tags": [
+            "Approvals"
+          ],
+          "parameters": [
+            {
+              "name": "file_subject",
+              "in": "query",
+              "required": true,
+              "description": "The file's subject.",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Approvals",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "results": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/Approval"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Bad request",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          },
+          "x-resource-type": "service"
+        },
+        "post": {
+          "summary": "Request an approval",
+          "description": "Records the document's SHA-256 hash and the consent text for the jurisdiction. An external signatory gets a signing link that expires after 30 days. When a decision is made the server hashes the document again and refuses if it changed; the audit trail is written as a separate approval-certificate PDF next to the document, and the approved file is not modified.",
+          "operationId": "createApproval",
+          "tags": [
+            "Approvals"
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateApprovalRequest"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "The approval",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Approval"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Bad request: missing file, not exactly one signatory, or an unknown jurisdiction.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          },
+          "x-resource-type": "service"
+        }
+      },
+      "/workspaces/approvals/{id}": {
+        "get": {
+          "summary": "Get an approval",
+          "operationId": "getApproval",
+          "tags": [
+            "Approvals"
+          ],
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "required": true,
+              "description": "Approval id, or for an external signatory the signing token from the link.",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "The approval",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Approval"
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "Not found",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "410": {
+              "description": "The approval link has expired (30 days).",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          },
+          "x-resource-type": "service"
+        },
+        "delete": {
+          "summary": "Delete an approval",
+          "description": "Only an undecided approval can be deleted.",
+          "operationId": "deleteApproval",
+          "tags": [
+            "Approvals"
+          ],
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "required": true,
+              "description": "Approval id, or for an external signatory the signing token from the link.",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Deleted"
+            },
+            "400": {
+              "description": "Bad request",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "Not found",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          },
+          "x-resource-type": "service"
+        }
+      },
+      "/workspaces/approvals/{id}/approve": {
+        "patch": {
+          "summary": "Approve a document",
+          "description": "The server stamps the time, forwarding chain, document hash, jurisdiction and consent text on the decision event, and writes the event before the status. An internal approval can only be decided by the named signatory; an external one only with its token.",
+          "operationId": "approveApproval",
+          "tags": [
+            "Approvals"
+          ],
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "required": true,
+              "description": "Approval id, or for an external signatory the signing token from the link.",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalDecisionRequest"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Decision recorded"
+            },
+            "400": {
+              "description": "Bad request: invalid signature, or a required signature or initials place is empty.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Unauthorized",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Only the requested signatory can decide an internal approval.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "Not found, or an invalid token",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "409": {
+              "description": "The approval is already decided.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "410": {
+              "description": "The approval link has expired (30 days).",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          },
+          "x-resource-type": "service"
+        }
+      },
+      "/workspaces/approvals/{id}/reject": {
+        "patch": {
+          "summary": "Reject a document",
+          "description": "The server stamps the time, forwarding chain, document hash, jurisdiction and consent text on the decision event, and writes the event before the status. An internal approval can only be decided by the named signatory; an external one only with its token.",
+          "operationId": "rejectApproval",
+          "tags": [
+            "Approvals"
+          ],
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "required": true,
+              "description": "Approval id, or for an external signatory the signing token from the link.",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalDecisionRequest"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Decision recorded"
+            },
+            "400": {
+              "description": "Bad request: invalid signature, or a required signature or initials place is empty.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Unauthorized",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Only the requested signatory can decide an internal approval.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "Not found, or an invalid token",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "409": {
+              "description": "The approval is already decided.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "410": {
+              "description": "The approval link has expired (30 days).",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          },
+          "x-resource-type": "service"
+        }
+      },
+      "/workspaces/approvals/{id}/events": {
+        "get": {
+          "summary": "List approval events",
+          "operationId": "listApprovalEvents",
+          "tags": [
+            "Approvals"
+          ],
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "required": true,
+              "description": "Approval id, or for an external signatory the signing token from the link.",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "The audit trail",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "results": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/ApprovalEvent"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "Not found",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          },
+          "x-resource-type": "service"
+        },
+        "post": {
+          "summary": "Record a signatory event",
+          "description": "Accepts only `document_viewed`, `user_seen` and `checkbox_checked`, from the signatory, while the approval is in progress. Decisions are written by approve and reject.",
+          "operationId": "createApprovalEvent",
+          "tags": [
+            "Approvals"
+          ],
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "required": true,
+              "description": "Approval id, or for an external signatory the signing token from the link.",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "event_type"
+                  ],
+                  "properties": {
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "document_viewed",
+                        "user_seen",
+                        "checkbox_checked"
+                      ]
+                    },
+                    "metadata": {
+                      "$ref": "#/components/schemas/ApprovalEventMetadata"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "The event",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ApprovalEvent"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Bad request",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "409": {
+              "description": "The approval is already decided.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "410": {
+              "description": "The approval link has expired (30 days).",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          },
+          "x-resource-type": "service"
+        }
       }
     },
     "components": {
       "securitySchemes": {
-        "bearerAuth": {
-          "type": "http",
-          "scheme": "bearer",
-          "bearerFormat": "JWT",
-          "description": "JWT bearer token. The service engine reads only `Authorization: Bearer <jwt>` and derives the account/tenant from it."
-        },
         "apiKeyAuth": {
           "type": "apiKey",
           "in": "header",
-          "name": "X-Api-Key",
-          "description": "Static API key. Accepted at the gateway, which swaps it for a JWT before the service sees the request (confirmed working for reads)."
+          "name": "x-api-key"
+        },
+        "bearerAuth": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT"
+        },
+        "oauth2": {
+          "type": "oauth2",
+          "description": "API integration client credentials. Tokens only work on the task-sync routes in workspaces.",
+          "flows": {
+            "clientCredentials": {
+              "tokenUrl": "https://api.quiva.ai/oauth/token",
+              "scopes": {}
+            }
+          }
         }
       },
       "parameters": {
@@ -1142,7 +1761,7 @@
             },
             "email": {
               "type": "string",
-              "description": "Signatory email. Supports single-brace angular expression placeholders resolved against the trigger payload, e.g. `{client_email}`. The rendered value is trimmed and lowercased; signatories with a missing or invalid rendered email (or empty name) are skipped \u2014 if none remain, no signature request is sent and the document's `signatures` is `null`.",
+              "description": "Signatory email. Supports single-brace angular expression placeholders resolved against the trigger payload, e.g. `{client_email}`. The rendered value is trimmed and lowercased; signatories with a missing or invalid rendered email (or empty name) are skipped — if none remain, no signature request is sent and the document's `signatures` is `null`.",
               "example": "{client_email}"
             },
             "validity": {
@@ -1169,7 +1788,7 @@
             "conditions": {
               "type": "object",
               "additionalProperties": true,
-              "description": "Rule-engine condition object evaluated against the trigger payload; the sub-template is only included when it resolves to true. Payload keys are exposed as facts named `<key>.value` (e.g. payload `client_region` \u2192 fact `client_region.value`).",
+              "description": "Rule-engine condition object evaluated against the trigger payload; the sub-template is only included when it resolves to true. Payload keys are exposed as facts named `<key>.value` (e.g. payload `client_region` → fact `client_region.value`).",
               "example": {
                 "all": [
                   {
@@ -1187,12 +1806,12 @@
           "properties": {
             "name": {
               "type": "string",
-              "description": "Output filename template, rendered against the trigger payload with single-brace angular expressions (e.g. `invoice-{invoice_number}` \u2192 `invoice-INV-2026-014`). Defaults to the template key when omitted or when rendering fails. The `.pdf`/`.docx` extension is appended automatically from `content_type` \u2014 do not include it.",
+              "description": "Output filename template, rendered against the trigger payload with single-brace angular expressions (e.g. `invoice-{invoice_number}` → `invoice-INV-2026-014`). Defaults to the template key when omitted or when rendering fails. The `.pdf`/`.docx` extension is appended automatically from `content_type` — do not include it.",
               "example": "invoice-{invoice_number}"
             },
             "content_type": {
               "type": "string",
-              "description": "Output MIME type. DOCX sources can render to PDF or DOCX; PDF sources can only output PDF (PDF\u2192DOCX conversion is not supported).",
+              "description": "Output MIME type. DOCX sources can render to PDF or DOCX; PDF sources can only output PDF (PDF→DOCX conversion is not supported).",
               "enum": [
                 "application/pdf",
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -1234,7 +1853,7 @@
                 "key",
                 "content_type"
               ],
-              "description": "Reference to the source template file in object storage (the document object store bucket). DOCX sources are processed with the angular expression parser: tags such as `{client_name}`, `{#items}\u2026{/items}` (loops), `{price + tax}` (operators), and `{amount | formatcurrency:'EUR'}` (filters) are evaluated against the trigger payload to produce the final output. PDF sources (`application/pdf`) are passed through \u2014 and merged with sub-templates \u2014 without expression rendering, and can only output PDF.",
+              "description": "Reference to the source template file in object storage (the document object store bucket). DOCX sources are processed with the angular expression parser: tags such as `{client_name}`, `{#items}…{/items}` (loops), `{price + tax}` (operators), and `{amount | formatcurrency:'EUR'}` (filters) are evaluated against the trigger payload to produce the final output. PDF sources (`application/pdf`) are passed through — and merged with sub-templates — without expression rendering, and can only output PDF.",
               "properties": {
                 "key": {
                   "type": "string",
@@ -1363,14 +1982,15 @@
               "example": 0
             },
             "signed_at": {
-              "type": "string",
+              "type": [
+                "string",
+                "null"
+              ],
               "format": "date-time",
-              "nullable": true,
               "description": "ISO 8601 datetime when the signatory signed. Null if not yet signed.",
               "example": "2024-03-16T14:22:10Z"
             },
             "request": {
-              "nullable": true,
               "allOf": [
                 {
                   "$ref": "#/components/schemas/DocumentSignatoryRequest"
@@ -1378,13 +1998,15 @@
               ]
             },
             "error": {
-              "type": "string",
-              "nullable": true,
+              "type": [
+                "string",
+                "null"
+              ],
               "description": "Error message if the signature request failed.",
               "example": null
             }
           },
-          "description": "Per-signatory e-signature state on a document. Status lifecycle: `DRAFT` (created at trigger time, request not yet sent) \u2192 `SENT` (HelloSign request dispatched; `request` populated) \u2192 `SIGNED`, or `EXPIRED` (validity window elapsed \u2014 an expiry cron marks the signature and cancels the HelloSign request) / `FAILED` (delivery or signing error \u2014 see `error`). The `expiry` timestamp is computed at trigger time as now + the template signatory's `validity`."
+          "description": "Per-signatory e-signature state on a document. Status lifecycle: `DRAFT` (created at trigger time, request not yet sent) → `SENT` (HelloSign request dispatched; `request` populated) → `SIGNED`, or `EXPIRED` (validity window elapsed — an expiry cron marks the signature and cancels the HelloSign request) / `FAILED` (delivery or signing error — see `error`). The `expiry` timestamp is computed at trigger time as now + the template signatory's `validity`."
         },
         "Document": {
           "type": "object",
@@ -1401,8 +2023,10 @@
               "example": "acme-nda-2024.pdf"
             },
             "output": {
-              "nullable": true,
-              "type": "object",
+              "type": [
+                "object",
+                "null"
+              ],
               "description": "Reference to the generated output file in object storage.",
               "properties": {
                 "key": {
@@ -1423,15 +2047,19 @@
               }
             },
             "signatures": {
-              "type": "array",
-              "nullable": true,
+              "type": [
+                "array",
+                "null"
+              ],
               "items": {
                 "$ref": "#/components/schemas/DocumentSignatory"
               }
             },
             "errors": {
-              "type": "array",
-              "nullable": true,
+              "type": [
+                "array",
+                "null"
+              ],
               "items": {
                 "type": "string"
               },
@@ -1469,7 +2097,7 @@
           "properties": {
             "key": {
               "type": "string",
-              "description": "Document key \u2014 used to derive the storage subject.",
+              "description": "Document key — used to derive the storage subject.",
               "example": "contracts/acme-nda-2024.docx"
             },
             "created_at": {
@@ -1481,8 +2109,10 @@
               "example": "Acme NDA 2024"
             },
             "output": {
-              "nullable": true,
-              "type": "object",
+              "type": [
+                "object",
+                "null"
+              ],
               "properties": {
                 "key": {
                   "type": "string",
@@ -1500,15 +2130,19 @@
               }
             },
             "signatures": {
-              "type": "array",
-              "nullable": true,
+              "type": [
+                "array",
+                "null"
+              ],
               "items": {
                 "$ref": "#/components/schemas/DocumentSignatory"
               }
             },
             "errors": {
-              "type": "array",
-              "nullable": true,
+              "type": [
+                "array",
+                "null"
+              ],
               "items": {
                 "type": "string"
               }
@@ -1559,7 +2193,7 @@
             "content": {
               "type": "string",
               "format": "byte",
-              "description": "Base64-encoded template file content. The file is compiled with angular expression parser and any tag errors are reported \u2014 nothing is persisted.",
+              "description": "Base64-encoded template file content. The file is compiled with angular expression parser and any tag errors are reported — nothing is persisted.",
               "example": "UEsDBBQABgAIAAAAIQDfpNJ..."
             }
           }
@@ -1612,7 +2246,7 @@
             "payload": {
               "type": "object",
               "additionalProperties": true,
-              "description": "Data context (source) for all template expressions. **No schema required \u2014 completely flexible and user-defined.** Every key in the payload becomes an identifier available in template tags. Example: payload `{\"client_name\": \"Acme\", \"invoice_number\": \"INV-001\"}` makes `{client_name}` and `{invoice_number}` available in the template. Nested objects and arrays are fully traversable: `{client.address.city}`, `{items.0.price}`, `{#items}...{/items}`. Missing fields render as empty (not errors) \u2014 use conditionals like `{#field}...{/}` to handle optional data. Structure your payload to match the identifiers referenced in your template; the API does not validate field matching.",
+              "description": "Data context (source) for all template expressions. **No schema required — completely flexible and user-defined.** Every key in the payload becomes an identifier available in template tags. Example: payload `{\"client_name\": \"Acme\", \"invoice_number\": \"INV-001\"}` makes `{client_name}` and `{invoice_number}` available in the template. Nested objects and arrays are fully traversable: `{client.address.city}`, `{items.0.price}`, `{#items}...{/items}`. Missing fields render as empty (not errors) — use conditionals like `{#field}...{/}` to handle optional data. Structure your payload to match the identifiers referenced in your template; the API does not validate field matching.",
               "example": {
                 "client_name": "Acme Corp",
                 "client_email": "billing@acme.com",
@@ -1642,7 +2276,7 @@
             },
             "subject": {
               "type": "string",
-              "description": "Messaging subject of the queued document (`ms.document.document.{sanitised filepath}`). Present on success \u2014 poll `GET /documents/{key}` with the corresponding key to observe generation progress.",
+              "description": "Messaging subject of the queued document (`ms.document.document.{sanitised filepath}`). Present on success — poll `GET /documents/{key}` with the corresponding key to observe generation progress.",
               "example": "ms.document.document.invoices.2026.invoice-INV-2026-014.pdf"
             },
             "errors": {
@@ -1664,8 +2298,10 @@
               "$ref": "#/components/schemas/Template"
             },
             "metadata": {
-              "type": "object",
-              "nullable": true,
+              "type": [
+                "object",
+                "null"
+              ],
               "description": "Optional data-point metadata about the aggregate."
             }
           }
@@ -1708,8 +2344,10 @@
               "$ref": "#/components/schemas/Document"
             },
             "metadata": {
-              "type": "object",
-              "nullable": true,
+              "type": [
+                "object",
+                "null"
+              ],
               "description": "Optional data-point metadata about the aggregate."
             }
           }
@@ -1750,7 +2388,7 @@
           "properties": {
             "subject": {
               "type": "string",
-              "description": "Messaging subject of the created or updated record. Formats: draft template `ms.document.draft.template.{key}`, published template `ms.document.template.{key}`, document `ms.document.document.{key}` \u2014 with keys sanitised into subject tokens (`/` \u2192 `.`, spaces \u2192 `_`, other special characters \u2192 `uXXXX` codes).",
+              "description": "Messaging subject of the created or updated record. Formats: draft template `ms.document.draft.template.{key}`, published template `ms.document.template.{key}`, document `ms.document.document.{key}` — with keys sanitised into subject tokens (`/` → `.`, spaces → `_`, other special characters → `uXXXX` codes).",
               "example": "ms.document.draft.template.invoice-template"
             }
           }
@@ -1803,6 +2441,228 @@
             "error": {
               "type": "string",
               "example": "\"key\" is required"
+            }
+          }
+        },
+        "Jurisdiction": {
+          "type": "string",
+          "enum": [
+            "AU",
+            "NZ",
+            "UK",
+            "US"
+          ],
+          "default": "AU",
+          "description": "Sets the consent text the signatory sees. `US` adds the ESIGN consumer disclosures."
+        },
+        "ApprovalEventMetadata": {
+          "type": "object",
+          "description": "The browser sends only `user_agent`, `fingerprint`, `signature`, `initials` and `timezone_offset`. The server stamps the rest at the moment of the decision.",
+          "properties": {
+            "ip": {
+              "type": "string",
+              "readOnly": true,
+              "description": "The forwarding chain. Only the trailing hops are gateway-observed."
+            },
+            "user_agent": {
+              "type": "string"
+            },
+            "fingerprint": {
+              "type": "string"
+            },
+            "document_hash": {
+              "type": "string",
+              "readOnly": true,
+              "description": "SHA-256 (hex) of the document at the decision."
+            },
+            "jurisdiction": {
+              "$ref": "#/components/schemas/Jurisdiction",
+              "readOnly": true
+            },
+            "consent": {
+              "type": "string",
+              "readOnly": true,
+              "description": "The consent text shown, recorded verbatim."
+            },
+            "signature": {
+              "type": "string",
+              "description": "SVG drawn by the signatory."
+            },
+            "initials": {
+              "type": "string",
+              "description": "SVG drawn by the signatory."
+            },
+            "timezone_offset": {
+              "type": "integer"
+            }
+          }
+        },
+        "Approval": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "file_subject": {
+              "type": "string"
+            },
+            "task_id": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "created_by": {
+              "type": "string"
+            },
+            "decided_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "in_progress",
+                "approved",
+                "rejected"
+              ]
+            },
+            "signatory_internal": {
+              "type": "object",
+              "properties": {
+                "user_id": {
+                  "type": "string"
+                },
+                "full_name": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              }
+            },
+            "signatory_external": {
+              "type": "object",
+              "properties": {
+                "full_name": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string",
+                  "description": "Signing link carrying a random token. Expires 30 days after the approval is requested."
+                }
+              }
+            },
+            "jurisdiction": {
+              "$ref": "#/components/schemas/Jurisdiction"
+            },
+            "document_hash": {
+              "type": "string",
+              "readOnly": true,
+              "description": "SHA-256 (hex) of the file when approval was requested. A decision is refused if the file has changed since."
+            },
+            "consent": {
+              "type": "string",
+              "readOnly": true,
+              "description": "The statement the signatory agrees to, set on read."
+            },
+            "sign_places": {
+              "type": "array",
+              "readOnly": true,
+              "items": {
+                "type": "string",
+                "enum": [
+                  "signature",
+                  "initials"
+                ]
+              },
+              "description": "What the signatory must fill in before approving."
+            }
+          }
+        },
+        "CreateApprovalRequest": {
+          "type": "object",
+          "required": [
+            "file_subject"
+          ],
+          "description": "Exactly one of `signatory_internal` and `signatory_external` is required.",
+          "properties": {
+            "file_subject": {
+              "type": "string"
+            },
+            "jurisdiction": {
+              "$ref": "#/components/schemas/Jurisdiction"
+            },
+            "signatory_internal": {
+              "type": "object",
+              "required": [
+                "user_id"
+              ],
+              "properties": {
+                "user_id": {
+                  "type": "string"
+                },
+                "full_name": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                }
+              }
+            },
+            "signatory_external": {
+              "type": "object",
+              "required": [
+                "email"
+              ],
+              "properties": {
+                "full_name": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                }
+              }
+            },
+            "metadata": {
+              "$ref": "#/components/schemas/ApprovalEventMetadata"
+            }
+          }
+        },
+        "ApprovalDecisionRequest": {
+          "type": "object",
+          "properties": {
+            "feedback": {
+              "type": "string",
+              "description": "Reason, typically on rejection."
+            },
+            "metadata": {
+              "$ref": "#/components/schemas/ApprovalEventMetadata"
+            }
+          }
+        },
+        "ApprovalEvent": {
+          "type": "object",
+          "properties": {
+            "event_type": {
+              "type": "string"
+            },
+            "feedback": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "metadata": {
+              "$ref": "#/components/schemas/ApprovalEventMetadata"
             }
           }
         }
