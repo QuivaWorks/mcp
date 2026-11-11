@@ -1407,6 +1407,24 @@ check('push-example.mjs header comment is at most 3 lines', () => {
   assert.ok(src.findIndex((l) => !l.startsWith('//')) <= 3);
 });
 
+// --- task action resources (olympus #1646) ---------------------------------
+check('a new task action without resources is refused', () => {
+  const r = validate('task_action', { description: 'Do it' }, { requireRequired: true });
+  assert.ok(r.errors.some((e) => e.includes('must point at a resource')));
+});
+check('a new task action with a todo resource passes', () => {
+  const r = validate('task_action', { description: 'Do it', resources: [{ resource_id: 'x', resource_type: 'todo', metadata: { todos: [{ text: 'a', done: false }] } }] }, { requireRequired: true });
+  assert.equal(r.valid, true, r.errors.join('; '));
+});
+check('a record_config resource passes; an unknown type is refused', () => {
+  assert.equal(validate('task_action', { description: 'd', resources: [{ resource_id: 'cfg', resource_type: 'record_config' }] }, { requireRequired: true }).valid, true);
+  const bad = validate('task_action', { description: 'd', resources: [{ resource_id: 'cfg', resource_type: 'record-config' }] }, { requireRequired: true });
+  assert.ok(bad.errors.some((e) => e.includes('is not one of')));
+});
+check('editing a stored action by id needs no resource', () => {
+  assert.equal(validate('task_action', { id: 'ta_1', description: 'd', done: true }, { requireRequired: true }).valid, true);
+});
+
 if (failures) {
   console.error(`\n${failures} check(s) failed`);
   process.exit(1);

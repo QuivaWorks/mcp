@@ -405,6 +405,14 @@ function validateTimeSpent(value, label, errors) {
   }
 }
 
+// Resource types a new task action may carry (workspaces-service
+// handler/task_action_resources.go). record_config links a record set that is
+// attached to the task's space.
+const TASK_ACTION_RESOURCE_TYPES = ['record', 'record_config', 'file', 'assistant_session', 'todo', 'flow_input'];
+const TASK_ACTION_BARE_MSG =
+  'a new task action must point at a resource (record, record_config, file, assistant_session) or the API returns 400. ' +
+  'For a step with nothing to open, add a `todo` resource: { resource_id: "<any id>", resource_type: "todo", metadata: { todos: [{ text, done }] } }';
+
 // A task action (handler/task_actions.go) is a checklist item hung off a task on
 // its own subject; get_task returns it in task_actions[].
 function validateTaskAction(p, required, errors, warnings) {
@@ -423,6 +431,12 @@ function validateTaskAction(p, required, errors, warnings) {
     errors.push('done must be a boolean');
   }
 
+  // olympus #1646: a NEW action must carry a valid resource or the API 400s.
+  // An id means "edit", and stored bare actions stay editable, so only a write
+  // with no id is held to it.
+  if (p.id === undefined && !(Array.isArray(p.resources) && p.resources.length)) {
+    (required ? errors : warnings).push(TASK_ACTION_BARE_MSG);
+  }
   if (p.resources !== undefined) {
     if (!Array.isArray(p.resources)) {
       errors.push('resources must be an array of { resource_id, resource_type, metadata? }');
@@ -433,6 +447,17 @@ function validateTaskAction(p, required, errors, warnings) {
         requireString(r, 'resource_type', true, errors);
         if (r.metadata !== undefined && !isObject(r.metadata)) {
           errors.push(`resources[${i}].metadata must be an object`);
+        }
+        if (typeof r.resource_type !== 'string') return;
+        if (!TASK_ACTION_RESOURCE_TYPES.includes(r.resource_type)) {
+          errors.push(`resources[${i}].resource_type "${r.resource_type}" is not one of ${TASK_ACTION_RESOURCE_TYPES.join(', ')}`);
+        } else if (r.resource_type === 'record' && typeof r.resource_id === 'string') {
+          const [cfg, rec] = r.resource_id.split(/\.(.*)/s);
+          if (!cfg || !rec) errors.push(`resources[${i}]: a record resource_id is {configId}.{recordId}`);
+        } else if (r.resource_type === 'assistant_session' && typeof r.resource_id === 'string' && !r.resource_id.includes('.')) {
+          errors.push(`resources[${i}]: an assistant_session resource_id is {agentSubject}.{sessionId}`);
+        } else if (r.resource_type === 'todo' && !(isObject(r.metadata) && Array.isArray(r.metadata.todos) && r.metadata.todos.length)) {
+          errors.push(`resources[${i}]: a todo resource needs at least one { text, done } item in metadata.todos`);
         }
       });
     }

@@ -107,9 +107,9 @@ const TASK_ACTION_EXAMPLE = {
   done: false,
   resources: [
     {
-      resource_id: 'project_brief',
-      resource_type: 'record-config',
-      metadata: { note: 'record the checked source here' },
+      resource_id: 'ta_confirm_source_figures_todos',
+      resource_type: 'todo',
+      metadata: { todos: [{ text: 'Open the source and compare each figure', done: false }] },
     },
   ],
 };
@@ -383,7 +383,9 @@ const REFERENCE = {
     },
     unverifiable_write_response:
       'The write handler responds with your own request body echoed back, not the stored aggregate. Confirm through get_task.',
-    resource_shape: '{ resource_id, resource_type, metadata? } — both ids are free-form strings; the service does not validate that the resource exists.',
+    resource_required:
+      'REQUIRED on a NEW action (olympus #1646): the API returns 400 when `resources` is empty or invalid. Editing a stored action (an `id` you got from get_task) is not held to this, so stored bare actions can still be completed.',
+    resource_shape: '{ resource_id, resource_type, metadata? }. Valid resource_type values: `record` (resource_id {configId}.{recordId}), `record_config` (a record set attached to the task\'s space; resource_id is the config id; marked done by hand), `file`, `assistant_session` ({agentSubject}.{sessionId}), `todo` (metadata.todos lists { text, done } items; use it when there is nothing else to open) and `flow_input` (added by the flow runner for a paused run). Any other type is refused.',
     validation_quirk:
       '`description` is required on EVERY write, not just creates: the handler checks it before touching the store, so a call that only flips `done` still has to resend the description.',
     suppress_events: 'Request-only `suppress_events: true` stops the write publishing a task event.',

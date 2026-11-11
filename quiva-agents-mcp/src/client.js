@@ -2,6 +2,8 @@
 // Auth, first configured wins: QUIVA_API_KEY, QUIVA_BEARER_TOKEN, then QUIVA_EMAIL + QUIVA_PASSWORD login (re-login once on 401).
 // An API key works: cerberus swaps it for a user JWT (bellerophon-cerberus/http/middleware/ms_auth.go:143).
 
+import { credentialsFromEnv } from './profile.js';
+
 const DEFAULT_API_URL = 'https://api.quiva.ai';
 
 export class QuivaClient {
@@ -18,14 +20,7 @@ export class QuivaClient {
   // Stdio entrypoints build a client from the process environment; anything
   // composing servers in-process should pass explicit options instead.
   static fromEnv(env = process.env) {
-    return new QuivaClient({
-      apiUrl: env.QUIVA_API_URL,
-      apiKey: env.QUIVA_API_KEY,
-      bearerToken: env.QUIVA_BEARER_TOKEN,
-      email: env.QUIVA_EMAIL,
-      password: env.QUIVA_PASSWORD,
-      account: env.QUIVA_ACCOUNT,
-    });
+    return new QuivaClient(credentialsFromEnv(env));
   }
 
   hasCredentials() {

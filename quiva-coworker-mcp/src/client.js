@@ -1,6 +1,8 @@
 // HTTP client for Abbie's settings API (hub-service, /hub/coworker/* and /hub/agent/model-pool).
 // Auth precedence: QUIVA_API_KEY, then QUIVA_BEARER_TOKEN, then QUIVA_EMAIL + QUIVA_PASSWORD.
 
+import { credentialsFromEnv } from './profile.js';
+
 const DEFAULT_API_URL = 'https://api.quiva.ai';
 
 export class QuivaClient {
@@ -16,14 +18,7 @@ export class QuivaClient {
 
   // Stdio entrypoints only; in-process composition passes explicit options.
   static fromEnv(env = process.env) {
-    return new QuivaClient({
-      apiUrl: env.QUIVA_API_URL,
-      apiKey: env.QUIVA_API_KEY,
-      bearerToken: env.QUIVA_BEARER_TOKEN,
-      email: env.QUIVA_EMAIL,
-      password: env.QUIVA_PASSWORD,
-      account: env.QUIVA_ACCOUNT,
-    });
+    return new QuivaClient(credentialsFromEnv(env));
   }
 
   hasCredentials() {

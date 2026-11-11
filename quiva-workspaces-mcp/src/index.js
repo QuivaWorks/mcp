@@ -105,7 +105,7 @@ function ifMatchHeader(value) {
 }
 
 const commentPayload = jsonValue.describe('The comment object: { body, reply_id? }. See get_workspaces_reference("comments").');
-const taskActionPayload = jsonValue.describe('The task action: { description, id?, done?, resources?[{ resource_id, resource_type, metadata? }] }. `description` is required on EVERY write, even one that only flips `done`. See get_workspaces_reference("task-actions").');
+const taskActionPayload = jsonValue.describe('The task action: { description, id?, done?, resources[{ resource_id, resource_type: record|record_config|file|assistant_session|todo, metadata? }] }. `resources` is REQUIRED when creating (no id): the API 400s a new action without a valid resource; for nothing-to-open use one `todo` resource with metadata.todos. `description` is required on EVERY write, even one that only flips `done`. See get_workspaces_reference("task-actions").');
 
 // The space id is the second segment of every key: spaces.<SPACE_ID>....
 function spaceIdOfKey(key) {
@@ -453,7 +453,7 @@ export function registerTools(server, client, { prefix = '' } = {}) {
 
   tool(
     'set_task_action',
-    'Create or update a checklist action on a task (PUT /workspaces/task/{task_id}/action). Omit `id` to create one (server assigns ta_<random>); pass an existing `id` to address that action. `description` is required on EVERY write, even one that only flips `done`. 404 "task not found" if the task does not exist. THE WRITE MOVES THE TASK STATUS BY ROLE: none done -> the space\'s `todo` status (else default_status), some done -> `working`, all done -> `done` (else the first complete, non-outcome status). Chat actions do not count, an id the space lacks is never written, and with no matching role the status is left alone. The response echoes your request — verify with get_task (`task_actions[]`).',
+    'Create or update a checklist action on a task (PUT /workspaces/task/{task_id}/action). Omit `id` to create one (server assigns ta_<random>); a NEW action must include a valid `resources` entry (record, record_config, file, assistant_session, or a `todo` with metadata.todos) or the API returns 400; pass an existing `id` to address that action (edits need no resource). `description` is required on EVERY write, even one that only flips `done`. 404 "task not found" if the task does not exist. THE WRITE MOVES THE TASK STATUS BY ROLE: none done -> the space\'s `todo` status (else default_status), some done -> `working`, all done -> `done` (else the first complete, non-outcome status). Chat actions do not count, an id the space lacks is never written, and with no matching role the status is left alone. The response echoes your request — verify with get_task (`task_actions[]`).',
     {
       task_id: z.string().describe('Task id the action hangs off'),
       action: taskActionPayload,
