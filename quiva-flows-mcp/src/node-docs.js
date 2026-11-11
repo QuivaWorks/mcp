@@ -833,7 +833,7 @@ export const NODE_TYPES = {
 
   email: {
     summary:
-      'Send one email from the account\'s own verified sending domain, through the sanctioned send endpoint (microstrate.accounts.post.send-commercial-email), so suppression, consent and the sender-domain check always apply. (Not in the OpenAPI spec.)',
+      'Send one email, from the account\'s verified sending domain (or, with none, as "<Account> via the platform"), through the sanctioned send endpoint (microstrate.accounts.post.send-commercial-email), so suppression, consent and the sender-domain check always apply. (Not in the OpenAPI spec.)',
     required: ['id', 'node_type', 'payload'],
     nodeLevelProps: {
       operation: 'Optional; the only value is "send_email", which is also the default (hub-service/data/email_endpoints.go).',
@@ -841,10 +841,16 @@ export const NODE_TYPES = {
     payload: {
       required: {
         to: 'ONE recipient address. A list is refused: consent is decided per person, so send one email per recipient.',
-        subject: 'Subject line.',
-        'html | text': 'At least one body. Give text as well for clients that will not render HTML.',
+        subject: 'Subject line. Not needed when template_key is set.',
+        'html | text': 'At least one body unless template_key is set. Give text as well for clients that will not render HTML.',
       },
       optional: {
+        template_key: 'Key of a PUBLISHED account email template. It supplies subject and body, so subject/html/text must then be left empty (mixing is refused). Manage templates with the distribution server\'s email template tools or the Email page.',
+        data: 'Values for the template\'s {tags} as an object, e.g. { client: { first_name: "Ada" } } answers {client.first_name}. A tag the data does not answer refuses the send.',
+        class: '"commercial" (default, recipient can opt out) or "transactional" (a notice they need; ignores unsubscribes, allows cc/bcc).',
+        cc: 'Transactional only. Array of addresses.',
+        bcc: 'Transactional only. Array of addresses.',
+        attachment_refs: 'Stored files to attach: [{ bucket, key, filename? }], added to any the template carries; up to 6 MB total. An unreadable file refuses the send.',
         from_address: 'Must be in the account\'s verified sending domain. Empty uses the account\'s own from address.',
         reply_to: 'Same domain rule as from_address.',
         contact_folder: 'Files the email against a person in the activity log. Defaults from the task a scheduled run was fired from.',

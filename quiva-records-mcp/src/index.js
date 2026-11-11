@@ -209,14 +209,21 @@ export function registerTools(server, client, { prefix = '' } = {}) {
 
   tool(
     'list_record_configs',
-    'List record configurations. Optionally pass `ids` to batch-fetch specific configs. Without ids the list is paged by the storage layer: when the reply has `truncated: true`, call again with `cursor: next_cursor`. Call this first to discover available record types.',
+    'List record configurations. Default (`summary: true`) pages id, name, description, collection_id and updated_at only (GET /records/config?summary=1) with `limit`/`offset`, optional `search` and `collection_id`; the reply carries `total_hits`. Pass `summary: false` for full configs paged by cursor (when `truncated: true`, call again with `cursor: next_cursor`), or `ids` to batch-fetch full configs. Call this first to discover available record types, then get_record_config for the schema.',
     {
-      ids: z.array(z.string()).optional().describe('Optional list of config ids to fetch (batch). Omit for all.'),
-      limit: z.number().int().positive().optional().describe('Page size (unbatched listing only)'),
-      cursor: z.string().optional().describe('next_cursor from a previous truncated reply'),
+      ids: z.array(z.string()).optional().describe('Optional list of config ids to fetch in full (batch). Omit for all.'),
+      summary: z.boolean().default(true).describe('true = lightweight paged summaries (limit/offset); false = full configs (limit/cursor)'),
+      limit: z.number().int().positive().optional().describe('Page size (default 25, max 1000 for summaries)'),
+      offset: z.number().int().min(0).optional().describe('Summary paging offset'),
+      search: z.string().optional().describe('Summary only: match on name/description'),
+      collection_id: z.string().optional().describe('Summary only: filter by record set collection'),
+      cursor: z.string().optional().describe('next_cursor from a previous truncated full-config reply'),
     },
-    async ({ ids, limit, cursor }) =>
-      client.get('/records/config', ids?.length ? { ids: ids.join(',') } : { limit, cursor })
+    async ({ ids, summary, limit, offset, search, collection_id, cursor }) => {
+      if (ids?.length) return client.get('/records/config', { ids: ids.join(',') });
+      if (summary) return client.get('/records/config', { summary: 1, limit, offset, search, collection_id });
+      return client.get('/records/config', { limit, cursor });
+    }
   );
 
   tool(
@@ -319,6 +326,41 @@ export function registerTools(server, client, { prefix = '' } = {}) {
       }
       return client.delete(`/records/config/${encodeURIComponent(id)}`);
     }
+  );
+
+  // ---------------------------------------------------------------------------
+  // Record config versions (publish snapshots; records-service/configversion)
+  // ---------------------------------------------------------------------------
+
+  tool(
+    'list_record_config_versions',
+    'List a record config\'s published versions, newest first (GET /records/config-versions/{id}): the current version and the numbers the next publish would take (`next_version`, `next_major_version`).',
+    { id: z.string().describe('Record config id') },
+    async ({ id }) => client.get(`/records/config-versions/${encodeURIComponent(id)}`)
+  );
+
+  tool(
+    'get_record_config_version',
+    'Get one published version of a record config with its full snapshot (GET /records/config-version/{id}?version=MAJOR.MINOR).',
+    {
+      id: z.string().describe('Record config id'),
+      version: z.string().describe('Version number, MAJOR.MINOR, from list_record_config_versions'),
+    },
+    async ({ id, version }) => client.get(`/records/config-version/${encodeURIComponent(id)}`, { version })
+  );
+
+  tool(
+    'publish_record_config',
+    'Publish the record config as currently stored as its next version (POST /records/config-publish/{id}). Save changes with update_record_config first. Minor by default; `major: true` bumps the major number. Pass `expected_current_version_id` to refuse if someone else published in between, and `idempotency_key` to make a retry safe.',
+    {
+      id: z.string().describe('Record config id'),
+      title: z.string().describe('Short title for this version'),
+      summary: z.string().optional().describe('What changed'),
+      major: z.boolean().optional().describe('Bump the major version'),
+      expected_current_version_id: z.string().optional().describe('Refuse unless this is still the current version id'),
+      idempotency_key: z.string().optional().describe('Replays with the same key return the first result'),
+    },
+    async ({ id, ...body }) => client.post(`/records/config-publish/${encodeURIComponent(id)}`, body)
   );
 
   // ---------------------------------------------------------------------------

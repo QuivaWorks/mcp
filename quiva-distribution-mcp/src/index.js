@@ -355,6 +355,48 @@ export function registerTools(server, client, { prefix = '' } = {}) {
       return { withdrawn: found, response: result, ...(found ? {} : { warning: 'The invitation is not listed as withdrawn after the call.' }) };
     }
   );
+
+  // ---------------------------------------------------------------------------
+  // Account email templates (accounts-service; flows and Abbie send by key)
+  // ---------------------------------------------------------------------------
+
+  tool(
+    'list_email_templates',
+    'List the account\'s email templates (GET /accounts/email-templates). Rows carry key, name, status (draft | published | published_with_draft), tags (the {placeholders} the body uses) and timestamps, not the bodies. `status: "published"` also returns published_with_draft, since both can be sent.',
+    { status: z.enum(['draft', 'published', 'published_with_draft']).optional() },
+    async ({ status }) => client.get('/accounts/email-templates', { status })
+  );
+
+  tool(
+    'get_email_template',
+    'Get one email template with both versions (GET /accounts/email-template?key=): `draft` and `published`, each with subject, html, text, plus sample_data and tags.',
+    { key: z.string().min(1).describe('Template key (the slug flows reference; never changes)') },
+    async ({ key }) => client.get('/accounts/email-template', { key })
+  );
+
+  tool(
+    'render_email_template',
+    'Preview a template the way a send would render it (POST /accounts/email-template-render). Returns { version, subject, html, text, unresolved[] }; `unresolved` lists tags the data did not answer, and a real send refuses on them. Without `data` it uses the template\'s stored sample data. Sends nothing.',
+    {
+      key: z.string().min(1),
+      version: z.enum(['draft', 'published']).optional().describe('Which version to render (default: the draft if any, else published)'),
+      data: z.record(z.any()).optional().describe('Values for the template tags'),
+    },
+    async ({ key, version, data }) => client.post('/accounts/email-template-render', { key, version, data })
+  );
+
+  tool(
+    'publish_email_template',
+    'Promote a template\'s draft to its published version (POST /accounts/email-template-publish). A published template sends in the account\'s name from flows and Abbie, so this requires confirm: true and an admin credential. Render it first with render_email_template.',
+    {
+      key: z.string().min(1),
+      confirm: z.boolean().optional().describe('Must be true. Nothing is published otherwise.'),
+    },
+    async ({ key, confirm }) => {
+      if (confirm !== true) return { published: false, reason: 'confirm: true is required; a published template sends in the account\'s name.' };
+      return client.post('/accounts/email-template-publish', { key });
+    }
+  );
 }
 
 async function main() {

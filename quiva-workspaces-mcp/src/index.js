@@ -918,6 +918,129 @@ export function registerTools(server, client, { prefix = '' } = {}) {
   );
 
   // ---------------------------------------------------------------------------
+  // Task relations (related tickets)
+  // ---------------------------------------------------------------------------
+
+  tool(
+    'list_task_relations',
+    'List a task\'s related-ticket links (GET /workspaces/task/{task_id}/relations). Each row: { related_task_id, type, direction, label, task: { id, title, status, status_name, space_id, ... } }. Links to deleted tasks are omitted.',
+    { task_id: z.string().describe('Task id') },
+    async ({ task_id }) => client.get(`/workspaces/task/${encodeURIComponent(task_id)}/relations`)
+  );
+
+  tool(
+    'link_task',
+    'Link two tasks (PUT /workspaces/task-relation); both sides are written. `type` is from task_id\'s side. Re-linking a pair replaces its type. 403 unless the SOURCE task\'s space has related tickets turned on (the space `related_tasks` setting); at most 50 links per task. Returns the source task\'s relations.',
+    {
+      task_id: z.string().describe('The task the link is written from'),
+      related_task_id: z.string().describe('The task it points at'),
+      type: z.string().describe('Link type as read from task_id: relates_to, blocks, is_blocked_by, duplicates, is_duplicated_by, clones or is_cloned_by'),
+    },
+    async ({ task_id, related_task_id, type }) => client.put('/workspaces/task-relation', { task_id, related_task_id, type })
+  );
+
+  tool(
+    'unlink_task',
+    'Remove the link between two tasks, both sides (DELETE /workspaces/task/{task_id}/relation/{related_task_id}). 404 if they are not linked. Returns the remaining relations.',
+    {
+      task_id: z.string().describe('Task id'),
+      related_task_id: z.string().describe('The linked task to unlink'),
+    },
+    async ({ task_id, related_task_id }) =>
+      client.delete(`/workspaces/task/${encodeURIComponent(task_id)}/relation/${encodeURIComponent(related_task_id)}`)
+  );
+
+  // ---------------------------------------------------------------------------
+  // Space collections (the caller's spaces sidebar groups; per user)
+  // ---------------------------------------------------------------------------
+
+  const collectionPayload = jsonValue.describe('{ name, description?, icon?: { name, color: "#RRGGBB" }, space_ids?[], catch_all? }. Adding a space takes it out of every other collection.');
+
+  tool(
+    'list_space_collections',
+    'List the calling user\'s space collections (GET /workspaces/space-collections): sidebar groups of spaces, in order. `is_default: true` means nothing is saved and the list is computed. Per user, so it needs a credential that resolves to one.',
+    {},
+    async () => client.get('/workspaces/space-collections')
+  );
+
+  tool(
+    'create_space_collection',
+    'Create a space collection (POST /workspaces/space-collection). `name` is required (max 120 bytes); max 50 collections. Returns the full list plus `collection`.',
+    { collection: collectionPayload },
+    async ({ collection }) => client.post('/workspaces/space-collection', collection)
+  );
+
+  tool(
+    'update_space_collection',
+    'Update a space collection (PATCH /workspaces/space-collection/{id}); only the fields sent change and `space_ids` replaces the whole list.',
+    { id: z.string().describe('Collection id'), collection: collectionPayload },
+    async ({ id, collection }) => client.patch(`/workspaces/space-collection/${encodeURIComponent(id)}`, collection)
+  );
+
+  tool(
+    'delete_space_collection',
+    'Delete a space collection (DELETE /workspaces/space-collection/{id}); its spaces move to the catch-all collection. The spaces themselves are untouched.',
+    { id: z.string().describe('Collection id') },
+    async ({ id }) => client.delete(`/workspaces/space-collection/${encodeURIComponent(id)}`)
+  );
+
+  // ---------------------------------------------------------------------------
+  // Folder labels
+  // ---------------------------------------------------------------------------
+
+  tool(
+    'rename_folder',
+    'Rename a folder by LABEL (PATCH /workspaces/folder-name). The key never changes, so nothing that points at the folder breaks: list_files keys, file paths and create_folder parents keep using the key path. `folder` is the space-relative dot path of keys (e.g. "ProductLines.Healthcare"). An empty `display_name` clears the label. 400 invalid name, 403 space root or a Microsoft 365 managed folder, 404 missing folder, 409 a sibling already uses the label.',
+    {
+      space_id: z.string().describe('Space id'),
+      folder: z.string().describe('Space-relative dot path of the folder KEYS'),
+      display_name: z.string().describe('New label (max 120 characters); "" clears it'),
+    },
+    async ({ space_id, folder, display_name }) => client.patch('/workspaces/folder-name', { space_id, folder, display_name })
+  );
+
+  tool(
+    'resolve_folder',
+    'Turn a folder path as people see it (labels, "/" or "." between segments) into the key path the file tools need (GET /workspaces/resolve-folder). Labels win over raw keys, case-insensitively, so after a rename use this rather than guessing the key. Creates nothing. Returns { folder, resolved, missing_from?, key_path, labels[] }.',
+    {
+      space_id: z.string().describe('Space id'),
+      path: z.string().describe('Display path, e.g. "Clients/Acme/Contracts"'),
+    },
+    async ({ space_id, path }) => client.get('/workspaces/resolve-folder', { space_id, path })
+  );
+
+  // ---------------------------------------------------------------------------
+  // Entity comments (comments on a record/entity rather than a task)
+  // ---------------------------------------------------------------------------
+
+  const entityPath = (type, id) => `/workspaces/entity/${encodeURIComponent(type)}/${encodeURIComponent(id)}`;
+
+  tool(
+    'list_entity_comments',
+    'List comments on an entity (GET /workspaces/entity/{entity_type}/{entity_id}/comments). Private comments by default; pass visibility "shared" with the counterparty account for a thread shared across a distribution link. Optional target_type/target_id narrow to one part of the entity.',
+    {
+      entity_type: z.string().describe('Entity type, e.g. "record"'),
+      entity_id: z.string().describe('Entity id'),
+      visibility: z.enum(['private', 'shared']).optional(),
+      counterparty_account_id: z.string().optional().describe('Required to find shared comments'),
+      target_type: z.string().optional(),
+      target_id: z.string().optional(),
+    },
+    async ({ entity_type, entity_id, ...query }) => client.get(`${entityPath(entity_type, entity_id)}/comments`, query)
+  );
+
+  tool(
+    'create_entity_comment',
+    'Add a comment to an entity (POST /workspaces/entity/{entity_type}/{entity_id}/comment). Body { body, reply_id?, visibility?: private|shared, counterparty_account_id?, target?: { type, id }, mentions?[], attachments?[] }. A shared comment needs counterparty_account_id.',
+    {
+      entity_type: z.string().describe('Entity type, e.g. "record"'),
+      entity_id: z.string().describe('Entity id'),
+      comment: jsonValue.describe('{ body, reply_id?, visibility?, counterparty_account_id?, target?, mentions?[], counterparty_mentions?[], attachments?[] }'),
+    },
+    async ({ entity_type, entity_id, comment }) => client.post(`${entityPath(entity_type, entity_id)}/comment`, comment)
+  );
+
+  // ---------------------------------------------------------------------------
   // Users (accounts-service — for resolving assignee/reporter ids)
   // ---------------------------------------------------------------------------
 
