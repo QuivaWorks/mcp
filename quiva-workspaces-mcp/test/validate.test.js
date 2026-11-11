@@ -506,7 +506,7 @@ check('unknown kind is an error', () => {
 // --- golden gate ------------------------------------------------------------
 // Every payload in examples/harvested/ is a REAL space/task/comment living on the
 // platform. If the validator rejects one, the VALIDATOR is wrong — that is the
-// whole point of this gate. (See docs/lessons.md: the flows MCP shipped a wrong
+// whole point of this gate. (the flows MCP shipped a wrong
 // rules syntax for two weeks because no check like this existed.)
 //
 // Harvested payloads are READ responses, so they legitimately carry server-set

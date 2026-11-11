@@ -257,7 +257,7 @@ check('implicit {/} close is accepted', () => {
 // Every template in examples/harvested/ is a REAL template living on the
 // platform. If the validator rejects one, the VALIDATOR is wrong — that is the
 // whole point of this gate. Anything not explained by the allowlist below is a
-// bug by definition. (See docs/lessons.md: the flows MCP shipped a wrong rules
+// bug by definition. (the flows MCP shipped a wrong rules
 // syntax for two weeks because no check like this existed.)
 
 const ALLOWED_GOLDEN_FAILURES = [

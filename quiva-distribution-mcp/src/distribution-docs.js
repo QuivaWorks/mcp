@@ -207,7 +207,7 @@ const REFERENCE = {
   filing: {
     summary: 'payload.filing: how a sent record names the entity and case it belongs to, without naming a folder.',
     body: [
-      'A record, decision or status message may carry payload.filing = { entity, case } (trigger-service/distribution/filing.go; contract docs/example-vertical spec/contracts/08-folder-layout on PR #1560). A revoke and every distributor-side kind land folderless whatever they carry.',
+      'A record, decision or status message may carry payload.filing = { entity, case } (trigger-service/distribution/filing.go). A revoke and every distributor-side kind land folderless whatever they carry.',
       'filing.entity: the entity\'s own fields (for example name, email, phone and whatever identity fields the receiving space\'s base record declares). filing.case: { quote_id, primary_config?, primary_record_id?, renewal_of? }. primary_record_id "self" anchors the case on the row being landed.',
       'The publisher NEVER names a folder, path or token. The landing derives the case folder from filing.case.quote_id alone and finds the entity folder from the target space\'s base record, so a sender cannot file into a place it did not earn.',
       'The base record must be the config the SENDER published (a product\'s entity_config). A space with no base record, or one the sender did not install, lands the message folderless and logs it. The filing keys must include at least one of the base record\'s identity fields.',

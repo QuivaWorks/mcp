@@ -32,9 +32,9 @@ they 404 at the gateway and are deliberately not tools.
 exists specifically because they are wrong in ways that fail silently: the spec
 says `wait` for a delay node (the engine has no such handler), says PATCH for
 record updates (the service registers PUT), says `/templates` at the top level
-(everything lives under `/file-generator`). `docs/lessons.md` opens with a case
-where the flows spec contained zero mentions of the syntax the engine actually
-required, and the wrong syntax shipped for two weeks.
+(everything lives under `/file-generator`). One flows spec contained zero mentions of
+the syntax the engine actually required, and the wrong syntax shipped for two
+weeks.
 
 So the reading order is: spec for the shape, `get_*_reference` for the truth, and
 the harvested examples for proof. Where they disagree, the engine wins.

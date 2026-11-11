@@ -9,7 +9,7 @@
 //                        shape from a read, which is the one thing a harvested
 //                        example cannot teach. Not evidence: a hand-written
 //                        example is how the flows MCP shipped a wrong rules
-//                        syntax (docs/lessons.md).
+//                        syntax.
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';

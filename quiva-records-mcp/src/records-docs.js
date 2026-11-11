@@ -718,7 +718,7 @@ const REFERENCE = {
   },
   'query-views': {
     summary:
-      'The table-shaped half of query_records (GET /records): scope_folder, search, a date window and latest_by. Engine: records-service/handler/record_query_view.go and QueryRecordsHandler in handler/records.go. These land with evari-olympus #1560 (branch example-vertical-policy-view); a records-service built before it ignores the params and returns unfiltered rows.',
+      'The table-shaped half of query_records (GET /records): scope_folder, search, a date window and latest_by. Engine: records-service/handler/record_query_view.go and QueryRecordsHandler in handler/records.go. These land with evari-olympus #1560; a records-service built before it ignores the params and returns unfiltered rows.',
     params: {
       scope_folder: 'Records whose folder OR parent_folder equals it. Counts as the required scope beside folder and space_id. ANDed with the other scope, never replacing it.',
       search: 'Words, ANDed (the first 5 are used). Each word is ORed across search_fields: text fields match by PREFIX (lower-cased), keyword fields exactly.',

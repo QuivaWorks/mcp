@@ -117,10 +117,6 @@ verified. Re-read it, fix what moved, then `npm run engine:pin` (or the
 
 ## Reading order
 
-- [docs/lessons.md](docs/lessons.md): the failure modes that shaped all of this.
-  Short, and the single most useful thing to read first.
-- [docs/quiva-mcp-architecture.md](docs/quiva-mcp-architecture.md): how the
-  servers and the platform fit together.
 - [specs/](specs/): agent-instruction documents for platform features
   (form builder, form rules).
 - [specs/openapi/](specs/openapi/): the platform's OpenAPI specs, generated from

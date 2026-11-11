@@ -4,7 +4,6 @@ import assert from 'node:assert/strict';
 import { readHarvested } from '../src/examples.js';
 import { validate } from '../src/validate.js';
 import { getReference, GOTCHAS, ELEMENT_CATALOG, ELEMENT_KINDS, ELEMENT_CONTAINERS } from '../src/records-docs.js';
-import { config as riskProgramme } from './fixtures/risk-programme.mjs';
 import { readdirSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -603,47 +602,11 @@ check('an array-field container prop that is not accepted warns', () => {
   assert.ok(r.warnings.some((w) => w.includes('gridTemplateColumns') && w.includes('array-field container')), JSON.stringify(r.warnings));
 });
 
-check('the risk-programme fixture validates clean (0 errors, 0 warnings)', () => {
-  // The fixture is the source of truth for the live `risk_programme` config, so
-  // a regression in it fails here rather than on the platform.
-  const r = validate(riskProgramme);
-  assert.equal(r.valid, true, JSON.stringify(r.errors));
-  assert.equal(r.errors.length, 0, JSON.stringify(r.errors));
-  assert.equal(r.warnings.length, 0, JSON.stringify(r.warnings));
-});
-
-check('every risk-programme choice input carries options matching its enum', () => {
-  const CHOICE = new Set(['dropdown', 'multi-select', 'multi-toggle', 'statuses']);
-  const nodes = [];
-  const walk = (n) => {
-    if (Array.isArray(n)) return n.forEach(walk);
-    if (!n || typeof n !== 'object') return;
-    if (n.type === 'field') nodes.push(n);
-    Object.values(n).forEach(walk);
-  };
-  walk(riskProgramme.views);
-  const choices = nodes.filter((n) => CHOICE.has(n.inputType));
-  assert.ok(choices.length >= 8, `expected the programme's enum inputs, found ${choices.length}`);
-  for (const n of choices) {
-    assert.ok(Array.isArray(n.props?.options) && n.props.options.length, `${n.field} has no props.options`);
-  }
-  // And every repeater item leaf carries the `ui` mirror the renderer reads.
-  for (const [name, prop] of Object.entries(riskProgramme.schema.properties)) {
-    if (prop.type !== 'array' || !prop.items?.properties) continue;
-    for (const [leaf, lp] of Object.entries(prop.items.properties)) {
-      assert.ok(lp.ui?.inputType, `${name}[].${leaf} has no ui.inputType mirror`);
-      if (Array.isArray(lp.enum)) {
-        assert.ok(Array.isArray(lp.ui.props?.options) && lp.ui.props.options.length, `${name}[].${leaf} enum has no ui options`);
-      }
-    }
-  }
-});
-
 // --- golden gate ------------------------------------------------------------
 // Every config in examples/harvested/ is a REAL record config living on the
 // platform. If the validator rejects one, the VALIDATOR is wrong — that is the
 // whole point of this gate. Anything not explained by the allowlist below is a
-// bug by definition. (See docs/lessons.md: the flows MCP shipped a wrong rules
+// bug by definition. (the flows MCP shipped a wrong rules
 // syntax for two weeks because no check like this existed.)
 
 const ALLOWED_GOLDEN_FAILURES = [

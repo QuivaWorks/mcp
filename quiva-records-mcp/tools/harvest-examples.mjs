@@ -4,7 +4,7 @@
 // Why: reference examples an agent learns from must be configs that demonstrably
 // work. The six files in examples/authored/ are hand-written fixtures — that is
 // precisely the pattern that shipped a wrong condition syntax in the flows MCP
-// (see docs/lessons.md). These harvested files also serve as the golden fixtures
+//. These harvested files also serve as the golden fixtures
 // for `npm test`: the local validator must accept every config already live.
 //
 // CONFIGS ONLY — never record rows. Production records hold client PII.

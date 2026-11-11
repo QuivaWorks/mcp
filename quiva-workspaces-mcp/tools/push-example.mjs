@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Push the authored example and read it back: a write response is not proof (docs/lessons.md).
+// Push the authored example and read it back: a write response is not proof.
 // --cleanup also deletes it and verifies it is gone. Refuses production without --allow-production.
 
 import { QuivaClient } from '../src/client.js';

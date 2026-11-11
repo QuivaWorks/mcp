@@ -5,8 +5,7 @@ Seven MCP servers (193 tools) plus a hosted remote that composes them, which let
 
 ## The defect class this repo exists to prevent
 
-Read [docs/lessons.md](docs/lessons.md) first — it is short. The pattern behind
-every incident in it is the same:
+The pattern behind every incident this repo guards against is the same:
 
 > Tooling was verified against the spec of the day, and never re-checked against
 > the renderer or the engine that actually consumes the output.
@@ -91,7 +90,4 @@ before. Never hard-code a real person into a committed file.
 
 ## Ground rules carried over
 
-- Do not press **Save schema** on the `risk_programme` record config in the UI. A
-  frontend bug deletes any field named `type`, and saving persists the deletion,
-  taking four form rules with it.
 - Frontend fixes in the platform's web app are **out of scope** here.

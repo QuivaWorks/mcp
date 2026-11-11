@@ -45,7 +45,7 @@ export const GOTCHAS = [
   // Files: the two sinks, and the async index. This is the operational trap.
   'A file write has TWO sinks: the object BUCKET and the file INDEX. `GET /workspaces/files` lists the INDEX, and so does the vertical deployer (accounts-service deployVerticals), so a file present in the bucket but missing from the index is readable by key and invisible to everything that matters. Writing an object DOES self-register — you do not need `/workspaces/files/file-record` (the UI never calls it; that route and `/sync-files` are repair paths). BUT INDEXING IS ASYNCHRONOUS: verified live twice, a config object was absent from the index at t+1s and present at t+16s, and a nested folder took minutes. create_folder also returns NO body at all (`response.Success(request)`). So "written" means "appears in the index" — poll for it; never write and immediately act on it.',
   // Files: deletes are deliberately not exposed.
-  'DELETE of a file or folder is deliberately NOT exposed by this MCP, because it has never been exercised — and `delete_workflow` in the flows MCP silently orphaned every draft it "deleted" while returning success (docs/lessons.md). From the source only, therefore UNVERIFIED: params go in the QUERY STRING not the body (`?space_id=&folder=&subfolder=`), it is RECURSIVE over everything nested, it is a SOFT delete (each object is copied to a trash bucket, then removed, then unindexed), it hard-requires a Bearer JWT (`helper.GetAuthToken` failure is a 401, unlike create which tolerates its absence), and a partial failure returns 400 while KEEPING whatever it already deleted. Delete by hand if you must, then verify by re-listing rather than trusting the response.',
+  'DELETE of a file or folder is deliberately NOT exposed by this MCP, because it has never been exercised — and `delete_workflow` in the flows MCP silently orphaned every draft it "deleted" while returning success. From the source only, therefore UNVERIFIED: params go in the QUERY STRING not the body (`?space_id=&folder=&subfolder=`), it is RECURSIVE over everything nested, it is a SOFT delete (each object is copied to a trash bucket, then removed, then unindexed), it hard-requires a Bearer JWT (`helper.GetAuthToken` failure is a 401, unlike create which tolerates its absence), and a partial failure returns 400 while KEEPING whatever it already deleted. Delete by hand if you must, then verify by re-listing rather than trusting the response.',
   // Contacts can enrol a person.
   'create_contact (POST /workspaces/client) can CREATE A PORTAL SIGN-IN: when the space\'s `base_record.create_login_on_create` is true and the contact has an email, the handler also creates a `client`-role user for that address (handler/contact_login.go). Check the space first, and use an obviously fake example.com address for any test. The response reports `login_created` / `login_skipped`.',
   // Foreign endpoint.
@@ -680,7 +680,7 @@ const REFERENCE = {
     users: [
       'GET    /accounts/users/list             → accounts.get.list-users-by-account (FOREIGN: accounts-service)',
     ],
-    probed: 'Every route above answered 401 unauthenticated on production and staging on 2026-09-27 (mapped). See docs/endpoint-probe-2026-09-27/workspaces.md.',
+    probed: 'Every route above answered 401 unauthenticated on production and staging on 2026-09-27 (mapped).',
     not_exposed: [
       'my-tasks, client-task-list, task watch/mute, task-event-schedules, change-log, tasks-export, bulk delete by folder, reindex/backfill, file trash/restore, and file approvals.',
       'FILE APPROVALS — GET/POST /workspaces/approvals, GET/DELETE /workspaces/approvals/{id}, PATCH .../approve, PATCH .../reject, GET/POST .../events. The list REQUIRES a `file_subject` query param (400 "file subject is required" without it). approve/reject are PUBLIC so an emailed approval link works. Overlaps the file-generator approvals surface quiva-documents-mcp covers.',
@@ -734,7 +734,7 @@ const REFERENCE = {
     deleting: {
       exposed: false,
       why:
-        'Never exercised, and destructive. delete_workflow silently orphaned every draft it "deleted" while returning success (docs/lessons.md), so an unverified destructive tool is not shipped here.',
+        'Never exercised, and destructive. delete_workflow silently orphaned every draft it "deleted" while returning success, so an unverified destructive tool is not shipped here.',
       source_derived_UNVERIFIED: [
         'Params go in the QUERY STRING, not the body: DELETE /workspaces/files/folder?space_id=&folder=&subfolder=',
         'Recursive — it lists everything nested plus the target marker.',

@@ -159,5 +159,5 @@ read_file       read content back — a write response is not proof
 
 Deleting a file or folder is deliberately **not** exposed as a tool: the semantics
 have never been exercised, and the flows MCP's `delete_workflow` silently orphaned
-every draft it "deleted" while returning success (`docs/lessons.md`). The reference
+every draft it "deleted" while returning success. The reference
 topic documents the route and marks it unverified.
