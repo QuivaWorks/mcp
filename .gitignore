@@ -15,3 +15,6 @@ node_modules/
 # Local .env backups hold real credentials.
 .env.bak*
 */.env.bak*
+
+# Local quiva-config skill pulls
+.quiva/

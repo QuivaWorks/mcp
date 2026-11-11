@@ -1,5 +1,7 @@
 # The platform specs
 
+> **Generated. Do not hand-edit.** These files are copied from the engine repository's `openapi/` directory by `scripts/sync-openapi.mjs`; change them there and re-run the script. Hand edits are overwritten.
+
 Six files that the documentation in this repo argues with.
 
 | File | What it is |

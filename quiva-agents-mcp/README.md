@@ -47,21 +47,39 @@ Auth options (checked in this order):
 > produce. A **restricted** key must be scoped to allow `/hub/agent*`, or it
 > 401s at the gateway.
 
-### Register with Claude Code
+## Register with Claude Code and Codex
 
-The repo-level [.mcp.json](../.mcp.json) registers the server. With credentials
-in `quiva-agents-mcp/.env`, (re)start Claude Code in this repo and approve the
-server when prompted. (MCP servers connect at session start — a session that
-predates registration won't see the tools until restart.)
+The repo no longer registers the local servers for you; add the ones you want.
+Clone the repo and run `npm install` at its root, then use an absolute path to
+`quiva-agents-mcp/bin/run.sh`. Put credentials in `quiva-agents-mcp/.env`, or use a profile (below).
 
-Alternatively register it manually:
+**Profile instead of a per-server `.env`.** Set `QUIVA_PROFILE=<name>` and the server
+reads `~/.config/quiva/profiles.json` (or `$QUIVA_CONFIG_DIR/profiles.json`):
+`{"<name>": {"env": "production", "account": "<id>", "api_key": "..."}}`. One profile
+serves all seven servers and the quiva-config skill. Resolution order: the profile's key
+(`QUIVA_API_KEY_<NAME>` overrides it; name upper-cased, non-alphanumerics as `_`),
+then `QUIVA_API_KEY`, `QUIVA_BEARER_TOKEN`, then email and password. A profile's `env`
+picks the API base URL; `QUIVA_API_URL` still wins if set. Profiles without an `api_key`
+are ignored.
+
+Claude Code:
 
 ```bash
 claude mcp add quiva-agents \
-  -e QUIVA_API_URL=https://api.quiva.ai \
-  -e QUIVA_BEARER_TOKEN=$QUIVA_BEARER_TOKEN \
-  -- sh /path/to/evari-olympus/quiva-agents-mcp/bin/run.sh
+  -e QUIVA_PROFILE=<name> \
+  -- sh /path/to/mcp/quiva-agents-mcp/bin/run.sh
 ```
+
+Codex (`~/.codex/config.toml`, or `.codex/config.toml` in a trusted project):
+
+```toml
+[mcp_servers.quiva-agents]
+command = "sh"
+args = ["/path/to/mcp/quiva-agents-mcp/bin/run.sh"]
+env = { QUIVA_PROFILE = "<name>" }
+```
+
+Restart the client after registering: servers connect at session start.
 
 ## Tools
 

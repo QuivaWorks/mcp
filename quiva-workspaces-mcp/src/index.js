@@ -38,6 +38,7 @@ Spaces also hold FILES, and the space "VERTICAL" is a template library whose
 folders are deployed into an account when a vertical is added to it:
 11. get_workspaces_reference("files") / ("verticals") — the dotted-path scheme, how
    a folder is really stored, and the deployment contract.
+11a. file_case_folder — file a case under the base-record entity (identity + case_key); read back via the file index.
 12. list_files -> create_folder -> write_file — build a vertical's folder tree and
    drop configs into it. Both writes confirm against the FILE INDEX, because
    indexing is asynchronous and the index is what deployment reads.
@@ -82,10 +83,10 @@ function wrap(value) {
 
 // Run the local validator, gate the call on errors, and surface warnings
 // alongside a successful result.
-async function withValidation(kind, payload, requireRequired, skip, run, key) {
+async function withValidation(kind, payload, requireRequired, skip, run, key, extra = {}) {
   let validation = null;
   if (!skip) {
-    validation = validate(kind, payload, { requireRequired });
+    validation = validate(kind, payload, { requireRequired, ...extra });
     if (!validation.valid) {
       return { [key]: false, validation };
     }
@@ -104,7 +105,7 @@ function ifMatchHeader(value) {
 }
 
 const commentPayload = jsonValue.describe('The comment object: { body, reply_id? }. See get_workspaces_reference("comments").');
-const taskActionPayload = jsonValue.describe('The task action: { description, id?, done?, resources?[{ resource_id, resource_type, metadata? }] }. `description` is required on EVERY write, even one that only flips `done`. See get_workspaces_reference("task-actions").');
+const taskActionPayload = jsonValue.describe('The task action: { description, id?, done?, resources[{ resource_id, resource_type: record|record_config|file|assistant_session|todo, metadata? }] }. `resources` is REQUIRED when creating (no id): the API 400s a new action without a valid resource; for nothing-to-open use one `todo` resource with metadata.todos. `description` is required on EVERY write, even one that only flips `done`. See get_workspaces_reference("task-actions").');
 
 // The space id is the second segment of every key: spaces.<SPACE_ID>....
 function spaceIdOfKey(key) {
@@ -178,7 +179,7 @@ export function registerTools(server, client, { prefix = '' } = {}) {
       const listed = await client.get('/workspaces/files', { space_id: spaceId });
       const results = listed?.results ?? [];
       entries = results.length;
-      const match = results.find((f) => fileKeyOf(f) === key);
+      const match = results.find((f) => (typeof key === 'function' ? key(fileKeyOf(f)) : fileKeyOf(f) === key));
       if (match) {
         indexed = true;
         const name_indexed = Boolean(match.name);
@@ -230,7 +231,7 @@ export function registerTools(server, client, { prefix = '' } = {}) {
     'validate_payload',
     'Validate a workspaces payload locally (no API call). Encodes engine rules: space id ^\\w+$ + uppercasing, status roles, base/organisation records, custom_tab and hidden_tabs, list edits, task title + space, sub-task parent, pipeline fields, identity, comment body-or-reply_id, reaction map shape, RFC3339 dates, time logs, task actions, contacts, task templates, and read-only-field lints. Run before create_*/update_*.',
     {
-      kind: z.enum(['space', 'task', 'multi_task', 'comment', 'reaction', 'task_action', 'time_log', 'contact', 'task_template', 'folder', 'file']).describe('Which payload shape to validate. "time_log" = an add_time_log body; "contact" = a create_contact body; "folder" = a create_folder body; "file" = { key, content } for write_file.'),
+      kind: z.enum(['space', 'task', 'multi_task', 'comment', 'reaction', 'task_action', 'time_log', 'contact', 'task_template', 'folder', 'file', 'case_folder']).describe('Which payload shape to validate. "case_folder" = a file_case_folder body; "time_log" = an add_time_log body; "contact" = a create_contact body; "folder" = a create_folder body; "file" = { key, content } for write_file.'),
       payload: jsonValue.describe('The payload object to validate'),
       mode: z.enum(['create', 'update']).default('create').describe('create = required fields enforced; update = all optional'),
     },
@@ -268,14 +269,20 @@ export function registerTools(server, client, { prefix = '' } = {}) {
 
   tool(
     'update_space',
-    'Update a space (PATCH). Merges the fields you send over the stored space — send only changed fields, built from scratch. A sent statuses/priorities/tags list REPLACES the stored one; use upsert_statuses / remove_statuses (and the priority/tag pairs) to change entries by id. Also takes base_record, organisation_record, modules, custom_tab, hidden_tabs, view. May return 202 when removing a status or priority triggers a background re-assignment. A space with editing disabled answers 403.',
+    'Update a space (PATCH). Merges the fields you send over the stored space — send only changed fields, built from scratch. A sent statuses/priorities/tags list REPLACES the stored one; use upsert_statuses / remove_statuses (and the priority/tag pairs) to change entries by id. Also takes base_record, organisation_record, modules, custom_tab, hidden_tabs, view (incl. view.front_page.layouts, validated locally: get_workspaces_reference("front-page-layouts")). base_record is REPLACED wholesale, and swapping its config_id folds the old config into legacy_config_ids unless you send legacy_config_ids: [] (get_workspaces_reference("spaces")). May return 202 when removing a status or priority triggers a background re-assignment. A space with editing disabled answers 403.',
     {
       id: z.string().describe('Space id (uppercased form)'),
       space: spacePayload,
       skip_local_validation: z.boolean().default(false),
     },
-    async ({ id, space, skip_local_validation }) =>
-      withValidation('space', space, false, skip_local_validation, () => client.patch(`/workspaces/space/${encodeURIComponent(id)}`, space), 'updated')
+    async ({ id, space, skip_local_validation }) => {
+      // Best effort: a base-record swap is only detectable against the stored space.
+      let current;
+      if (!skip_local_validation && (space?.base_record || space?.organisation_record)) {
+        try { current = await client.get(`/workspaces/space/${encodeURIComponent(id)}`); } catch { current = undefined; }
+      }
+      return withValidation('space', space, false, skip_local_validation, () => client.patch(`/workspaces/space/${encodeURIComponent(id)}`, space), 'updated', { current });
+    }
   );
 
   tool(
@@ -446,7 +453,7 @@ export function registerTools(server, client, { prefix = '' } = {}) {
 
   tool(
     'set_task_action',
-    'Create or update a checklist action on a task (PUT /workspaces/task/{task_id}/action). Omit `id` to create one (server assigns ta_<random>); pass an existing `id` to address that action. `description` is required on EVERY write, even one that only flips `done`. 404 "task not found" if the task does not exist. THE WRITE MOVES THE TASK STATUS BY ROLE: none done -> the space\'s `todo` status (else default_status), some done -> `working`, all done -> `done` (else the first complete, non-outcome status). Chat actions do not count, an id the space lacks is never written, and with no matching role the status is left alone. The response echoes your request — verify with get_task (`task_actions[]`).',
+    'Create or update a checklist action on a task (PUT /workspaces/task/{task_id}/action). Omit `id` to create one (server assigns ta_<random>); a NEW action must include a valid `resources` entry (record, record_config, file, assistant_session, or a `todo` with metadata.todos) or the API returns 400; pass an existing `id` to address that action (edits need no resource). `description` is required on EVERY write, even one that only flips `done`. 404 "task not found" if the task does not exist. THE WRITE MOVES THE TASK STATUS BY ROLE: none done -> the space\'s `todo` status (else default_status), some done -> `working`, all done -> `done` (else the first complete, non-outcome status). Chat actions do not count, an id the space lacks is never written, and with no matching role the status is left alone. The response echoes your request — verify with get_task (`task_actions[]`).',
     {
       task_id: z.string().describe('Task id the action hangs off'),
       action: taskActionPayload,
@@ -781,6 +788,74 @@ export function registerTools(server, client, { prefix = '' } = {}) {
   );
 
   tool(
+    'file_case_folder',
+    'File a case under the space\'s base-record entity (POST /workspaces/case-folder; needs workspaces-service from evari-olympus #1560). Resolves or creates the entity from `identity`, then opens the case folder <entity>.<case> with a type:"case" marker. Idempotent: an existing case marker is never rewritten (created_case: false). 409 case_being_filed means another caller holds the claim and no marker exists yet — retry. The response is not trusted: this reads the file index back for the case marker (and its content) and reports `verified`. The marker is NOT at a path the response names, so it is found by case folder id.',
+    {
+      space_id: z.string().describe('Space whose base_record keys the entity (uppercased form)'),
+      identity: jsonValue.describe('{ <identity field>: <string value> } using the base_record\'s identity_fields. At least one non-blank value.'),
+      case_key: jsonValue.describe('{ field, value }: hashed into the case folder id with case_config_id, so the same key always gives the same folder'),
+      case_config_id: z.string().describe('Prefix of the case folder id (letters, digits, _ -); the config the key is derived against, e.g. "quote_config"'),
+      name: z.string().optional().describe('Written on the entity only when this call creates it'),
+      email: z.string().optional().describe('Written on the entity only when this call creates it'),
+      display: jsonValue.optional().describe('Values for the base_record\'s display_fields, written only on create'),
+      primary_config: z.string().optional().describe('With primary_record_id: the anchor record of the case. Both or neither.'),
+      primary_record_id: z.string().optional(),
+      metadata: jsonValue.optional().describe('Extra marker metadata, string values, max 20 keys. type, case_id, primary_*, created_* and the case_key field are reserved.'),
+      wait_for_index: z.boolean().optional().describe('Poll the file index until the marker appears (default true)'),
+      skip_local_validation: z.boolean().optional(),
+    },
+    async ({ space_id, identity, case_key, case_config_id, name, email, display, primary_config, primary_record_id, metadata, wait_for_index = true, skip_local_validation }) => {
+      const payload = { space_id, identity, case_key, case_config_id };
+      for (const [k, v] of Object.entries({ name, email, display, primary_config, primary_record_id, metadata })) {
+        if (v !== undefined) payload[k] = v;
+      }
+      return withValidation('case_folder', payload, true, skip_local_validation, async () => {
+        let response;
+        try {
+          response = await client.post('/workspaces/case-folder', payload);
+        } catch (err) {
+          const code = err?.body?.body?.code ?? err?.body?.code;
+          if (err?.status === 409 && code === 'case_being_filed') {
+            return { filed: false, retry: true, code, note: 'Another caller is filing this case and no marker exists yet. Nothing was written by this call; retry in a moment.' };
+          }
+          throw err;
+        }
+        const spaceId = String(space_id).toUpperCase();
+        const folder = response?.case_folder;
+        const entity = response?.entity_folder;
+        const result = { response, filed: true, space_id: spaceId, entity_folder: entity, case_folder: folder };
+        if (!folder) return { ...result, verified: false, note: 'The response named no case_folder, so there is nothing to read back. Treat the case as NOT filed.' };
+        if (!wait_for_index) return { ...result, verified: false, note: 'wait_for_index was false — nothing has been confirmed.' };
+
+        const tail = `.${folder}.__meta__.json`;
+        let markerKey;
+        const verification = await waitForIndex(spaceId, (key) => {
+          const hit = typeof key === 'string' && key.startsWith(`spaces.${spaceId}.`) && key.endsWith(tail) && (!entity || key.includes(`.${entity}.`));
+          if (hit) markerKey = key;
+          return hit;
+        });
+        let marker;
+        if (verification.indexed && markerKey) {
+          try { marker = JSON.parse((await client.readObject(WORKSPACES_BUCKET, markerKey)).content); } catch { marker = undefined; }
+        }
+        const typeOk = marker ? marker.type === 'case' && marker.case_id === folder : undefined;
+        return {
+          ...result,
+          marker_key: markerKey,
+          marker,
+          verified: verification.indexed && typeOk !== false,
+          verification,
+          note: !verification.indexed
+            ? `The case marker is NOT yet in the file index after ${verification.waited_ms}ms (indexing is asynchronous and can take minutes). Re-run list_files for the space before relying on it; do not treat the case as filed.`
+            : typeOk === false
+              ? `The marker at ${markerKey} exists but is not a type:"case" marker for ${folder} — something else owns this path.`
+              : indexNote(verification, markerKey, { isMarker: true }),
+        };
+      }, 'filed');
+    }
+  );
+
+  tool(
     'read_file',
     'Read one file\'s CONTENT by its dotted key. Text for .json/.md/.txt/.yaml/.csv/.html/.svg keys, base64 otherwise (a vertical document_templates folder holds .docx). This hits the object store, which is a different URL root from /workspaces/* and is absent from the gateway route registry. Reading back is how you verify a write — never trust the write response alone.',
     {
@@ -840,6 +915,129 @@ export function registerTools(server, client, { prefix = '' } = {}) {
           note: indexNote(verification, key),
         };
       }, 'written')
+  );
+
+  // ---------------------------------------------------------------------------
+  // Task relations (related tickets)
+  // ---------------------------------------------------------------------------
+
+  tool(
+    'list_task_relations',
+    'List a task\'s related-ticket links (GET /workspaces/task/{task_id}/relations). Each row: { related_task_id, type, direction, label, task: { id, title, status, status_name, space_id, ... } }. Links to deleted tasks are omitted.',
+    { task_id: z.string().describe('Task id') },
+    async ({ task_id }) => client.get(`/workspaces/task/${encodeURIComponent(task_id)}/relations`)
+  );
+
+  tool(
+    'link_task',
+    'Link two tasks (PUT /workspaces/task-relation); both sides are written. `type` is from task_id\'s side. Re-linking a pair replaces its type. 403 unless the SOURCE task\'s space has related tickets turned on (the space `related_tasks` setting); at most 50 links per task. Returns the source task\'s relations.',
+    {
+      task_id: z.string().describe('The task the link is written from'),
+      related_task_id: z.string().describe('The task it points at'),
+      type: z.string().describe('Link type as read from task_id: relates_to, blocks, is_blocked_by, duplicates, is_duplicated_by, clones or is_cloned_by'),
+    },
+    async ({ task_id, related_task_id, type }) => client.put('/workspaces/task-relation', { task_id, related_task_id, type })
+  );
+
+  tool(
+    'delete_task_relation',
+    'Remove the link between two tasks, both sides (DELETE /workspaces/task/{task_id}/relation/{related_task_id}). 404 if they are not linked. Returns the remaining relations.',
+    {
+      task_id: z.string().describe('Task id'),
+      related_task_id: z.string().describe('The linked task to detach'),
+    },
+    async ({ task_id, related_task_id }) =>
+      client.delete(`/workspaces/task/${encodeURIComponent(task_id)}/relation/${encodeURIComponent(related_task_id)}`)
+  );
+
+  // ---------------------------------------------------------------------------
+  // Space collections (the caller's spaces sidebar groups; per user)
+  // ---------------------------------------------------------------------------
+
+  const collectionPayload = jsonValue.describe('{ name, description?, icon?: { name, color: "#RRGGBB" }, space_ids?[], catch_all? }. Adding a space takes it out of every other collection.');
+
+  tool(
+    'list_space_collections',
+    'List the calling user\'s space collections (GET /workspaces/space-collections): sidebar groups of spaces, in order. `is_default: true` means nothing is saved and the list is computed. Per user, so it needs a credential that resolves to one.',
+    {},
+    async () => client.get('/workspaces/space-collections')
+  );
+
+  tool(
+    'create_space_collection',
+    'Create a space collection (POST /workspaces/space-collection). `name` is required (max 120 bytes); max 50 collections. Returns the full list plus `collection`.',
+    { collection: collectionPayload },
+    async ({ collection }) => client.post('/workspaces/space-collection', collection)
+  );
+
+  tool(
+    'update_space_collection',
+    'Update a space collection (PATCH /workspaces/space-collection/{id}); only the fields sent change and `space_ids` replaces the whole list.',
+    { id: z.string().describe('Collection id'), collection: collectionPayload },
+    async ({ id, collection }) => client.patch(`/workspaces/space-collection/${encodeURIComponent(id)}`, collection)
+  );
+
+  tool(
+    'delete_space_collection',
+    'Delete a space collection (DELETE /workspaces/space-collection/{id}); its spaces move to the catch-all collection. The spaces themselves are untouched.',
+    { id: z.string().describe('Collection id') },
+    async ({ id }) => client.delete(`/workspaces/space-collection/${encodeURIComponent(id)}`)
+  );
+
+  // ---------------------------------------------------------------------------
+  // Folder labels
+  // ---------------------------------------------------------------------------
+
+  tool(
+    'rename_folder',
+    'Rename a folder by LABEL (PATCH /workspaces/folder-name). The key never changes, so nothing that points at the folder breaks: list_files keys, file paths and create_folder parents keep using the key path. `folder` is the space-relative dot path of keys (e.g. "ProductLines.Healthcare"). An empty `display_name` clears the label. 400 invalid name, 403 space root or a Microsoft 365 managed folder, 404 missing folder, 409 a sibling already uses the label.',
+    {
+      space_id: z.string().describe('Space id'),
+      folder: z.string().describe('Space-relative dot path of the folder KEYS'),
+      display_name: z.string().describe('New label (max 120 characters); "" clears it'),
+    },
+    async ({ space_id, folder, display_name }) => client.patch('/workspaces/folder-name', { space_id, folder, display_name })
+  );
+
+  tool(
+    'resolve_folder',
+    'Turn a folder path as people see it (labels, "/" or "." between segments) into the key path the file tools need (GET /workspaces/resolve-folder). Labels win over raw keys, case-insensitively, so after a rename use this rather than guessing the key. Creates nothing. Returns { folder, resolved, missing_from?, key_path, labels[] }.',
+    {
+      space_id: z.string().describe('Space id'),
+      path: z.string().describe('Display path, e.g. "Clients/Acme/Contracts"'),
+    },
+    async ({ space_id, path }) => client.get('/workspaces/resolve-folder', { space_id, path })
+  );
+
+  // ---------------------------------------------------------------------------
+  // Entity comments (comments on a record/entity rather than a task)
+  // ---------------------------------------------------------------------------
+
+  const entityPath = (type, id) => `/workspaces/entity/${encodeURIComponent(type)}/${encodeURIComponent(id)}`;
+
+  tool(
+    'list_entity_comments',
+    'List comments on an entity (GET /workspaces/entity/{entity_type}/{entity_id}/comments). Private comments by default; pass visibility "shared" with the counterparty account for a thread shared across a distribution link. Optional target_type/target_id narrow to one part of the entity.',
+    {
+      entity_type: z.string().describe('Entity type, e.g. "record"'),
+      entity_id: z.string().describe('Entity id'),
+      visibility: z.enum(['private', 'shared']).optional(),
+      counterparty_account_id: z.string().optional().describe('Required to find shared comments'),
+      target_type: z.string().optional(),
+      target_id: z.string().optional(),
+    },
+    async ({ entity_type, entity_id, ...query }) => client.get(`${entityPath(entity_type, entity_id)}/comments`, query)
+  );
+
+  tool(
+    'create_entity_comment',
+    'Add a comment to an entity (POST /workspaces/entity/{entity_type}/{entity_id}/comment). Body { body, reply_id?, visibility?: private|shared, counterparty_account_id?, target?: { type, id }, mentions?[], attachments?[] }. A shared comment needs counterparty_account_id.',
+    {
+      entity_type: z.string().describe('Entity type, e.g. "record"'),
+      entity_id: z.string().describe('Entity id'),
+      comment: jsonValue.describe('{ body, reply_id?, visibility?, counterparty_account_id?, target?, mentions?[], counterparty_mentions?[], attachments?[] }'),
+    },
+    async ({ entity_type, entity_id, comment }) => client.post(`${entityPath(entity_type, entity_id)}/comment`, comment)
   );
 
   // ---------------------------------------------------------------------------

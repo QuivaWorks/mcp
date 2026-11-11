@@ -41,22 +41,39 @@ Auth options (checked in this order):
 
 `QUIVA_API_URL` sets the API base URL (default `https://api.quiva.ai`).
 
-### Register with Claude Code
+## Register with Claude Code and Codex
 
-The repo-level [.mcp.json](../.mcp.json) already registers the server. With
-credentials in `quiva-records-mcp/.env`, just (re)start Claude Code in this
-repo and approve the server when prompted. (MCP servers connect at session
-start — a session that predates registration won't see the tools until
-restart.)
+The repo no longer registers the local servers for you; add the ones you want.
+Clone the repo and run `npm install` at its root, then use an absolute path to
+`quiva-records-mcp/bin/run.sh`. Put credentials in `quiva-records-mcp/.env`, or use a profile (below).
 
-Alternatively register it manually:
+**Profile instead of a per-server `.env`.** Set `QUIVA_PROFILE=<name>` and the server
+reads `~/.config/quiva/profiles.json` (or `$QUIVA_CONFIG_DIR/profiles.json`):
+`{"<name>": {"env": "production", "account": "<id>", "api_key": "..."}}`. One profile
+serves all seven servers and the quiva-config skill. Resolution order: the profile's key
+(`QUIVA_API_KEY_<NAME>` overrides it; name upper-cased, non-alphanumerics as `_`),
+then `QUIVA_API_KEY`, `QUIVA_BEARER_TOKEN`, then email and password. A profile's `env`
+picks the API base URL; `QUIVA_API_URL` still wins if set. Profiles without an `api_key`
+are ignored.
+
+Claude Code:
 
 ```bash
 claude mcp add quiva-records \
-  -e QUIVA_API_URL=https://api.quiva.ai \
-  -e QUIVA_API_KEY=$QUIVA_API_KEY \
-  -- sh /path/to/evari-olympus/quiva-records-mcp/bin/run.sh
+  -e QUIVA_PROFILE=<name> \
+  -- sh /path/to/mcp/quiva-records-mcp/bin/run.sh
 ```
+
+Codex (`~/.codex/config.toml`, or `.codex/config.toml` in a trusted project):
+
+```toml
+[mcp_servers.quiva-records]
+command = "sh"
+args = ["/path/to/mcp/quiva-records-mcp/bin/run.sh"]
+env = { QUIVA_PROFILE = "<name>" }
+```
+
+Restart the client after registering: servers connect at session start.
 
 ## Tools
 
@@ -65,8 +82,10 @@ claude mcp add quiva-records \
 - `get_records_reference` — schema, views, form-builder, form-rules, table-views, flow, index-fields, config-source, record, bulk-operations, endpoints and more
 - `validate_record_config` — id/name/schema/views lint (incl. the `field` vs `ref` gotcha), table-view filters, the `views.flow` wizard, `index_fields`, `source` and the `unset_*` flags
 
-**Record configs**: `list_record_configs` (optional `ids` batch), `get_record_config`,
+**Record configs**: `list_record_configs` (pages summaries with `GET /records/config?summary=1`; `summary: false` for full configs, `ids` to batch), `get_record_config`,
 `create_record_config`, `update_record_config`, `delete_record_config` (purges every record; requires `confirm: true`)
+
+**Config versions**: `list_record_config_versions`, `get_record_config_version`, `publish_record_config`
 
 **Records**: `list_records` (one config; fans out over spaces when unscoped),
 `query_records` (by folder/space, with config_id, parent_folder, filter, sort_by,

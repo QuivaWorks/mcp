@@ -1,6 +1,7 @@
 // HTTP client for the Quiva documents (file-generator) API.
 //
 // Auth precedence (first one configured wins):
+//   0. QUIVA_PROFILE=<name> (see profile.js), then
 //   1. QUIVA_API_KEY      -> X-Api-Key header
 //   2. QUIVA_BEARER_TOKEN -> Authorization: Bearer
 //   3. QUIVA_EMAIL + QUIVA_PASSWORD (+ optional QUIVA_ACCOUNT)
@@ -18,6 +19,8 @@
 //     sees the real envelope; see get_documents_reference("gotchas").
 //   * Template/document UPDATE is PATCH (merge-style upsert over the event
 //     stream), NOT PUT — see patch().
+
+import { credentialsFromEnv } from './profile.js';
 
 const DEFAULT_API_URL = 'https://api.quiva.ai';
 
@@ -38,14 +41,7 @@ export class QuivaClient {
   // Stdio entrypoints build a client from the process environment; anything
   // composing servers in-process should pass explicit options instead.
   static fromEnv(env = process.env) {
-    return new QuivaClient({
-      apiUrl: env.QUIVA_API_URL,
-      apiKey: env.QUIVA_API_KEY,
-      bearerToken: env.QUIVA_BEARER_TOKEN,
-      email: env.QUIVA_EMAIL,
-      password: env.QUIVA_PASSWORD,
-      account: env.QUIVA_ACCOUNT,
-    });
+    return new QuivaClient(credentialsFromEnv(env));
   }
 
   hasCredentials() {

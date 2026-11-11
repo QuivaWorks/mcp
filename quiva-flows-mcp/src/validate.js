@@ -482,6 +482,13 @@ function checkEmailNode(data, payload, isObj, label, errors) {
   } else if (!hasValue(payload.to)) {
     errors.push(`node ${label}: email payload requires "to"`);
   }
+  // A template supplies subject and body; the endpoint refuses one mixed with either.
+  if (hasValue(payload.template_key)) {
+    if (hasValue(payload.subject) || hasValue(payload.html) || hasValue(payload.text)) {
+      errors.push(`node ${label}: email payload names a template_key, so subject, html and text must be left empty — the template provides them`);
+    }
+    return;
+  }
   if (!hasValue(payload.subject)) errors.push(`node ${label}: email payload requires "subject"`);
   if (!hasValue(payload.html) && !hasValue(payload.text)) {
     errors.push(`node ${label}: email payload has no body — give "html", "text" or both`);
