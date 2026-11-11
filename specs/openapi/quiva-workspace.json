@@ -623,6 +623,50 @@
           "tags": [
             "Spaces"
           ]
+        },
+        "delete": {
+          "summary": "Delete every task in a folder",
+          "description": "Deletes every task in one space with one folder. Both space_id and folder are required; an empty folder is refused rather than meaning every folder.",
+          "operationId": "deleteTasksByFolder",
+          "tags": [
+            "Tasks"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "space_id",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "folder",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          },
+          "x-path-derived": true
         }
       },
       "/workspaces/task/{id}": {
@@ -1568,7 +1612,8 @@
             {
               "oauth2": []
             }
-          ]
+          ],
+          "operationId": "upsertExternalTask"
         }
       },
       "/workspaces/space/{space_id}/changes": {
@@ -1692,7 +1737,8 @@
             {
               "oauth2": []
             }
-          ]
+          ],
+          "operationId": "listSpaceChanges"
         }
       },
       "/workspaces/space/{space_id}/copy-structure": {
@@ -1813,7 +1859,8 @@
             {
               "apiKeyAuth": []
             }
-          ]
+          ],
+          "operationId": "copySpaceStructure"
         }
       },
       "/workspaces/space/{space_id}/reset": {
@@ -1914,7 +1961,8 @@
             {
               "apiKeyAuth": []
             }
-          ]
+          ],
+          "operationId": "resetSpace"
         }
       },
       "/workspaces/task/{task_id}/time-log": {
@@ -3640,7 +3688,6 @@
           "tags": [
             "Folders"
           ],
-          "x-staging-only": true,
           "requestBody": {
             "required": true,
             "content": {
@@ -3772,6 +3819,1255 @@
               "apiKeyAuth": []
             }
           ]
+        }
+      },
+      "/workspaces/task-from-template": {
+        "post": {
+          "summary": "Create a task from a template",
+          "description": "Creates a task from a stored task template.",
+          "operationId": "createTaskFromTemplate",
+          "tags": [
+            "Tasks"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          },
+          "x-path-derived": true
+        }
+      },
+      "/workspaces/task/{task_id}/watch": {
+        "post": {
+          "summary": "Watch a task",
+          "description": "Adds the caller to the task's watchers.",
+          "operationId": "watchTask",
+          "tags": [
+            "Tasks"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "task_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        },
+        "delete": {
+          "summary": "Stop watching a task",
+          "description": "Removes the caller from the task's watchers.",
+          "operationId": "unwatchTask",
+          "tags": [
+            "Tasks"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "task_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/workspaces/task/{task_id}/mute": {
+        "post": {
+          "summary": "Mute a task",
+          "description": "Silences notifications about the task for the caller.",
+          "operationId": "muteTask",
+          "tags": [
+            "Tasks"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "task_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        },
+        "delete": {
+          "summary": "Unmute a task",
+          "description": "Restores notifications about the task for the caller.",
+          "operationId": "unmuteTask",
+          "tags": [
+            "Tasks"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "task_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/workspaces/tasks/my-tasks": {
+        "get": {
+          "summary": "List my tasks",
+          "description": "Every non-archived task across all spaces assigned to the caller. dated=true (default) keeps tasks with a due date or scheduled time, dated=false only those with neither, dated=any everything.",
+          "operationId": "listMyTasks",
+          "tags": [
+            "Tasks"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "dated",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "limit",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "cursor",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/workspaces/client/tasks": {
+        "get": {
+          "summary": "List a client's tasks",
+          "description": "Lists the tasks visible to a client user.",
+          "operationId": "listClientTasks",
+          "tags": [
+            "Tasks"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "space_id",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/workspaces/task/{task_id}/change-log": {
+        "get": {
+          "summary": "Get a task's change log",
+          "description": "Reads the recorded changes to one task.",
+          "operationId": "getTaskChangeLog",
+          "tags": [
+            "Tasks"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "task_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/workspaces/space/{space_id}/export-tasks": {
+        "get": {
+          "summary": "Export a space's tasks",
+          "description": "Exports the space's tasks matching the list filters.",
+          "operationId": "exportTasks",
+          "tags": [
+            "Tasks"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "space_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "format",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/workspaces/task/{task_id}/scheduled-events": {
+        "get": {
+          "summary": "List a task's scheduled events",
+          "description": "Lists the scheduled events on one task.",
+          "operationId": "listTaskScheduledEvents",
+          "tags": [
+            "Task Schedules"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "task_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "space_id",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        },
+        "post": {
+          "summary": "Schedule a task event",
+          "description": "Arms a one-off or recurring event on a task. A recurring schedule armed by a root-substituted request must carry trigger_end.",
+          "operationId": "scheduleTaskEvent",
+          "tags": [
+            "Task Schedules"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "task_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/workspaces/task/scheduled-events": {
+        "get": {
+          "summary": "List scheduled events in a space",
+          "description": "Lists the scheduled task events in a space.",
+          "operationId": "listScheduledTaskEvents",
+          "tags": [
+            "Task Schedules"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "space_id",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/workspaces/task/{task_id}/scheduled-events/{id}": {
+        "put": {
+          "summary": "Update a scheduled task event",
+          "description": "Replaces a scheduled event's schedule.",
+          "operationId": "updateScheduledTaskEvent",
+          "tags": [
+            "Task Schedules"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "task_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        },
+        "delete": {
+          "summary": "Cancel a scheduled task event",
+          "description": "Removes a scheduled event from the task.",
+          "operationId": "unscheduleTaskEvent",
+          "tags": [
+            "Task Schedules"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "task_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/workspaces/task/{task_id}/scheduled-events/{id}/read": {
+        "post": {
+          "summary": "Mark a task event notification read",
+          "description": "Marks the notification a scheduled event raised as read.",
+          "operationId": "markTaskEventNotificationRead",
+          "tags": [
+            "Task Schedules"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "task_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "space_id",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          },
+          "x-path-derived": true
+        }
+      },
+      "/workspaces/files": {
+        "get": {
+          "summary": "List a space's files",
+          "description": "Lists files and folder markers in a space, one level at a time.",
+          "operationId": "listFiles",
+          "tags": [
+            "Files"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "space_id",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "subfolder",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "exact",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "only_folder",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "search",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "cursor",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        },
+        "delete": {
+          "summary": "Delete a file",
+          "description": "Moves one file to the workspaces trash. path is the space-relative object path.",
+          "operationId": "deleteFile",
+          "tags": [
+            "Files"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "space_id",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "path",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/workspaces/files/trash": {
+        "get": {
+          "summary": "List trashed files",
+          "description": "Lists files in the workspaces trash.",
+          "operationId": "listTrashFiles",
+          "tags": [
+            "Files"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "space_id",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/workspaces/files/restore": {
+        "post": {
+          "summary": "Restore from trash",
+          "description": "Restores trashed entries under a prefix.",
+          "operationId": "restoreFromTrash",
+          "tags": [
+            "Files"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "prefix",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/workspaces/file/{name}/metadata": {
+        "patch": {
+          "summary": "Update a file's metadata",
+          "description": "Updates the metadata of one file.",
+          "operationId": "updateFileMetadata",
+          "tags": [
+            "Files"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "name",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/workspaces/files/versions": {
+        "get": {
+          "summary": "List a file's versions",
+          "description": "Lists saved versions of a file, newest first.",
+          "operationId": "listFileVersions",
+          "tags": [
+            "Files"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "space_id",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "path",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "limit",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "cursor",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/workspaces/files/version": {
+        "get": {
+          "summary": "Get one file version",
+          "description": "Reads one saved version of a file.",
+          "operationId": "getFileVersion",
+          "tags": [
+            "Files"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "space_id",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "path",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "sequence",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/workspaces/files/version/restore": {
+        "post": {
+          "summary": "Restore a file version",
+          "description": "Restores a saved version as the file's current content.",
+          "operationId": "restoreFileVersion",
+          "tags": [
+            "Files"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/workspaces/save-session-file": {
+        "post": {
+          "summary": "Save a chat-session file to a space",
+          "description": "Copies a work or outputs file from an assistant session into a space folder.",
+          "operationId": "saveSessionFile",
+          "tags": [
+            "Files"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "session_id": {
+                      "type": "string"
+                    },
+                    "key": {
+                      "type": "string"
+                    },
+                    "space_id": {
+                      "type": "string"
+                    },
+                    "path": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "session_id",
+                    "key",
+                    "space_id",
+                    "path"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/workspaces/files/folder": {
+        "post": {
+          "summary": "Create a folder",
+          "description": "Creates a folder in a space.",
+          "operationId": "createFolder",
+          "tags": [
+            "Folders"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        },
+        "delete": {
+          "summary": "Delete a folder",
+          "description": "Moves a folder and its contents to the trash.",
+          "operationId": "deleteFolder",
+          "tags": [
+            "Folders"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "space_id",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "folder",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "subfolder",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/workspaces/distribution-binding": {
+        "post": {
+          "summary": "Bind a distribution",
+          "description": "Writes one distribution binding by distribution_id. Role-gated.",
+          "operationId": "upsertDistributionBinding",
+          "tags": [
+            "Distribution"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        },
+        "delete": {
+          "summary": "Remove a distribution binding",
+          "description": "Removes one binding. Absent is not an error.",
+          "operationId": "deleteDistributionBinding",
+          "tags": [
+            "Distribution"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "distribution_id",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
         }
       }
     },
@@ -6146,6 +7442,23 @@
           }
         }
       }
-    }
+    },
+    "tags": [
+      {
+        "name": "Tasks"
+      },
+      {
+        "name": "Files"
+      },
+      {
+        "name": "Folders"
+      },
+      {
+        "name": "Task Schedules"
+      },
+      {
+        "name": "Distribution"
+      }
+    ]
   }
 }

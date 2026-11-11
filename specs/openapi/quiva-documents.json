@@ -113,6 +113,12 @@
       {
         "name": "Approvals",
         "description": "Checkbox approval of a workspace file, recorded as e-signature evidence."
+      },
+      {
+        "name": "Generation"
+      },
+      {
+        "name": "Template Source"
       }
     ],
     "paths": {
@@ -1665,6 +1671,983 @@
             }
           },
           "x-resource-type": "service"
+        }
+      },
+      "/file-generator/pptx": {
+        "post": {
+          "summary": "Generate a PPTX presentation",
+          "description": "Invoke an AI agent to generate a PPTX presentation from a prompt and upload it to an object store bucket. Required fields: bucket, prompt. Optional: path, title.",
+          "operationId": "generatePptx",
+          "tags": [
+            "Generation"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "bucket": {},
+                    "prompt": {},
+                    "path": {},
+                    "title": {}
+                  },
+                  "required": [
+                    "bucket",
+                    "prompt"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            }
+          }
+        }
+      },
+      "/file-generator/html-pdf": {
+        "post": {
+          "summary": "Convert HTML to PDF",
+          "description": "Convert raw HTML to PDF via LibreOffice and upload it to an object store bucket. Required fields: bucket, html. Optional: path, title.",
+          "operationId": "htmlToPdf",
+          "tags": [
+            "Generation"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "bucket": {},
+                    "html": {},
+                    "path": {},
+                    "title": {}
+                  },
+                  "required": [
+                    "bucket",
+                    "html"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            }
+          }
+        }
+      },
+      "/file-generator/docx-generator": {
+        "post": {
+          "summary": "Generate a DOCX document",
+          "description": "Invoke an AI agent to generate a DOCX document from a prompt and upload it to an object store bucket. Required fields: bucket, prompt. Optional: path, title.",
+          "operationId": "generateDocx",
+          "tags": [
+            "Generation"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "bucket": {},
+                    "prompt": {},
+                    "path": {},
+                    "title": {}
+                  },
+                  "required": [
+                    "bucket",
+                    "prompt"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            }
+          }
+        }
+      },
+      "/file-generator/docx-editor": {
+        "post": {
+          "summary": "Edit a DOCX document",
+          "description": "Load a DOCX from an object store URL, apply AI-driven edits from a prompt, and upload the result to an object store bucket. Required fields: attachment (obj:// URL), prompt, bucket. Optional: path, title.",
+          "operationId": "editDocx",
+          "tags": [
+            "Generation"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "attachment": {},
+                    "prompt": {},
+                    "bucket": {},
+                    "path": {},
+                    "title": {}
+                  },
+                  "required": [
+                    "attachment",
+                    "prompt",
+                    "bucket"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            }
+          }
+        }
+      },
+      "/file-generator/pdf-python": {
+        "post": {
+          "summary": "Generate a PDF with Python",
+          "description": "Invoke an AI agent to generate a PDF document from a prompt using Python and pypdf, then upload it to an object store bucket. Required fields: bucket, prompt. Optional: path, title.",
+          "operationId": "generatePdf",
+          "tags": [
+            "Generation"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "bucket": {},
+                    "prompt": {},
+                    "path": {},
+                    "title": {}
+                  },
+                  "required": [
+                    "bucket",
+                    "prompt"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            }
+          }
+        }
+      },
+      "/file-generator/xlsx": {
+        "post": {
+          "summary": "Create or edit an XLSX spreadsheet",
+          "description": "Invoke an AI agent to create or edit an Excel XLSX spreadsheet from a prompt and upload it to an object store bucket. Required fields: bucket (or attachment), prompt. Optional: attachment (obj:// URL to edit), path, title.",
+          "operationId": "generateXlsx",
+          "tags": [
+            "Generation"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "bucket": {},
+                    "prompt": {},
+                    "attachment": {},
+                    "path": {},
+                    "title": {}
+                  },
+                  "required": [
+                    "bucket",
+                    "prompt"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            }
+          }
+        }
+      },
+      "/file-generator/xlsx-read": {
+        "post": {
+          "summary": "Read an XLSX spreadsheet",
+          "description": "Read an existing XLSX spreadsheet's facets - values, formulas, named ranges, fills, comments, validation - without returning the file. Required fields: bucket, key. Optional: sheets (names), range (e.g. \"A1:F40\"), include (facet names; default values, formulas, fills).",
+          "operationId": "readXlsx",
+          "tags": [
+            "Generation"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "bucket": {},
+                    "key": {}
+                  },
+                  "required": [
+                    "bucket",
+                    "key"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            }
+          }
+        }
+      },
+      "/file-generator/document-convert": {
+        "post": {
+          "summary": "Convert a document between formats",
+          "description": "Convert a document between formats via LibreOffice: pdf to docx, doc/rtf/odt to docx, xls/csv to xlsx, docx to pdf. Required fields: bucket, key, source_ext, to. Source up to 16 MB; the converted output is capped at 8 MB and returned inline (base64), plus a report.",
+          "operationId": "convertDocument",
+          "tags": [
+            "Generation"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "bucket": {},
+                    "key": {},
+                    "source_ext": {},
+                    "to": {}
+                  },
+                  "required": [
+                    "bucket",
+                    "key",
+                    "source_ext",
+                    "to"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            }
+          }
+        }
+      },
+      "/file-generator/docx-render-check": {
+        "post": {
+          "summary": "Render-check a DOCX template source",
+          "description": "Render a .docx template's editable source (scratch copy when scope + run match, else working copy, else draft, else published) with an empty, a given and a stress payload; returns page and font facts and the PDFs' obj:// URIs. Required: key. Optional: payload, record {config_id, record_id}, stress, scope, run.",
+          "operationId": "renderCheckDocx",
+          "tags": [
+            "Template Source"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {},
+                    "payload": {},
+                    "record": {},
+                    "stress": {},
+                    "scope": {},
+                    "run": {}
+                  },
+                  "required": [
+                    "key"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            }
+          }
+        }
+      },
+      "/file-generator/docx-lint": {
+        "post": {
+          "summary": "Lint a DOCX template source",
+          "description": "Diagnose a .docx template's source (working copy if one exists): layout, fonts, content controls and tags. Required: key. Optional: page_size (\"letter\" | \"a4\"), codes, offset, limit (default 20, max 100), controls (true lists every content control and form field with an id, plus controls_rev), controls_offset, controls_limit (default and max 500). Writes nothing. Optional: scope (slot name) + run (invocation id) to read and write that slot's scratch copy instead.",
+          "operationId": "lintDocxTemplate",
+          "tags": [
+            "Template Source"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {},
+                    "page_size": {},
+                    "codes": {},
+                    "offset": {},
+                    "limit": {},
+                    "controls": {},
+                    "controls_offset": {},
+                    "controls_limit": {}
+                  },
+                  "required": [
+                    "key"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            }
+          }
+        }
+      },
+      "/file-generator/docx-tag": {
+        "post": {
+          "summary": "Tag a DOCX template source",
+          "description": "Put merge tags into a .docx template's source by visible text (find) or control id (control, with controls_rev), optionally with lint fixes in the same pass. Required: key, edits, dry_run. Optional: controls_rev, fixes (ids or code:* selectors), allowed_tags, allow_unlisted, page_size. Writes the working copy, never the published source. Optional: scope (slot name) + run (invocation id) to read and write that slot's scratch copy instead.",
+          "operationId": "tagDocxTemplate",
+          "tags": [
+            "Template Source"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {},
+                    "edits": {},
+                    "dry_run": {},
+                    "controls_rev": {},
+                    "fixes": {},
+                    "allowed_tags": {},
+                    "allow_unlisted": {},
+                    "page_size": {}
+                  },
+                  "required": [
+                    "key",
+                    "edits",
+                    "dry_run"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            }
+          }
+        }
+      },
+      "/file-generator/docx-repair": {
+        "post": {
+          "summary": "Repair a DOCX template source",
+          "description": "Apply lint fixes to a .docx template's source. Required: key, fixes (\"safe\", or fix ids and code:* selectors), dry_run. Optional: page_size. Writes the working copy, never the published source. Optional: scope (slot name) + run (invocation id) to read and write that slot's scratch copy instead.",
+          "operationId": "repairDocxTemplate",
+          "tags": [
+            "Template Source"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {},
+                    "fixes": {},
+                    "dry_run": {},
+                    "page_size": {}
+                  },
+                  "required": [
+                    "key",
+                    "fixes",
+                    "dry_run"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            }
+          }
+        }
+      },
+      "/file-generator/docx-source-versions": {
+        "post": {
+          "summary": "List DOCX template source versions",
+          "description": "List saved versions of a .docx template's source, newest first. Required: key. Optional: scope (slot name) + run (invocation id) to read and write that slot's scratch copy instead.",
+          "operationId": "listDocxSourceVersions",
+          "tags": [
+            "Template Source"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {},
+                    "scope": {}
+                  },
+                  "required": [
+                    "key"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            }
+          }
+        }
+      },
+      "/file-generator/docx-source-restore": {
+        "post": {
+          "summary": "Restore a DOCX template source version",
+          "description": "Copy a saved version of a .docx template's source into its working copy. Required: key, version. Optional: scope (slot name) + run (invocation id) to read and write that slot's scratch copy instead.",
+          "operationId": "restoreDocxSourceVersion",
+          "tags": [
+            "Template Source"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {},
+                    "version": {},
+                    "scope": {}
+                  },
+                  "required": [
+                    "key",
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            }
+          }
+        }
+      },
+      "/file-generator/docx-discard-edits": {
+        "post": {
+          "summary": "Discard DOCX template edits",
+          "description": "Delete a .docx template's working copy and every scratch copy; scoped, only that slot's scratch copy. Required: key. Optional: scope (slot name) + run (invocation id) to read and write that slot's scratch copy instead.",
+          "operationId": "discardDocxEdits",
+          "tags": [
+            "Template Source"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {},
+                    "scope": {}
+                  },
+                  "required": [
+                    "key"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            }
+          }
+        }
+      },
+      "/file-generator/docx-edit-text": {
+        "post": {
+          "summary": "Edit DOCX template wording",
+          "description": "Change a .docx template's wording: delete paragraphs, rows or blocks, replace text within a paragraph, insert a paragraph. Required: key, ops, dry_run; approval_digest (from the dry run's proposal, once approved) to write. Optional: controls_rev, page_size. Never part of a repair sweep. Optional: scope (slot name) + run (invocation id) to read and write that slot's scratch copy instead.",
+          "operationId": "editDocxTemplateText",
+          "tags": [
+            "Template Source"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {},
+                    "ops": {},
+                    "controls_rev": {},
+                    "page_size": {}
+                  },
+                  "required": [
+                    "key",
+                    "ops"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            }
+          }
+        }
+      },
+      "/file-generator/docx-working-locate": {
+        "post": {
+          "summary": "Locate a DOCX template working copy",
+          "description": "Where the editable source a scoped read would use is stored: bucket, name, sha256 digest, and the prefix for a sandbox candidate. Required: key. Writes nothing. Optional: scope (slot name) + run (invocation id) to read and write that slot's scratch copy instead.",
+          "operationId": "locateDocxWorkingCopy",
+          "tags": [
+            "Template Source"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {},
+                    "scope": {}
+                  },
+                  "required": [
+                    "key"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            }
+          }
+        }
+      },
+      "/file-generator/docx-adopt": {
+        "post": {
+          "summary": "Adopt a sandbox candidate as the working copy",
+          "description": "Check a sandbox script's output (candidate_key) and, when approved, make it the working copy. Required: key, candidate_key, expect_digest, script, reason, dry_run; approval_digest to write. Optional: page_size. Scripts may not change wording, visibility, field codes, numbering or which parts exist. The candidate is deleted; the script is kept under _scripts/. Optional: scope (slot name) + run (invocation id) to read and write that slot's scratch copy instead.",
+          "operationId": "adoptDocxCandidate",
+          "tags": [
+            "Template Source"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {},
+                    "candidate_key": {},
+                    "expect_digest": {},
+                    "script": {},
+                    "reason": {},
+                    "page_size": {}
+                  },
+                  "required": [
+                    "key",
+                    "candidate_key",
+                    "expect_digest",
+                    "script",
+                    "reason"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            }
+          }
+        }
+      },
+      "/file-generator/docx-promote-scratch": {
+        "post": {
+          "summary": "Promote a scratch copy to the working copy",
+          "description": "Copy a slot's scratch copy of a .docx template's source to its working copy, then delete every scratch copy. Required: key, scope, run.",
+          "operationId": "promoteDocxScratch",
+          "tags": [
+            "Template Source"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {},
+                    "scope": {},
+                    "run": {}
+                  },
+                  "required": [
+                    "key",
+                    "scope",
+                    "run"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "$ref": "#/components/responses/BadRequest"
+            },
+            "401": {
+              "$ref": "#/components/responses/Unauthorized"
+            }
+          }
         }
       }
     },

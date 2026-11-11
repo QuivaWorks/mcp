@@ -4108,6 +4108,1041 @@
           },
           "x-resource-type": "service"
         }
+      },
+      "/hub/workflows/{collection_topic}/{flow_topic}/node/{node_topic}": {
+        "get": {
+          "summary": "Get a node of a workflow",
+          "description": "Reads one node of a workflow, as the editor does.",
+          "operationId": "getWorkflowNode",
+          "tags": [
+            "Workflows"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "collection_topic",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "flow_topic",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "node_topic",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "draft",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/hub/workflows/{collection_topic}/{flow_topic}/integrity": {
+        "get": {
+          "summary": "Check a workflow's node and edge lists",
+          "description": "Read-only report of node or edge id entries that cannot be addressed. Repair is an ordinary update.",
+          "operationId": "getWorkflowIntegrity",
+          "tags": [
+            "Workflows"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "parameters": [
+            {
+              "name": "collection_topic",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "flow_topic",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "draft",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/hub/workflows/validate": {
+        "post": {
+          "summary": "Validate a workflow config",
+          "description": "Reports what is wrong with a flow config without storing anything. The body is either a workflow with a config key or a bare config.",
+          "operationId": "validateWorkflow",
+          "tags": [
+            "Workflows"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/hub/workflows/run-test": {
+        "post": {
+          "summary": "Run a workflow as a test",
+          "description": "Runs a workflow in test mode and answers with the run detail.",
+          "operationId": "runWorkflowTest",
+          "tags": [
+            "Workflows"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/hub/nodes/{collection_topic}/{node_topic}/projection": {
+        "get": {
+          "summary": "Get a node projection",
+          "description": "Retrieves a workflow node with its payload data for client projection requests.",
+          "operationId": "getNodeProjection",
+          "tags": [
+            "Nodes"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "parameters": [
+            {
+              "name": "collection_topic",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "node_topic",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/hub/run-stats": {
+        "get": {
+          "summary": "Get run statistics",
+          "description": "Reads aggregate run statistics for the account's workflows.",
+          "operationId": "getRunStats",
+          "tags": [
+            "Workflows"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/hub/schedule": {
+        "post": {
+          "summary": "Schedule a flow",
+          "description": "Arms a schedule that runs a published flow.",
+          "operationId": "scheduleFlow",
+          "tags": [
+            "Schedules"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/hub/unschedule/{topic}": {
+        "delete": {
+          "summary": "Unschedule a flow",
+          "description": "Removes a flow's schedule.",
+          "operationId": "unscheduleFlow",
+          "tags": [
+            "Schedules"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "topic",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/hub/scheduled": {
+        "get": {
+          "summary": "List scheduled flows",
+          "description": "Lists the flows that have a schedule.",
+          "operationId": "listScheduledFlows",
+          "tags": [
+            "Schedules"
+          ],
+          "x-resource-type": "service",
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/hub/eval-snippet": {
+        "get": {
+          "summary": "Get an eval snippet",
+          "description": "Reads a stored eval snippet by id.",
+          "operationId": "getEvalSnippet",
+          "tags": [
+            "Eval snippets"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "parameters": [
+            {
+              "name": "id",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        },
+        "patch": {
+          "summary": "Store an eval snippet",
+          "description": "Stores a named snippet on the account's config stream. The id has no dots or colons.",
+          "operationId": "putEvalSnippet",
+          "tags": [
+            "Eval snippets"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        },
+        "delete": {
+          "summary": "Delete an eval snippet",
+          "description": "Removes a stored snippet.",
+          "operationId": "deleteEvalSnippet",
+          "tags": [
+            "Eval snippets"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "parameters": [
+            {
+              "name": "id",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/hub/eval": {
+        "post": {
+          "summary": "Run a stored eval snippet",
+          "description": "Runs a snippet stored on the account by id, with a bounded deadline. Never runs code taken from the request. The result is flat at the top of the body.",
+          "operationId": "runEvalSnippet",
+          "tags": [
+            "Eval snippets"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "input": {},
+                    "deadline_ms": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/hub/integrations/oauth-variables": {
+        "get": {
+          "summary": "Get OAuth variables",
+          "description": "Reads the account's OAuth variables for integrations.",
+          "operationId": "getOauthVariables",
+          "tags": [
+            "Oauth"
+          ],
+          "x-resource-type": "service",
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        },
+        "post": {
+          "summary": "Save OAuth variables",
+          "description": "Saves the account's OAuth variables for integrations.",
+          "operationId": "saveOauthVariables",
+          "tags": [
+            "Oauth"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/hub/marketplace": {
+        "get": {
+          "summary": "List marketplace flows",
+          "description": "Lists the flows available in the marketplace together with the owned ones.",
+          "operationId": "listMarketplaceFlows",
+          "tags": [
+            "Marketplace"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "page",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "page-size",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/hub/marketplace/product": {
+        "get": {
+          "summary": "Get a marketplace product",
+          "description": "Reads one marketplace product.",
+          "operationId": "getMarketplaceProduct",
+          "tags": [
+            "Marketplace"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "product_id",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/hub/marketplace/product-download-stats": {
+        "get": {
+          "summary": "Get product download statistics",
+          "description": "Reads download counts for a product.",
+          "operationId": "getMarketplaceProductDownloadStats",
+          "tags": [
+            "Marketplace"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "parameters": [
+            {
+              "name": "product_id",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/hub/obtain-marketplace-product": {
+        "post": {
+          "summary": "Obtain a marketplace product",
+          "description": "Obtains a product from the marketplace for the account.",
+          "operationId": "obtainMarketplaceProduct",
+          "tags": [
+            "Marketplace"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/hub/marketplace/workflows/download": {
+        "post": {
+          "summary": "Download a marketplace product",
+          "description": "Copies a marketplace flow into the account.",
+          "operationId": "downloadMarketplaceProduct",
+          "tags": [
+            "Marketplace"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/hub/marketplace/rate-product": {
+        "post": {
+          "summary": "Rate a marketplace product",
+          "description": "Records the caller's rating of a product.",
+          "operationId": "rateMarketplaceProduct",
+          "tags": [
+            "Marketplace"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/hub/marketplace/submissions": {
+        "get": {
+          "summary": "List marketplace submissions",
+          "description": "Lists the caller's submissions.",
+          "operationId": "listMarketplaceSubmissions",
+          "tags": [
+            "Marketplace"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "status",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        },
+        "post": {
+          "summary": "Create a marketplace submission",
+          "description": "Creates a submission.",
+          "operationId": "createMarketplaceSubmission",
+          "tags": [
+            "Marketplace"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
+      },
+      "/hub/marketplace/submissions/{topic}": {
+        "get": {
+          "summary": "View a marketplace submission",
+          "description": "Reads one submission.",
+          "operationId": "getMarketplaceSubmission",
+          "tags": [
+            "Marketplace"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "topic",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "product_type",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "status",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        },
+        "patch": {
+          "summary": "Update a marketplace submission",
+          "description": "Only the user who created a submission can edit it.",
+          "operationId": "updateMarketplaceSubmission",
+          "tags": [
+            "Marketplace"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "topic",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        },
+        "delete": {
+          "summary": "Delete a marketplace submission",
+          "description": "Only the user who created a submission can delete it.",
+          "operationId": "deleteMarketplaceSubmission",
+          "tags": [
+            "Marketplace"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "topic",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid"
+            }
+          }
+        }
       }
     },
     "components": {
@@ -5998,6 +7033,15 @@
       {
         "name": "Oauth",
         "description": "Oauth configurations and connections"
+      },
+      {
+        "name": "Schedules"
+      },
+      {
+        "name": "Eval snippets"
+      },
+      {
+        "name": "Marketplace"
       }
     ]
   }

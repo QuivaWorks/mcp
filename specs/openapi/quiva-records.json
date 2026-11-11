@@ -2410,6 +2410,1664 @@
             }
           }
         ]
+      },
+      "/records/record-once": {
+        "post": {
+          "summary": "Create a record once",
+          "description": "Creates a record under an id the caller chose. A repeat of the same id is answered 409 with the stored record and never overwrites it or the edits made since. Takes the same body as create record, with config_id in the body.",
+          "operationId": "createRecordOnce",
+          "tags": [
+            "Records"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordCreate"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/upsert-record": {
+        "post": {
+          "summary": "Upsert a record by identity",
+          "description": "Finds the record whose identity matches (trying identity_fields in order) or creates it, and merges data into it. Omitting parent_folder leaves an existing parent alone.",
+          "operationId": "upsertRecord",
+          "tags": [
+            "Records"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "config_id": {
+                      "type": "string"
+                    },
+                    "identity": {
+                      "type": "object"
+                    },
+                    "identity_fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "legacy_config_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "space_id": {
+                      "type": "string"
+                    },
+                    "parent_folder": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "config_id",
+                    "identity",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/record-if": {
+        "delete": {
+          "summary": "Delete a record while a field is unset",
+          "description": "Deletes the record only while data[unset_field] is unset. 200 deleted, 404 gone, 409 refused because the field is set or the record changed mid-check.",
+          "operationId": "deleteRecordIf",
+          "tags": [
+            "Records"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "config_id": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "unset_field": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "config_id",
+                    "id",
+                    "unset_field"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/reindex": {
+        "post": {
+          "summary": "Reindex a config's records",
+          "description": "Rewrites one page of the config's records into the search index so a newly declared index field becomes filterable. Resume with the cursor from the previous reply. A record the indexer refuses is reported by id and does not stop the page.",
+          "operationId": "reindexRecords",
+          "tags": [
+            "Records"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "config_id": {
+                      "type": "string"
+                    },
+                    "cursor": {
+                      "type": "string"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "config_id"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/export-records": {
+        "post": {
+          "summary": "Email an export of a record set",
+          "description": "Builds a CSV or JSON file of the records matching the same filter and sort strings a records query takes, and emails it as an attachment.",
+          "operationId": "exportRecords",
+          "tags": [
+            "Records"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "config_id": {
+                      "type": "string"
+                    },
+                    "format": {
+                      "type": "string"
+                    },
+                    "filter": {
+                      "type": "string"
+                    },
+                    "sort": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "config_id"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/records-count-by-config": {
+        "get": {
+          "summary": "Count records per config",
+          "description": "Returns the record count for each of the listed config ids.",
+          "operationId": "countRecordsByConfig",
+          "tags": [
+            "Records"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "parameters": [
+            {
+              "name": "ids",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/config/upgrades": {
+        "get": {
+          "summary": "List shipped fields a config can adopt",
+          "description": "Lists named shipped fields the account's record config does not yet have.",
+          "operationId": "listRecordConfigUpgrades",
+          "tags": [
+            "Record Configs"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "config_id",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/config/upgrade": {
+        "post": {
+          "summary": "Adopt shipped fields into a config",
+          "description": "Adds the named shipped fields to the account's own record config. Nothing else in the document changes, and the config stays off the shipped track afterwards.",
+          "operationId": "upgradeRecordConfig",
+          "tags": [
+            "Record Configs"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "config_id": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "config_id",
+                    "fields"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/metrics-run": {
+        "post": {
+          "summary": "Run metrics",
+          "description": "Evaluates metric definitions against a config's records.",
+          "operationId": "runMetrics",
+          "tags": [
+            "Record Metrics"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/metrics-validate": {
+        "post": {
+          "summary": "Validate metric definitions",
+          "description": "Checks metric definitions without running them.",
+          "operationId": "validateMetrics",
+          "tags": [
+            "Record Metrics"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/interpret": {
+        "post": {
+          "summary": "Interpret a scored record",
+          "description": "Interprets a scored record under the published policy. Takes the same roles as scoring, because the record trigger runs as whoever wrote the record.",
+          "operationId": "interpretRecord",
+          "tags": [
+            "Record Assessment"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "config_id": {
+                      "type": "string"
+                    },
+                    "record_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "config_id",
+                    "record_id"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          },
+          "x-path-derived": true
+        }
+      },
+      "/records/reinterpret": {
+        "post": {
+          "summary": "Re-run interpretation for a record",
+          "description": "Re-runs interpretation for one record. Staff only; writes nothing a person owns.",
+          "operationId": "reinterpretRecord",
+          "tags": [
+            "Record Assessment"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "config_id": {
+                      "type": "string"
+                    },
+                    "record_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "config_id",
+                    "record_id"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/re-extract": {
+        "post": {
+          "summary": "Re-extract a record's stored report",
+          "description": "Re-reads the record's stored report under the connector's current definition, then re-interprets. No provider call and no meter. Staff only.",
+          "operationId": "reExtractRecord",
+          "tags": [
+            "Record Assessment"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "config_id": {
+                      "type": "string"
+                    },
+                    "record_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "config_id",
+                    "record_id"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/policy-publish": {
+        "post": {
+          "summary": "Publish the assessment policy",
+          "description": "Publishes a policy, or the default policy with use_default. Admin and root only; 409 once a policy is in use.",
+          "operationId": "publishPolicy",
+          "tags": [
+            "Record Assessment"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/policy-profiles": {
+        "post": {
+          "summary": "List policy profiles",
+          "description": "Returns the policy profiles available to the account.",
+          "operationId": "listPolicyProfiles",
+          "tags": [
+            "Record Assessment"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/policy-preview": {
+        "post": {
+          "summary": "Preview a policy",
+          "description": "Previews a policy's effect without writing. Admin, root and developer roles.",
+          "operationId": "previewPolicy",
+          "tags": [
+            "Record Assessment"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/policy-impact": {
+        "post": {
+          "summary": "Measure a policy's impact",
+          "description": "Reports the impact of a policy across records without writing, paged by cursor. Admin, root and developer roles.",
+          "operationId": "policyImpact",
+          "tags": [
+            "Record Assessment"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/setup-test": {
+        "post": {
+          "summary": "Run the assessment setup test",
+          "description": "Runs the setup test for the assessment configuration.",
+          "operationId": "assessSetupTest",
+          "tags": [
+            "Record Assessment"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/approve-notes": {
+        "post": {
+          "summary": "Approve discussion notes",
+          "description": "Marks notes approved. Staff only, never a client.",
+          "operationId": "approveNotes",
+          "tags": [
+            "Record Assessment"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/agree-score": {
+        "post": {
+          "summary": "Agree a score",
+          "description": "Records agreement with a score. Staff only.",
+          "operationId": "agreeScore",
+          "tags": [
+            "Record Assessment"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/approve-client-report": {
+        "post": {
+          "summary": "Approve a client report",
+          "description": "Approves a client report. Staff only, never a client.",
+          "operationId": "approveClientReport",
+          "tags": [
+            "Record Assessment"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/client-report-render": {
+        "post": {
+          "summary": "Render a client report",
+          "description": "Renders a client report. Without task_id it is a preview; with one it is a delivery. Staff only.",
+          "operationId": "renderClientReport",
+          "tags": [
+            "Record Assessment"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/discussion-note": {
+        "post": {
+          "summary": "Create a discussion note",
+          "description": "Creates a discussion note. Staff only; a refusal carries a gate code.",
+          "operationId": "createDiscussionNote",
+          "tags": [
+            "Record Assessment"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/mark-signed": {
+        "post": {
+          "summary": "Mark a discussion note signed",
+          "description": "Records that the discussion note was signed, for a staff member. Clients are refused by role.",
+          "operationId": "markDiscussionNoteSigned",
+          "tags": [
+            "Record Assessment"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/approval-status": {
+        "get": {
+          "summary": "Get approval status",
+          "description": "Reads the approval status of a record. Staff.",
+          "operationId": "getApprovalStatus",
+          "tags": [
+            "Record Assessment"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "config_id",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "record_id",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/assess-setup-status": {
+        "get": {
+          "summary": "Get assessment setup status",
+          "description": "Reads the assessment setup checklist. Staff.",
+          "operationId": "getAssessSetupStatus",
+          "tags": [
+            "Record Assessment"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "config_id",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/assess-health": {
+        "get": {
+          "summary": "Get assessment health",
+          "description": "Reads assessment health, memoised server-side for about 60 seconds. Admin, root and developer roles.",
+          "operationId": "getAssessHealth",
+          "tags": [
+            "Record Assessment"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "config_id",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/strategy-publish": {
+        "post": {
+          "summary": "Publish a strategy version",
+          "description": "Publishes a strategy version.",
+          "operationId": "publishStrategy",
+          "tags": [
+            "Strategy and Simulation"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/strategy-version": {
+        "get": {
+          "summary": "Get a strategy version",
+          "description": "Reads the active strategy version unless one is named. 404 strategy_not_published when none is published.",
+          "operationId": "getStrategyVersion",
+          "tags": [
+            "Strategy and Simulation"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "version",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/strategy-versions": {
+        "get": {
+          "summary": "List strategy versions",
+          "description": "Lists published strategy versions.",
+          "operationId": "listStrategyVersions",
+          "tags": [
+            "Strategy and Simulation"
+          ],
+          "x-resource-type": "service",
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/strategy-method": {
+        "get": {
+          "summary": "Get a strategy method text",
+          "description": "Reads the method text of a version, or the latest. 404 for an unknown version.",
+          "operationId": "getStrategyMethod",
+          "tags": [
+            "Strategy and Simulation"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "version",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/simulation-run": {
+        "post": {
+          "summary": "Run a simulation",
+          "description": "Runs a stored model. 409 strategy_not_published; 422 for engine validation errors. Staff.",
+          "operationId": "runSimulation",
+          "tags": [
+            "Strategy and Simulation"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/simulation-compare": {
+        "post": {
+          "summary": "Compare simulation variants",
+          "description": "Runs variants against the base model's draws. Staff.",
+          "operationId": "compareSimulations",
+          "tags": [
+            "Strategy and Simulation"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/simulation-solve": {
+        "post": {
+          "summary": "Solve for a simulation target",
+          "description": "Runs one solver per call, for example sustainable spend or minimum strategy. Staff.",
+          "operationId": "solveSimulation",
+          "tags": [
+            "Strategy and Simulation"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/simulation-save": {
+        "post": {
+          "summary": "Save a simulation result",
+          "description": "Re-runs the stored model and files the result beside it. Staff.",
+          "operationId": "saveSimulation",
+          "tags": [
+            "Strategy and Simulation"
+          ],
+          "x-resource-type": "service",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "components": {
@@ -4352,6 +6010,15 @@
       {
         "name": "Record History",
         "description": "The change history of a record."
+      },
+      {
+        "name": "Record Assessment"
+      },
+      {
+        "name": "Strategy and Simulation"
+      },
+      {
+        "name": "Record Metrics"
       }
     ]
   }
