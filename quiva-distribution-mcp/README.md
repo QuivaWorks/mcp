@@ -38,6 +38,40 @@ counterparty.
 
 A role that is too low answers **401**, the same as a bad credential.
 
+## Register with Claude Code and Codex
+
+The repo no longer registers the local servers for you; add the ones you want.
+Clone the repo and run `npm install` at its root, then use an absolute path to
+`quiva-distribution-mcp/bin/run.sh`. Put credentials in `quiva-distribution-mcp/.env`, or use a profile (below).
+
+**Profile instead of a per-server `.env`.** Set `QUIVA_PROFILE=<name>` and the server
+reads `~/.config/quiva/profiles.json` (or `$QUIVA_CONFIG_DIR/profiles.json`):
+`{"<name>": {"env": "production", "account": "<id>", "api_key": "..."}}`. One profile
+serves all seven servers and the quiva-config skill. Resolution order: the profile's key
+(`QUIVA_API_KEY_<NAME>` overrides it; name upper-cased, non-alphanumerics as `_`),
+then `QUIVA_API_KEY`, `QUIVA_BEARER_TOKEN`, then email and password. A profile's `env`
+picks the API base URL; `QUIVA_API_URL` still wins if set. Profiles without an `api_key`
+are ignored.
+
+Claude Code:
+
+```bash
+claude mcp add quiva-distribution \
+  -e QUIVA_PROFILE=<name> \
+  -- sh /path/to/mcp/quiva-distribution-mcp/bin/run.sh
+```
+
+Codex (`~/.codex/config.toml`, or `.codex/config.toml` in a trusted project):
+
+```toml
+[mcp_servers.quiva-distribution]
+command = "sh"
+args = ["/path/to/mcp/quiva-distribution-mcp/bin/run.sh"]
+env = { QUIVA_PROFILE = "<name>" }
+```
+
+Restart the client after registering: servers connect at session start.
+
 ## Tools
 
 **Reference and validation (no API call)**
@@ -70,6 +104,15 @@ A role that is too low answers **401**, the same as a bad credential.
 | `list_product_definition_versions` | `GET /accounts/product-definitions` | read |
 | `sync_distribution_products` | `POST /accounts/distribution-products-sync` | write into other accounts, needs `confirm: true`; returns every step |
 | `list_connected_accounts` | `GET /accounts/distribution-connected-accounts` | read, `product_id` required |
+
+**Email templates** (accounts-service; flows and Abbie send them by key)
+
+| Tool | Route | Kind |
+|---|---|---|
+| `list_email_templates` | `GET /accounts/email-templates` | read |
+| `get_email_template` | `GET /accounts/email-template` | read, both versions |
+| `render_email_template` | `POST /accounts/email-template-render` | preview, sends nothing |
+| `publish_email_template` | `POST /accounts/email-template-publish` | write, needs `confirm: true` |
 
 **Invitations**
 

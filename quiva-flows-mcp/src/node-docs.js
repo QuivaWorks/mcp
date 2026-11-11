@@ -624,6 +624,7 @@ export const NODE_TYPES = {
         description: 'escalation task description',
         priority: 'task priority',
         assignees: 'comma-separated user ids; each is emailed a task + flow link',
+        fields: 'A JSON Schema object (type "object" with properties) or a $. reference to one: the form the assignee fills on the task. Anything else pauses with no form (the validator warns).',
       },
     },
     example: {
@@ -639,7 +640,7 @@ export const NODE_TYPES = {
       },
     },
     notes:
-      'The value supplied on resume becomes this node\'s output. The OpenAPI spec\'s "notify" email/slack block is NOT read by the current engine — use title/assignees instead.',
+      'The value supplied on resume becomes this node\'s output. Resuming a run that is not paused or errored is refused with 409. The OpenAPI spec\'s "notify" email/slack block is NOT read by the current engine — use title/assignees instead.',
   },
 
   'human-in-the-loop': {

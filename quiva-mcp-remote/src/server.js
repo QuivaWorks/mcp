@@ -13,7 +13,7 @@ import { AuthFailureCache, RateLimiter, clientIp } from './limits.js';
 import { loadPackages } from './packages.js';
 
 // Upstream fetches inherit the request's abort signal, and report API 401s back to the request.
-// No X-Forwarded-For is added: cerberus keys its limits by TCP peer and ignores it (DEPLOY.md).
+// No X-Forwarded-For is added: cerberus keys its limits by TCP peer and ignores it (see the internal deploy runbook).
 const requestScope = new AsyncLocalStorage();
 const baseFetch = globalThis.fetch;
 globalThis.fetch = async (input, init = {}) => {

@@ -1,7 +1,7 @@
 // Credential resolution shared by every stdio server (identical copy in each
 // package; keep them in sync). Mirrors the quiva-config skill's quiva.mjs:
 //   QUIVA_PROFILE=<name> -> ~/.config/quiva/profiles.json (or $QUIVA_CONFIG_DIR/profiles.json)
-//   profile shape: { "<name>": { "env": "staging"|"production", "account": "<id>", "api_key": "..." } }
+//   profile shape: { "<name>": { "env": "staging"|"production", "account": "<id>", "api_key": "...", "api_url"?: "<staging only>" } }
 //   QUIVA_API_KEY_<NAME> overrides the profile's key; then QUIVA_API_KEY.
 // Profiles without an api_key (e.g. a `login` block) are ignored.
 
@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const HOSTS = { production: 'https://api.quiva.ai', staging: 'https://api.quiva.ai' };
+const PRODUCTION_URL = 'https://api.quiva.ai';
 
 export function profilesPath(env = process.env) {
   const dir = env.QUIVA_CONFIG_DIR || path.join(os.homedir(), '.config', 'quiva');
@@ -30,8 +30,13 @@ function loadProfile(name, env) {
   const apiKey = env[keyVar] || p.api_key;
   if (!apiKey) throw new Error(`QUIVA_PROFILE=${name}: profile has no api_key (set ${keyVar} or add one)`);
   const profileEnv = p.env || 'production';
-  if (!HOSTS[profileEnv]) throw new Error(`QUIVA_PROFILE=${name}: unknown env "${profileEnv}"`);
-  return { apiKey, account: p.account ? String(p.account) : '', apiUrl: HOSTS[profileEnv] };
+  if (profileEnv !== 'production' && profileEnv !== 'staging') {
+    throw new Error(`QUIVA_PROFILE=${name}: unknown env "${profileEnv}"`);
+  }
+  // Production is the one built-in host; a staging profile names its own via
+  // api_url (or QUIVA_API_URL) so no pre-release host ships in this repo.
+  const apiUrl = profileEnv === 'production' ? PRODUCTION_URL : p.api_url || '';
+  return { apiKey, account: p.account ? String(p.account) : '', apiUrl, staging: profileEnv === 'staging' };
 }
 
 // Returns QuivaClient constructor options. An explicit QUIVA_API_URL always wins
@@ -47,5 +52,9 @@ export function credentialsFromEnv(env = process.env) {
   };
   if (!env.QUIVA_PROFILE) return base;
   const p = loadProfile(env.QUIVA_PROFILE, env);
-  return { ...base, apiKey: p.apiKey, account: base.account || p.account, apiUrl: base.apiUrl || p.apiUrl };
+  const apiUrl = base.apiUrl || p.apiUrl;
+  if (!apiUrl) {
+    throw new Error(`QUIVA_PROFILE=${env.QUIVA_PROFILE} is a staging profile: add "api_url" to it or set QUIVA_API_URL`);
+  }
+  return { ...base, apiKey: p.apiKey, account: base.account || p.account, apiUrl };
 }

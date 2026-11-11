@@ -44,6 +44,7 @@ const EXPECTED = [
   'list_products', 'get_product', 'create_product', 'update_product', 'list_granted_products',
   'list_product_definition_versions', 'list_distribution_invites', 'list_invite_inbox', 'withdraw_distribution_invite',
   'sync_distribution_products', 'list_connected_accounts',
+  'list_email_templates', 'get_email_template', 'render_email_template', 'publish_email_template',
 ];
 
 check('registers exactly the expected tools', () => {

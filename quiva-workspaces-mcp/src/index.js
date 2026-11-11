@@ -940,11 +940,11 @@ export function registerTools(server, client, { prefix = '' } = {}) {
   );
 
   tool(
-    'unlink_task',
+    'delete_task_relation',
     'Remove the link between two tasks, both sides (DELETE /workspaces/task/{task_id}/relation/{related_task_id}). 404 if they are not linked. Returns the remaining relations.',
     {
       task_id: z.string().describe('Task id'),
-      related_task_id: z.string().describe('The linked task to unlink'),
+      related_task_id: z.string().describe('The linked task to detach'),
     },
     async ({ task_id, related_task_id }) =>
       client.delete(`/workspaces/task/${encodeURIComponent(task_id)}/relation/${encodeURIComponent(related_task_id)}`)
