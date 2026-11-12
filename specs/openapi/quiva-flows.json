@@ -808,7 +808,14 @@
           "x-resource-type": "service",
           "parameters": [
             {
-              "$ref": "#/components/parameters/collectionTopic"
+              "name": "collection_topic",
+              "in": "query",
+              "required": false,
+              "description": "Only list items in this collection. The topic is a hash of the name used when the collection was created. Omit it to list every collection.",
+              "schema": {
+                "type": "string"
+              },
+              "example": "1234567890"
             }
           ],
           "responses": {
@@ -1976,10 +1983,17 @@
           "x-resource-type": "service",
           "parameters": [
             {
-              "$ref": "#/components/parameters/collectionTopic"
+              "name": "collection_topic",
+              "in": "query",
+              "required": false,
+              "description": "Only list items in this collection. The topic is a hash of the name used when the collection was created. Omit it to list every collection.",
+              "schema": {
+                "type": "string"
+              },
+              "example": "1234567890"
             },
             {
-              "name": "filter",
+              "name": "version",
               "in": "query",
               "description": "Filter workflows by type. If not specified, all types will be listed",
               "required": false,
