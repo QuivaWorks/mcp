@@ -147,6 +147,7 @@ describe('HTTP guards', () => {
     const body = await res.json();
     assert.equal(body.jsonrpc, '2.0');
     assert.match(body.error.message, /Settings → API keys/);
+    assert.match(body.error.message, /x-api-key/);
   });
 
   test('Basic auth is not a credential', async () => {

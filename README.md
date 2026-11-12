@@ -50,7 +50,7 @@ API key (Settings, API keys).
 
 **Codex**: see [AGENTS.md](AGENTS.md) for the agent instructions and the
 `~/.codex/config.toml` block; the remote server needs only `url` and
-`bearer_token_env_var` ([details](quiva-mcp-remote/README.md)). The
+`env_http_headers` ([details](quiva-mcp-remote/README.md)). The
 [quiva-config skill](skills/quiva-config/) pulls, diffs and pushes account
 configuration from the command line.
 

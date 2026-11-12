@@ -16,7 +16,7 @@ Export a key in the shell that starts Codex: `export QUIVA_API_KEY=...`. Then ad
 ```toml
 [mcp_servers.quiva]
 url = "https://api.quiva.ai/mcp"
-bearer_token_env_var = "QUIVA_API_KEY"
+env_http_headers = { "x-api-key" = "QUIVA_API_KEY" }
 ```
 
 `codex mcp list` should show `quiva`. Tools are prefixed by area (`flows_`, `records_`, `documents_`, `workspaces_`, `agents_`, `distribution_`, `coworker_`). Call each area's `*_list_reference_topics` tool before building.

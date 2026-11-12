@@ -78,7 +78,7 @@ const UNAUTHORIZED = { 'WWW-Authenticate': 'Bearer realm="quiva"' };
 async function handleMcpPost(req, res, { config, loaded, log, authFailures }) {
   const credential = credentialFrom(req.headers);
   if (!credential) {
-    throw new HttpError(401, -32001, `Missing credential: send "Authorization: Bearer <API key>". ${API_KEY_HINT}.`, UNAUTHORIZED);
+    throw new HttpError(401, -32001, `Missing credential: send "x-api-key: <API key>". ${API_KEY_HINT}.`, UNAUTHORIZED);
   }
   if (authFailures.has(credential)) {
     throw new HttpError(401, -32001, `The Quiva API rejected this credential in the last ${config.authFailureTtlMs / 1000} s. ${API_KEY_HINT}.`, UNAUTHORIZED);
