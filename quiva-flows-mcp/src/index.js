@@ -414,7 +414,7 @@ export function registerTools(server, client, { prefix = '' } = {}) {
       enable_log: z.boolean().default(true).describe('Store detailed run logs (searchable via search_run_logs)'),
       knowledge: z.array(z.string()).optional().describe('Knowledge URIs for agents: kv://, obj://, str://, sid://, dta://'),
       session_id: z.string().optional().describe('Session id for agent conversation continuity'),
-      run_id: z.string().optional().describe('Existing run/tracking id to resume a paused run'),
+      run_id: z.string().optional().describe('Full tracking id of a paused or errored run to resume, ms.hub.run.<uuid>.<flow subject> (as returned when the run started or by list_paused_workflows). A bare uuid is rejected with 400; a run that is not paused returns 409.'),
       retry: z.boolean().optional().describe('Retry a failed run'),
       context: jsonValue.optional().describe('Run context object, read in nodes as $.context. A layout action sends { preview: true|false, inputs: {...} }: see get_flows_reference("layout-actions").'),
     },
