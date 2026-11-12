@@ -29,7 +29,7 @@ Recipe for building a flow:
 5. list_functions / list_quiva_endpoints — discover valid "subject" values for function / quiva-endpoint nodes.
 6. validate_flow_config — lint the config locally before sending.
 7. create_workflow — creates a draft (auto-fills flow-editor geometry so the graph renders).
-8. publish_workflow — makes it runnable.
+8. publish_workflow — makes it runnable. unpublish_workflow takes it out of service and keeps the draft.
 9. run_workflow (await: true) — execute and inspect the result.
 10. Debug with search_run_logs / list_errored_workflows / list_paused_workflows; iterate with update_workflow (re-publish after updating).
 
@@ -309,11 +309,53 @@ export function registerTools(server, client, { prefix = '' } = {}) {
     async ({ subject, commit }) => client.post('/hub/workflows/publish', { subject, commit })
   );
 
+  // The route derives the config from the last two subject segments and `draft`,
+  // never from the draft/published segment of `subject`
+  // (hub-service/handler/get-subject.go GetSubjectFromParams).
+  async function versionExists(collectionTopic, flowTopic, draft) {
+    try {
+      await client.get(`/hub/workflows/${collectionTopic}/${flowTopic}`, { draft: String(draft) });
+      return true;
+    } catch (err) {
+      if (err.status === 404 || err.status === 400) return false;
+      throw err;
+    }
+  }
+
+  tool(
+    'unpublish_workflow',
+    'Take a workflow out of service: delete the PUBLISHED version and keep the draft, so it can be edited and published again. run_workflow on it fails until then. Calls DELETE /hub/workflows/{collection}/{flow}?draft=false, which removes only the published config and its published list entry (hub-service/handler/delete-subject.go DeleteWorkflowHandler). `subject` may be the draft or the published subject: only its collection and flow are used. Requires confirm: true. Reads both versions back and reports published_removed / draft_kept. Refused with 409 for a flow bound by a distribution contract (it cannot be removed here). It does NOT unschedule schedule triggers: only publish and the unschedule-flow route do. Needs the root, admin or developer role (403 otherwise).',
+    {
+      subject: z.string().describe('Workflow subject (draft or published); only the collection and flow are used'),
+      confirm: z.boolean().optional().describe('Must be true. The published version cannot be restored except by publishing the draft again.'),
+    },
+    async ({ subject, confirm }) => {
+      if (confirm !== true) {
+        throw new Error('unpublish_workflow takes the flow out of service; pass confirm: true to proceed');
+      }
+      const { collectionTopic, flowTopic } = subjectToTopics(subject);
+      if (!(await versionExists(collectionTopic, flowTopic, false))) {
+        return { unpublished: false, reason: 'There is no published version to remove.', draft_exists: await versionExists(collectionTopic, flowTopic, true) };
+      }
+      const response = await client.delete(`/hub/workflows/${collectionTopic}/${flowTopic}`, { draft: 'false' });
+      const publishedLeft = await versionExists(collectionTopic, flowTopic, false);
+      const draftKept = await versionExists(collectionTopic, flowTopic, true);
+      return {
+        ...wrap(response),
+        unpublished: !publishedLeft,
+        published_removed: !publishedLeft,
+        draft_kept: draftKept,
+        ...(publishedLeft ? { warning: 'The published version still reads back after the delete.' } : {}),
+        ...(!draftKept ? { warning: 'There is no draft: this flow had none, so nothing remains to republish. Create it again to recover.' } : {}),
+      };
+    }
+  );
+
   tool(
     'delete_workflow',
-    'Delete a workflow — both the draft and the published version by default. Set keep_draft=true to remove only the published version and leave the draft in place. Irreversible (no undo, no recycle bin), so it requires confirm: true. Needs the root, admin or developer role (403 otherwise).',
+    'Delete a workflow: with keep_draft=false (default) the draft AND the published version AND both list entries; with keep_draft=true only the published version (prefer unpublish_workflow, which also reads the result back). `subject` may be the draft or the published subject: only its collection and flow are used, not the draft/published segment. Irreversible (no undo, no recycle bin), so it requires confirm: true. Refused with 409 for a flow bound by a distribution contract. Reads both versions back and reports `remaining`; trust that, not the {"message":"success"} reply. Needs the root, admin or developer role (403 otherwise).',
     {
-      subject: z.string().describe('Workflow subject (draft or published)'),
+      subject: z.string().describe('Workflow subject (draft or published); only the collection and flow are used'),
       keep_draft: z.boolean().default(false).describe('true = delete only the published version, keeping the draft'),
       confirm: z.boolean().optional().describe('Must be true. The deletion cannot be undone.'),
     },
@@ -322,13 +364,22 @@ export function registerTools(server, client, { prefix = '' } = {}) {
         throw new Error('delete_workflow removes the flow irreversibly; pass confirm: true to proceed');
       }
       const { collectionTopic, flowTopic } = subjectToTopics(subject);
-      // No keep_draft in the engine: ?draft=true resolves a ".draft." subject, which deletes both versions.
+      // draft=true resolves the ".draft." subject, and the handler then deletes both versions.
       const response = await client.delete(`/hub/workflows/${collectionTopic}/${flowTopic}`, {
         draft: String(!keep_draft),
       });
+      const remaining = {
+        published: await versionExists(collectionTopic, flowTopic, false),
+        draft: await versionExists(collectionTopic, flowTopic, true),
+      };
+      const expected = keep_draft ? { published: false, draft: remaining.draft } : { published: false, draft: false };
+      const verified = remaining.published === expected.published && remaining.draft === expected.draft;
       return {
         ...wrap(response),
         deleted: keep_draft ? 'published version only (draft kept)' : 'draft and published',
+        remaining,
+        verified,
+        ...(verified ? {} : { warning: 'A version the delete should have removed still reads back.' }),
       };
     }
   );
@@ -365,8 +416,9 @@ export function registerTools(server, client, { prefix = '' } = {}) {
       session_id: z.string().optional().describe('Session id for agent conversation continuity'),
       run_id: z.string().optional().describe('Existing run/tracking id to resume a paused run'),
       retry: z.boolean().optional().describe('Retry a failed run'),
+      context: jsonValue.optional().describe('Run context object, read in nodes as $.context. A layout action sends { preview: true|false, inputs: {...} }: see get_flows_reference("layout-actions").'),
     },
-    async ({ subject, trigger, triggers, await: shouldAwait, enable_log, knowledge, session_id, run_id, retry }) => {
+    async ({ subject, trigger, triggers, await: shouldAwait, enable_log, knowledge, session_id, run_id, retry, context }) => {
       const body = { subject, await: shouldAwait, enable_log };
       if (trigger !== undefined) body.trigger = trigger;
       if (triggers !== undefined) body.triggers = triggers;
@@ -374,6 +426,7 @@ export function registerTools(server, client, { prefix = '' } = {}) {
       if (session_id !== undefined) body.session_id = session_id;
       if (run_id !== undefined) body.run_id = run_id;
       if (retry !== undefined) body.retry = retry;
+      if (context !== undefined) body.context = context;
       return client.post('/hub/workflows/run', body);
     }
   );

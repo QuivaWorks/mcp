@@ -8,7 +8,7 @@
 //                        must accept.
 // examples/authored/   — hand-written teaching fixtures. NOT evidence: a
 //                        hand-written example is how the flows MCP shipped a
-//                        wrong rules syntax (docs/lessons.md).
+//                        wrong rules syntax.
 //
 // A ten-file spread cannot tell you whether a validator RULE is wrong — for that
 // run tools/sweep-validate.mjs over all ~189 live configs.

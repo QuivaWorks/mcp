@@ -81,7 +81,7 @@
     "resources": [
       {
         "resource_id": "project_brief",
-        "resource_type": "record-config",
+        "resource_type": "record_config",
         "metadata": { "note": "record the checked source here" }
       }
     ]

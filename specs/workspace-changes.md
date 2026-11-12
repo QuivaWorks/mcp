@@ -1,6 +1,6 @@
 Task Actions
 
-evari-olympus/workspaces-service/handler/task_actions.go
+workspaces-service/handler/task_actions.go
 
 {
 "is_public": false,

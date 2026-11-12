@@ -51,6 +51,19 @@ claude mcp add --transport http quiva https://api.quiva.ai/mcp \
 Add `--scope user` to make it available in every project. Run `/mcp` inside
 Claude Code to check the connection.
 
+### Codex
+
+`~/.codex/config.toml` (or `.codex/config.toml` in a trusted project). Codex reads the key
+from an environment variable, so it never sits in the file:
+
+```toml
+[mcp_servers.quiva]
+url = "https://api.quiva.ai/mcp"
+bearer_token_env_var = "QUIVA_API_KEY"
+```
+
+Export `QUIVA_API_KEY` in the shell that starts Codex.
+
 ### Cursor
 
 `~/.cursor/mcp.json` (all projects) or `.cursor/mcp.json` (one project):
@@ -132,7 +145,7 @@ The server is stateless and reads configuration from the environment only:
 | `MAX_CONNECTIONS` | `256` | Open sockets; further connections are dropped |
 | `RATE_LIMIT_PER_SEC` / `RATE_LIMIT_BURST` | `10` / `40` | Per-IP token bucket, checked before the body is read (429 with `Retry-After`) |
 | `TRUST_PROXY` | `false` | `true` takes the client IP from the **last** `X-Forwarded-For` hop, which is the one the proxy in front appended. Set it only behind a proxy that appends |
-| `ALLOWED_HOSTS` | empty | Comma-separated `Host` values to accept, e.g. `10.0.0.5:8080`. When set, anything else gets 403 |
+| `ALLOWED_HOSTS` | empty | Comma-separated `Host` values to accept, e.g. `mcp.example.com`. When set, anything else gets 403 |
 | `AUTH_FAILURE_CACHE_SECONDS` | `0` (off) | Refuse a credential the API returned 401 for, for this long, without reading the body. Only a SHA-256 of the credential is kept. Off by default because a scoped API key gets 401 on routes outside its scope |
 | `ALLOWED_ORIGINS` | empty | Comma-separated browser origins to accept; requests with no `Origin` are always accepted |
 

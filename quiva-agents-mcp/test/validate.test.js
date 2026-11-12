@@ -207,7 +207,7 @@ check('omitting max_tokens does not warn', () => {
 // --- golden gate ------------------------------------------------------------
 // Every config in examples/harvested/ is a REAL agent living on the platform. If
 // the validator rejects one, the VALIDATOR is wrong — that is the whole point of
-// this gate (docs/lessons.md: the flows MCP shipped a wrong rules syntax for two
+// this gate (the flows MCP shipped a wrong rules syntax for two
 // weeks because no check like this existed).
 //
 // This validator IS currently wrong, and the allowlist below is the evidence.

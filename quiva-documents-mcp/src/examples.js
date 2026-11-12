@@ -8,7 +8,7 @@
 // examples/authored/   — hand-written teaching fixtures. Useful as fuller
 //                        illustrations, but NOT evidence: a hand-written example
 //                        is how the flows MCP shipped a wrong rules syntax
-//                        (docs/lessons.md). Prefer harvested ones where both exist.
+//                       . Prefer harvested ones where both exist.
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';

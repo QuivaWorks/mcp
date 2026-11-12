@@ -4,7 +4,7 @@
 // one where it should be excluded — so the artefact can be checked in the UI.
 //
 // This is also the live test of the open `conditions` question
-// (docs/quiva-mcp-handoff.md §4): the engine evaluates sub_templates[].conditions
+//: the engine evaluates sub_templates[].conditions
 // with rule-engine v2 and requires `...outcome === true`, while this MCP's docs and
 // validator describe json-rules-engine { all: [ { fact, operator, value } ] }.
 // Pass --negative-control to re-trigger with the WRONG form so the two can be

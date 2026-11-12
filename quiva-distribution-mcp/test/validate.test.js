@@ -23,7 +23,7 @@ const product = (over = {}) => ({
   code: 'support-plan',
   name: 'Support plan',
   record_configs: [{ id: 'requests', label: 'Requests' }],
-  actions: { requests: [{ type: 'create', label: 'New' }, { type: 'list', label: 'All' }] },
+  actions: { requests: [{ type: 'create', label: 'New' }, { type: 'rate', label: 'All' }] },
   ...over,
 });
 
@@ -59,10 +59,90 @@ check('unknown action type fails', () => {
   const r = validate('product', product({ actions: { requests: [{ type: 'open' }] } }));
   assert.ok(r.errors.some((e) => e.includes('not a type')));
 });
-check('app-only action type warns, not errors', () => {
-  const r = validate('product', product({ actions: { requests: [{ type: 'rate' }] } }));
+check('rate, bind, mta and cancellation are accepted without a warning', () => {
+  for (const type of ['rate', 'bind', 'mta', 'cancellation']) {
+    const r = validate('product', product({ actions: { requests: [{ type }] } }));
+    assert.equal(r.valid, true, JSON.stringify(r.errors));
+    assert.equal(r.warnings.length, 0, type);
+  }
+});
+check('retired "list" action type warns, not errors', () => {
+  const r = validate('product', product({ actions: { requests: [{ type: 'list' }] } }));
   assert.equal(r.valid, true, JSON.stringify(r.errors));
-  assert.ok(r.warnings.some((w) => w.includes('#1441')));
+  assert.ok(r.warnings.some((w) => w.includes('#1544')));
+});
+check('action keyed by distribution_delivery_failure passes', () => {
+  const r = validate('product', product({ actions: { distribution_delivery_failure: [{ type: 'create' }] } }));
+  assert.equal(r.valid, true, JSON.stringify(r.errors));
+});
+
+// --- type, sla_business_days, entity_config, distributor_front_page_layouts ---
+const errs = (over) => validate('product', product(over)).errors;
+const entity = (over = {}) => ({ config_id: 'requests', identity_fields: ['email'], ...over });
+const layout = (over = {}) => ({ id: 'front', config_id: 'requests', ...over });
+
+check('type workitem with record_configs fails; unknown type fails', () => {
+  assert.ok(errs({ type: 'workitem' }).some((e) => e.includes('workitem')));
+  assert.ok(errs({ type: 'other' }).some((e) => e.includes('not a product type')));
+  assert.equal(validate('product', product({ type: 'quote' })).valid, true);
+});
+check('sla_business_days: 0 and 260 pass, 261, -1 and 2.5 fail, null is absent', () => {
+  for (const ok of [0, 2, 260, null]) assert.equal(validate('product', product({ sla_business_days: ok })).valid, true, String(ok));
+  for (const bad of [261, -1, 2.5, '3']) assert.ok(errs({ sla_business_days: bad }).some((e) => e.includes('sla_business_days')), String(bad));
+});
+check('entity_config on one of the product record sets passes cleanly', () => {
+  const r = validate('product', product({ entity_config: entity({ label: 'Customer', display_fields: ['name'] }) }));
+  assert.equal(r.valid, true, JSON.stringify(r.errors));
+  assert.equal(r.warnings.length, 0);
+});
+check('entity_config.config_id must be a product record set, not a bundle config', () => {
+  assert.ok(errs({ entity_config: entity({ config_id: 'elsewhere' }) }).some((e) => e.includes('record_configs')));
+  assert.ok(errs({ entity_config: entity({ config_id: 'distribution_outcome' }) }).some((e) => e.includes('record_configs')));
+  assert.ok(errs({ entity_config: { identity_fields: ['email'] } }).some((e) => e.includes('config_id')));
+});
+check('entity_config.identity_fields is required and names are checked', () => {
+  assert.ok(errs({ entity_config: { config_id: 'requests' } }).some((e) => e.includes('identity_fields is required')));
+  assert.ok(errs({ entity_config: entity({ identity_fields: [] }) }).some((e) => e.includes('identity_fields is required')));
+  assert.ok(errs({ entity_config: entity({ identity_fields: ['a b'] }) }).some((e) => e.includes('not a field name')));
+  assert.ok(errs({ entity_config: entity({ display_fields: ['ok', 'a.b'] }) }).some((e) => e.includes('display_fields[1]')));
+  assert.ok(errs({ entity_config: entity({ identity_fields: [1] }) }).some((e) => e.includes('must be a string')));
+  assert.ok(errs({ entity_config: 'x' }).some((e) => e.includes('must be an object')));
+});
+check('entity_config unknown key and repeated identity field warn', () => {
+  const r = validate('product', product({ entity_config: entity({ identity_fields: ['email', 'email'], extra: 1 }) }));
+  assert.equal(r.valid, true, JSON.stringify(r.errors));
+  assert.ok(r.warnings.some((w) => w.includes('entity_config.extra')));
+  assert.ok(r.warnings.some((w) => w.includes('repeats a field')));
+});
+check('null entity_config and null layouts are absent', () => {
+  assert.equal(validate('product', product({ entity_config: null, distributor_front_page_layouts: null })).valid, true);
+});
+check('front page layouts: valid array passes, bundle config_id passes', () => {
+  const r = validate('product', product({ distributor_front_page_layouts: [layout(), layout({ id: 'alerts', config_id: 'distribution_delivery_failure' })] }));
+  assert.equal(r.valid, true, JSON.stringify(r.errors));
+  assert.ok(!r.warnings.some((w) => w.includes('distributor_front_page_layouts')));
+});
+check('front page layouts: not an array, non-object item, bad id, repeat id, unknown config_id fail', () => {
+  const at = (v) => errs({ distributor_front_page_layouts: v }).join(' | ');
+  assert.match(at({}), /must be an array/);
+  assert.match(at(['x']), /not a layout object/);
+  assert.match(at([layout({ id: 'a.b' })]), /id "a.b"/);
+  assert.match(at([layout({ id: '' })]), /id ""/);
+  assert.match(at([layout(), layout()]), /repeats id front/);
+  assert.match(at([layout({ config_id: 'nope' })]), /not a record set the distributor holds/);
+  assert.match(at([{ id: 'x' }]), /config_id ""/);
+});
+check('front page layouts: 50 pass, 51 fail; over 256 KiB fails; body is not inspected', () => {
+  const many = (n) => Array.from({ length: n }, (_, i) => layout({ id: `l${i}` }));
+  assert.equal(validate('product', product({ distributor_front_page_layouts: many(50) })).valid, true);
+  assert.ok(errs({ distributor_front_page_layouts: many(51) }).some((e) => e.includes('51 layouts')));
+  assert.ok(errs({ distributor_front_page_layouts: [layout({ blob: 'x'.repeat(256 * 1024) })] }).some((e) => e.includes('bytes')));
+  const deep = validate('product', product({ distributor_front_page_layouts: [layout({ tabs: 'anything', cards: [1, 2] })] }));
+  assert.equal(deep.valid, true, JSON.stringify(deep.errors));
+});
+check('new product fields are not reported as dropped', () => {
+  const r = validate('product', product({ sla_business_days: 3, entity_config: entity(), distributor_front_page_layouts: [layout()] }));
+  assert.ok(!r.warnings.some((w) => w.includes('is not a product field')));
 });
 check('repeated action type fails', () => {
   const r = validate('product', product({ actions: { requests: [{ type: 'create' }, { type: 'create' }] } }));
@@ -135,6 +215,12 @@ check('authored write bodies pass the validator', () => {
     assert.equal(r.valid, true, `${e.slug}: ${JSON.stringify(r.errors)}`);
   }
 });
+check('authored create-product-with-entity passes with no warnings', () => {
+  const e = getExample('create-product-with-entity');
+  const r = validate(e.of, e.payload);
+  assert.equal(r.valid, true, JSON.stringify(r.errors));
+  assert.equal(r.warnings.length, 0);
+});
 check('a stored product version is accepted with warnings only', () => {
   const read = getExample('product-read-app-action-types').response.product;
   const r = validate('product', read);
@@ -192,6 +278,15 @@ check('every topic resolves', () => {
 check('unknown topic returns an error', () => assert.ok(getReference('nope').error));
 check('not-exposed names the signing-key route', () => {
   assert.ok(getReference('not-exposed').table.some((r) => r.route.includes('distribution-signing-key')));
+});
+check('reference carries the PR #1560 topics and refusal', () => {
+  for (const t of ['product-sync', 'connected-accounts', 'filing', 'delivery-failure', 'layout-action-flows']) assert.ok(TOPICS.includes(t), t);
+  const msgs = getReference('messages').body.join('\n');
+  for (const needle of ['revoke-result', 'offer_record_id', 'deleted, gone, refused', 'sender_space_id', 'version is 1']) assert.ok(msgs.includes(needle), needle);
+  assert.ok(getReference('envelope-and-refusals').refusal_codes.some((r) => r.code === 'entity_config_conflict'));
+  const filing = getReference('filing').body.join('\n');
+  assert.ok(filing.includes('filing.entity') && filing.includes('NEVER names a folder'));
+  assert.ok(getReference('layout-action-flows').body.join('\n').includes('ok: false, code, reason'));
 });
 check('gotchas cite engine files', () => {
   assert.ok(GOTCHAS.filter((g) => /accounts-service\/[\w/]+\.go/.test(g)).length >= 8);

@@ -3,7 +3,7 @@
 // check the element tree survived, so the artefact can be inspected in the UI.
 //
 // A write response is not proof: quiva-flows-mcp's delete_workflow returned
-// {"message":"success"} while orphaning every draft (docs/quiva-mcp-handoff.md).
+// {"message":"success"} while orphaning every draft.
 // Everything here is verified by re-reading.
 //
 // Why this exists: `element` view nodes only started rendering when

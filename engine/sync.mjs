@@ -21,7 +21,7 @@
 // `--local <path>` swaps the `gh api` calls for `git -C <path>` against a
 // checkout you already have (e.g. when `gh` isn't installed). Same three
 // modes, same manifest; only where the tree/head sha comes from changes.
-//   node engine/sync.mjs --local ~/Documents/GitHub/evari-olympus --pin
+//   node engine/sync.mjs --local /path/to/checkout --pin
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';

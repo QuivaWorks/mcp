@@ -1,6 +1,8 @@
 // HTTP client for the Quiva distribution API (accounts-service, /accounts/*).
 // Auth, first configured wins: QUIVA_API_KEY, QUIVA_BEARER_TOKEN, then QUIVA_EMAIL + QUIVA_PASSWORD login (re-login once on 401).
 
+import { credentialsFromEnv } from './profile.js';
+
 const DEFAULT_API_URL = 'https://api.quiva.ai';
 
 export class QuivaClient {
@@ -16,14 +18,7 @@ export class QuivaClient {
 
   // Stdio entrypoints build a client from the environment; in-process hosts pass options.
   static fromEnv(env = process.env) {
-    return new QuivaClient({
-      apiUrl: env.QUIVA_API_URL,
-      apiKey: env.QUIVA_API_KEY,
-      bearerToken: env.QUIVA_BEARER_TOKEN,
-      email: env.QUIVA_EMAIL,
-      password: env.QUIVA_PASSWORD,
-      account: env.QUIVA_ACCOUNT,
-    });
+    return new QuivaClient(credentialsFromEnv(env));
   }
 
   hasCredentials() {

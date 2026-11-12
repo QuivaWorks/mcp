@@ -33,7 +33,8 @@ const CLEANUP = process.argv.includes('--cleanup');
 
 const COLLECTION_ID = '805092869';
 const COLLECTION = `ms.hub.config.collection.workflow.${COLLECTION_ID}`;
-const RECORD_CONFIG = 'risk_programme';
+// A record config that exists on the target environment.
+const RECORD_CONFIG = process.env.RECORD_CONFIG || 'example_record';
 const FLOW_NAME = 'mcp-verification-record-trigger';
 // Rule 1: this is not a free choice.
 const TRIGGER_NODE_ID = `record.${RECORD_CONFIG}`;
@@ -124,7 +125,7 @@ async function main() {
       {
         name: FLOW_NAME,
         description:
-          'Fires when a risk_programme record is written with completed:true. Proves hub-service record dispatch: the trigger node id must be record.<config_id> and the flow must be PUBLISHED.',
+          `Fires when a ${RECORD_CONFIG} record is written with completed:true. Proves hub-service record dispatch: the trigger node id must be record.<config_id> and the flow must be PUBLISHED.`,
         collection: COLLECTION,
         config: laidOut,
       },

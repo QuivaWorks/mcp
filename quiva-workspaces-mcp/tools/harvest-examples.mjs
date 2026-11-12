@@ -4,7 +4,7 @@
 //
 // Why: reference examples an agent learns from must be payloads that demonstrably
 // work. Hand-written examples are exactly the pattern that shipped a wrong
-// condition syntax in the flows MCP (see docs/lessons.md). These harvested files
+// condition syntax in the flows MCP. These harvested files
 // also serve as the golden fixtures for `npm test`: the local validator must
 // accept every space/task/comment that is already live.
 //

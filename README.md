@@ -36,20 +36,41 @@ So each server carries three things beyond a thin API wrapper:
   via `list_examples` / `get_example`. Harvested examples are evidence: they are
   known to work.
 
-## Setup
+## Install
+
+The fastest path is the hosted endpoint, `https://api.quiva.ai/mcp`, with a Quiva
+API key (Settings, API keys).
+
+**Claude Code** (plugin: the hosted server plus the `quiva-config` skill):
+
+```
+/plugin marketplace add QuivaWorks/mcp
+/plugin install quiva@quivaworks
+```
+
+**Codex**: see [AGENTS.md](AGENTS.md) for the agent instructions and the
+`~/.codex/config.toml` block; the remote server needs only `url` and
+`bearer_token_env_var` ([details](quiva-mcp-remote/README.md)). The
+[quiva-config skill](skills/quiva-config/) pulls, diffs and pushes account
+configuration from the command line.
+
+## Run the servers locally
 
 ```sh
 npm install
 cp quiva-flows-mcp/.env.example quiva-flows-mcp/.env   # and the other servers
 ```
 
-Fill in **one** auth option per `.env`. Precedence is `QUIVA_API_KEY`, then
-`QUIVA_BEARER_TOKEN`, then email + password. An API key works on every server,
-including `quiva-agents-mcp` — cerberus swaps it for a user JWT at the gateway
-before the request reaches hub-service (verified live 2026-09-27).
+The root `.mcp.json` registers only the hosted server. Register the local stdio servers
+you want with `claude mcp add` or a Codex `[mcp_servers.<name>]` block; each server's
+README has both.
 
-`.mcp.json` registers every stdio server, so Claude Code picks them up on open.
-Verify with `claude mcp list`.
+Credentials, first match wins: a **profile** (`QUIVA_PROFILE=<name>`, read from
+`~/.config/quiva/profiles.json`, shared by all seven servers and the quiva-config skill;
+`QUIVA_API_KEY_<NAME>` overrides the profile's key), then `QUIVA_API_KEY`, then
+`QUIVA_BEARER_TOKEN`, then email + password. The profile's `env` picks the API base
+URL. An API key works on every server, including `quiva-agents-mcp`: cerberus swaps it
+for a user JWT at the gateway before the request reaches hub-service.
 
 ```sh
 npm test                # local checks, no network
@@ -57,20 +78,8 @@ npm run engine:check    # is our engine documentation still current?
 ```
 
 `npm test` at the root runs every workspace's own suite (`node:test` for
-`quiva-mcp-remote`, a dependency-free `check()` harness everywhere else), all
-passing and none needing network, as of 2026-09-27:
-
-| Package | Checks |
-| --- | --- |
-| quiva-flows-mcp | 63 |
-| quiva-records-mcp | 119 |
-| quiva-documents-mcp | 45 |
-| quiva-workspaces-mcp | 183 |
-| quiva-agents-mcp | 53 |
-| quiva-distribution-mcp | 71 |
-| quiva-coworker-mcp | 75 |
-| quiva-mcp-remote | 35 |
-| **Total** | **644** |
+`quiva-mcp-remote`, a dependency-free `check()` harness everywhere else). None needs
+network.
 
 ## Remote (hosted) server
 
@@ -78,7 +87,7 @@ Prefer not to run anything locally? [quiva-mcp-remote](quiva-mcp-remote/) is one
 hosted MCP endpoint, `https://api.quiva.ai/mcp`, that composes every server above
 behind a single connection, authenticated with a Quiva API key. See
 [quiva-mcp-remote/README.md](quiva-mcp-remote/README.md) for client setup
-(Claude Code, Cursor, VS Code, Claude Desktop) and how to run it yourself.
+(Claude Code, Codex, Cursor, VS Code, Claude Desktop) and how to run it yourself.
 
 ## Keeping the docs honest
 
@@ -93,12 +102,10 @@ npm run engine:list               # what we cite, and which of our files cite it
 engine/fetch.sh <path-in-repo>    # read one engine file, no clone needed
 ```
 
-This needs the `gh` CLI authenticated as someone with read access to
-`myevari/evari-olympus` — any member of that org. There is no submodule and no
-vendored copy: files are fetched over the API on demand.
-
-Without `gh`, point the script at a local checkout instead — same three modes,
-blob shas read via `git ls-tree`/`git rev-parse` rather than the GitHub API:
+This is a maintainer check: it needs read access to the platform's engine source
+repository, which is private. Outside contributors can ignore it. With `gh`
+authenticated the files are fetched over the API; without it, point the script at a
+local checkout of the engine repository (blob shas read via `git ls-tree`):
 
 ```sh
 node engine/sync.mjs --local /path/to/evari-olympus [--pin|--list]
@@ -110,19 +117,12 @@ verified. Re-read it, fix what moved, then `npm run engine:pin` (or the
 
 ## Reading order
 
-- [docs/quiva-mcp-architecture.md](docs/quiva-mcp-architecture.md) — how the
-  servers and the platform fit together.
-- [docs/lessons.md](docs/lessons.md) — the failure modes that shaped all of this.
-  Short, and the single most useful thing to read first.
-- [docs/quiva-mcp-handoff.md](docs/quiva-mcp-handoff.md) — the running log:
-  current state, open questions, what is known to be stale.
-- `docs/quiva-*-playbook.md` — per-server working notes.
-- [specs/](specs/) — agent-instruction documents for platform features
+- [specs/](specs/): agent-instruction documents for platform features
   (form builder, form rules).
-- [specs/openapi/](specs/openapi/) — the platform's own OpenAPI specs, as Quiva
-  agent-tool definitions, plus the gateway route registry. **Do not trust them**:
-  most of the documentation above exists because they are wrong in ways that fail
-  silently. Good for shapes, and for deciding whether a route is routable at all.
+- [specs/openapi/](specs/openapi/): the platform's OpenAPI specs, generated from
+  the engine repository (do not hand-edit), plus the gateway route registry. Good for
+  shapes, and for deciding whether a route is routable at all; the documentation
+  above exists because they can be wrong in ways that fail silently.
 
 ## Verticals
 
@@ -135,15 +135,9 @@ before being pushed to the platform's `VERTICAL` space and deployed into account
 Two things to internalise before touching it: a folder's category name is a
 **routing key** and an unrecognised one deploys nothing silently; and a write is
 not done when the API returns 200 — indexing is asynchronous, and an index entry
-whose `name` comes back empty is invisible to both the deployer and the UI. See
-[docs/quiva-mcp-handoff.md](docs/quiva-mcp-handoff.md) §13.
+whose `name` comes back empty is invisible to both the deployer and the UI. See `get_workspaces_reference("verticals")`.
 
 ## Known stale
 
-Nothing repo-wide as of 2026-09-27. The inline `time_tracking.logs[]` shape this
-section used to flag is gone: `quiva-workspaces-mcp` now wraps the real
-`PUT/GET /workspaces/task/{id}/time-log` subresource with `add_time_log` /
-`list_time_logs` (server-minted ids, hydrated totals) — see that package's
-README. Per-package caveats that depend on which environment you're pointed at
-(e.g. `list_agents` paging, confirmed designed but not yet live on staging) live
-in that server's own tool descriptions, not here.
+Nothing repo-wide as of 2026-11-11. Per-package caveats that depend on which
+environment you are pointed at live in that server's own tool descriptions.

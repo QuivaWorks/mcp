@@ -1,7 +1,7 @@
 {
   "slug": "document-verification-example",
   "kind": "template",
-  "not_evidence": "HAND-WRITTEN. The two harvested templates on staging are thin (no output.name expression, no filters, no sub_templates), so this example exists to show the full surface. It is NOT proof the platform accepts it — the only proof is a live create -> publish -> trigger. See docs/lessons.md.",
+  "not_evidence": "HAND-WRITTEN. The two harvested templates on staging are thin (no output.name expression, no filters, no sub_templates), so this example exists to show the full surface. It is NOT proof the platform accepts it — the only proof is a live create -> publish -> trigger.",
   "teaches": [
     "output.name as an expression with no file extension (the extension comes from content_type)",
     "output bucket + folder placement, and the dot-separated document key that results",

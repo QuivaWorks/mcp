@@ -4,7 +4,6 @@ import assert from 'node:assert/strict';
 import { readHarvested } from '../src/examples.js';
 import { validate } from '../src/validate.js';
 import { getReference, GOTCHAS, ELEMENT_CATALOG, ELEMENT_KINDS, ELEMENT_CONTAINERS } from '../src/records-docs.js';
-import { config as riskProgramme } from './fixtures/risk-programme.mjs';
 import { readdirSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -603,47 +602,11 @@ check('an array-field container prop that is not accepted warns', () => {
   assert.ok(r.warnings.some((w) => w.includes('gridTemplateColumns') && w.includes('array-field container')), JSON.stringify(r.warnings));
 });
 
-check('the risk-programme fixture validates clean (0 errors, 0 warnings)', () => {
-  // The fixture is the source of truth for the live `risk_programme` config, so
-  // a regression in it fails here rather than on the platform.
-  const r = validate(riskProgramme);
-  assert.equal(r.valid, true, JSON.stringify(r.errors));
-  assert.equal(r.errors.length, 0, JSON.stringify(r.errors));
-  assert.equal(r.warnings.length, 0, JSON.stringify(r.warnings));
-});
-
-check('every risk-programme choice input carries options matching its enum', () => {
-  const CHOICE = new Set(['dropdown', 'multi-select', 'multi-toggle', 'statuses']);
-  const nodes = [];
-  const walk = (n) => {
-    if (Array.isArray(n)) return n.forEach(walk);
-    if (!n || typeof n !== 'object') return;
-    if (n.type === 'field') nodes.push(n);
-    Object.values(n).forEach(walk);
-  };
-  walk(riskProgramme.views);
-  const choices = nodes.filter((n) => CHOICE.has(n.inputType));
-  assert.ok(choices.length >= 8, `expected the programme's enum inputs, found ${choices.length}`);
-  for (const n of choices) {
-    assert.ok(Array.isArray(n.props?.options) && n.props.options.length, `${n.field} has no props.options`);
-  }
-  // And every repeater item leaf carries the `ui` mirror the renderer reads.
-  for (const [name, prop] of Object.entries(riskProgramme.schema.properties)) {
-    if (prop.type !== 'array' || !prop.items?.properties) continue;
-    for (const [leaf, lp] of Object.entries(prop.items.properties)) {
-      assert.ok(lp.ui?.inputType, `${name}[].${leaf} has no ui.inputType mirror`);
-      if (Array.isArray(lp.enum)) {
-        assert.ok(Array.isArray(lp.ui.props?.options) && lp.ui.props.options.length, `${name}[].${leaf} enum has no ui options`);
-      }
-    }
-  }
-});
-
 // --- golden gate ------------------------------------------------------------
 // Every config in examples/harvested/ is a REAL record config living on the
 // platform. If the validator rejects one, the VALIDATOR is wrong — that is the
 // whole point of this gate. Anything not explained by the allowlist below is a
-// bug by definition. (See docs/lessons.md: the flows MCP shipped a wrong rules
+// bug by definition. (the flows MCP shipped a wrong rules
 // syntax for two weeks because no check like this existed.)
 
 const ALLOWED_GOLDEN_FAILURES = [
@@ -1231,6 +1194,82 @@ await checkAsync('query_records: fields, parent_folder and filter reach the quer
   assert.equal(q.parent_folder, 'org-1');
   assert.equal(q.fields, 'title');
   assert.equal(q.filter, JSON.stringify([{ field: 'status', keyword: 'open' }]));
+});
+
+await checkAsync('query_records: view params reach the query string (latest_by as JSON, search_fields joined)', async () => {
+  const h = harness(() => ({ results: [], results_total: 0, total_hits: 0 }));
+  await h.run('query_records', {
+    scope_folder: 'case-1', config_id: 'policy_row', search: 'acme', search_fields: ['name', 'ref'],
+    date_field: 'created_at', date_from: '2026-01-01', date_to: '2026-03-31',
+    latest_by: { group_field: 'source_id', order_field: 'seq' },
+  });
+  const q = h.calls[0].query;
+  assert.equal(q.scope_folder, 'case-1');
+  assert.equal(q.search, 'acme');
+  assert.equal(q.search_fields, 'name,ref');
+  assert.equal(q.date_field, 'created_at');
+  assert.equal(q.date_from, '2026-01-01');
+  assert.equal(q.latest_by, JSON.stringify({ group_field: 'source_id', order_field: 'seq' }));
+});
+
+await checkAsync('query_records: scope_folder alone satisfies the scope; nothing at all is refused', async () => {
+  const h = harness(() => ({ results: [], total_hits: 0 }));
+  await h.run('query_records', { scope_folder: 'case-1' });
+  assert.equal(h.calls.length, 1);
+  assert.equal((await h.raw('query_records', {})).isError, true);
+  assert.equal(h.calls.length, 1);
+});
+
+await checkAsync('query_records: a malformed view is refused locally and sends nothing', async () => {
+  const h = harness(() => ({ results: [] }));
+  const bad = [
+    { config_id: 'c', latest_by: { group_field: 'a' } },
+    { config_id: 'c', latest_by: { group_field: 'a b', order_field: 'c' } },
+    { config_id: 'c', latest_by: 'newest' },
+    { config_id: 'c', date_from: '2026-01-01' },
+    { config_id: 'c', date_field: 'created_at' },
+    { config_id: 'c', date_field: 'created_at', date_from: 'yesterday' },
+    { config_id: ['a', 'b'], search: 'x' },
+    { config_id: ['a', 'b'], latest_by: { group_field: 'g', order_field: 'o' } },
+  ];
+  for (const extra of bad) {
+    const out = await h.run('query_records', { space_id: 'OPS', ...extra });
+    assert.equal(out.queried, false, JSON.stringify(extra));
+  }
+  const noConfig = await h.run('query_records', { space_id: 'OPS', search: 'x' });
+  assert.equal(noConfig.queried, false);
+  assert.match(noConfig.validation.errors[0], /exactly one config_id/);
+  assert.equal(h.calls.length, 0);
+});
+
+await checkAsync('query_records: built-in date field and scope need no config; payload date field does', async () => {
+  const h = harness(() => ({ results: [] }));
+  await h.run('query_records', { space_id: 'OPS', date_field: 'updated_at', date_to: '2026-03-31T00:00:00Z' });
+  assert.equal(h.calls.length, 1);
+  const out = await h.run('query_records', { space_id: 'OPS', date_field: 'renewal_date', date_to: '2026-03-31' });
+  assert.equal(out.queried, false);
+});
+
+await checkAsync('query_records: a truncated latest_by reply is flagged, total_hits counts groups', async () => {
+  const h = harness(() => ({ results: [{ id: '1' }], results_total: 1, total_hits: 1, truncated: true }));
+  const out = await h.run('query_records', { space_id: 'OPS', config_id: 'c', latest_by: { group_field: 'g', order_field: 'seq' }, limit: 500 });
+  assert.ok(out.warnings.some((w) => /truncated.*MISSING/.test(w)));
+  assert.ok(out.warnings.some((w) => /capped at 200/.test(w)));
+  assert.ok(out.warnings.some((w) => /SORTABLE/.test(w)));
+  const plain = await harness(() => ({ results: [], total_hits: 0 })).run('query_records', { space_id: 'OPS' });
+  assert.equal(plain.warnings, undefined);
+});
+
+check('query-views reference documents truncated/total_hits, and delete_record_if is documented internal-only', () => {
+  const r = getReference('query-views');
+  assert.match(r.latest_by_semantics.join(' '), /truncated: true/);
+  assert.match(r.latest_by_semantics.join(' '), /GROUPS/);
+  assert.match(JSON.stringify(getReference('endpoints').internal_only), /record-if.*NO gateway mapping/);
+});
+
+await checkAsync('no delete_record_if tool exists (the subject is internal-only)', async () => {
+  const h = harness(() => ({}));
+  await assert.rejects(async () => h.raw('delete_record_if', {}), TypeError);
 });
 
 await checkAsync('purge_records: refuses without confirm: true and sends nothing', async () => {

@@ -4,7 +4,7 @@
 // This is the check that the flows MCP lacked: a two-config golden gate passes a
 // validator that is confidently wrong. Only running the validator over the whole
 // corpus of configs that already exist tells you whether its rules match reality
-// (docs/lessons.md). Every error reported here is a config the platform accepted
+//. Every error reported here is a config the platform accepted
 // and the validator rejects — i.e. a validator bug, unless it is a config that is
 // genuinely broken and known to be.
 //

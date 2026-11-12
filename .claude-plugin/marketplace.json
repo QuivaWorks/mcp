@@ -1,0 +1,12 @@
+{
+  "name": "quivaworks",
+  "description": "QuivaWorks plugins for Claude Code",
+  "owner": { "name": "QuivaWorks" },
+  "plugins": [
+    {
+      "name": "quiva",
+      "source": "./",
+      "description": "Hosted QuivaWorks MCP server and the quiva-config skill"
+    }
+  ]
+}

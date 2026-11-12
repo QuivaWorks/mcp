@@ -43,6 +43,40 @@ only populated when a Bearer JWT is present. Prefer bearer/email auth.
 
 `QUIVA_API_URL` defaults to `https://api.quiva.ai`.
 
+## Register with Claude Code and Codex
+
+The repo no longer registers the local servers for you; add the ones you want.
+Clone the repo and run `npm install` at its root, then use an absolute path to
+`quiva-workspaces-mcp/bin/run.sh`. Put credentials in `quiva-workspaces-mcp/.env`, or use a profile (below).
+
+**Profile instead of a per-server `.env`.** Set `QUIVA_PROFILE=<name>` and the server
+reads `~/.config/quiva/profiles.json` (or `$QUIVA_CONFIG_DIR/profiles.json`):
+`{"<name>": {"env": "production", "account": "<id>", "api_key": "..."}}`. One profile
+serves all seven servers and the quiva-config skill. Resolution order: the profile's key
+(`QUIVA_API_KEY_<NAME>` overrides it; name upper-cased, non-alphanumerics as `_`),
+then `QUIVA_API_KEY`, `QUIVA_BEARER_TOKEN`, then email and password. A profile's `env`
+picks the API base URL; `QUIVA_API_URL` still wins if set. Profiles without an `api_key`
+are ignored.
+
+Claude Code:
+
+```bash
+claude mcp add quiva-workspaces \
+  -e QUIVA_PROFILE=<name> \
+  -- sh /path/to/mcp/quiva-workspaces-mcp/bin/run.sh
+```
+
+Codex (`~/.codex/config.toml`, or `.codex/config.toml` in a trusted project):
+
+```toml
+[mcp_servers.quiva-workspaces]
+command = "sh"
+args = ["/path/to/mcp/quiva-workspaces-mcp/bin/run.sh"]
+env = { QUIVA_PROFILE = "<name>" }
+```
+
+Restart the client after registering: servers connect at session start.
+
 ## Tools
 
 **Reference & validation (no API call)**
@@ -53,11 +87,15 @@ only populated when a Bearer JWT is present. Prefer bearer/email auth.
 
 **Spaces** — `list_spaces`, `create_space`, `get_space`, `update_space`, `delete_space`
 
-**Tasks** — `list_tasks`, `create_task`, `get_task`, `update_task`, `update_multi_task`, `delete_task`
+**Tasks** — `list_tasks`, `create_task`, `get_task`, `update_task`, `update_multi_task`, `delete_task`, `upsert_task_by_external_id` (idempotent create/update keyed on an external id, task sync), `list_space_changes` (the changes feed for a space)
+
+**Task relations** — `list_task_relations`, `link_task`, `delete_task_relation` (needs related tickets on in the space)
+
+**Space collections** — `list_space_collections`, `create_space_collection`, `update_space_collection`, `delete_space_collection` (the caller's sidebar groups)
 
 **Time logs** — `add_time_log`, `list_time_logs`
 
-**Task actions** — `set_task_action`, `delete_task_action`
+**Task actions** — `set_task_action`, `delete_task_action`. A new action must carry a valid resource (`record`, `record_config`, `file`, `assistant_session`, or a `todo` with `metadata.todos`) or the API returns 400.
 
 **Contacts** — `create_contact`
 
@@ -67,7 +105,9 @@ only populated when a Bearer JWT is present. Prefer bearer/email auth.
 
 **Comments** — `create_comment`, `list_comments`, `get_comment`, `update_comment`, `delete_comment`, `react_to_comment`
 
-**Files** — `list_files`, `create_folder`, `read_file`, `write_file`
+**Entity comments** — `list_entity_comments`, `create_entity_comment` (comments on a record or other entity, not a task)
+
+**Files** — `list_files`, `create_folder`, `file_case_folder`, `rename_folder` (label only; keys never change), `resolve_folder` (display path to key path), `read_file`, `write_file`
 
 **Users** — `list_users` (accounts-service, for resolving assignee/reporter ids)
 
@@ -94,7 +134,3 @@ Spec-vs-engine truths encoded in the validator and reference docs:
 
 Run `get_workspaces_reference("gotchas")` for the full list.
 
-## Register with Claude Code
-
-Already added to the repo `.mcp.json` as `quiva-workspaces`. Restart Claude Code
-(MCP servers connect at session start) to use the tools natively.

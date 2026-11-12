@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { QuivaClient } from './client.js';
 import { getExample, listExamples } from './examples.js';
 import { GOTCHAS, listReferenceTopics, getReference } from './records-docs.js';
-import { validate, queryFilterWarnings } from './validate.js';
+import { validate, queryFilterWarnings, queryViewProblems } from './validate.js';
 
 export const instructions = `
 Tools for creating and managing Quiva records. A "record config" defines a
@@ -121,9 +121,13 @@ const fieldsField = z
   .optional()
   .describe('Projection: payload paths each row keeps (array or comma-separated, max 100). Any path, declared or not. Projected rows are partial — never write one back.');
 
+const LATEST_BY_SCAN_CAP = 1000;
+
 // Query-string params shared by query_records and list_records.
-function recordQuery({ folder, space_id, parent_folder, config_id, filter, sort_by, fields, limit, offset }) {
-  const query = { folder, space_id, parent_folder, limit, offset, sort_by };
+function recordQuery({ folder, space_id, parent_folder, config_id, filter, sort_by, fields, limit, offset, scope_folder, search, search_fields, date_field, date_from, date_to, latest_by }) {
+  const query = { folder, space_id, parent_folder, limit, offset, sort_by, scope_folder, search, date_field, date_from, date_to };
+  if (search_fields !== undefined) query.search_fields = Array.isArray(search_fields) ? search_fields.join(',') : search_fields;
+  if (latest_by !== undefined) query.latest_by = JSON.stringify(latest_by);
   if (config_id !== undefined) query.config_id = Array.isArray(config_id) ? config_id.join(',') : config_id;
   // A bare array is the service's shorthand for "just the conditions".
   if (filter !== undefined) query.filter = JSON.stringify(filter);
@@ -205,14 +209,21 @@ export function registerTools(server, client, { prefix = '' } = {}) {
 
   tool(
     'list_record_configs',
-    'List record configurations. Optionally pass `ids` to batch-fetch specific configs. Without ids the list is paged by the storage layer: when the reply has `truncated: true`, call again with `cursor: next_cursor`. Call this first to discover available record types.',
+    'List record configurations. Default (`summary: true`) pages id, name, description, collection_id and updated_at only (GET /records/config?summary=1) with `limit`/`offset`, optional `search` and `collection_id`; the reply carries `total_hits`. Pass `summary: false` for full configs paged by cursor (when `truncated: true`, call again with `cursor: next_cursor`), or `ids` to batch-fetch full configs. Call this first to discover available record types, then get_record_config for the schema.',
     {
-      ids: z.array(z.string()).optional().describe('Optional list of config ids to fetch (batch). Omit for all.'),
-      limit: z.number().int().positive().optional().describe('Page size (unbatched listing only)'),
-      cursor: z.string().optional().describe('next_cursor from a previous truncated reply'),
+      ids: z.array(z.string()).optional().describe('Optional list of config ids to fetch in full (batch). Omit for all.'),
+      summary: z.boolean().default(true).describe('true = lightweight paged summaries (limit/offset); false = full configs (limit/cursor)'),
+      limit: z.number().int().positive().optional().describe('Page size (default 25, max 1000 for summaries)'),
+      offset: z.number().int().min(0).optional().describe('Summary paging offset'),
+      search: z.string().optional().describe('Summary only: match on name/description'),
+      collection_id: z.string().optional().describe('Summary only: filter by record set collection'),
+      cursor: z.string().optional().describe('next_cursor from a previous truncated full-config reply'),
     },
-    async ({ ids, limit, cursor }) =>
-      client.get('/records/config', ids?.length ? { ids: ids.join(',') } : { limit, cursor })
+    async ({ ids, summary, limit, offset, search, collection_id, cursor }) => {
+      if (ids?.length) return client.get('/records/config', { ids: ids.join(',') });
+      if (summary) return client.get('/records/config', { summary: 1, limit, offset, search, collection_id });
+      return client.get('/records/config', { limit, cursor });
+    }
   );
 
   tool(
@@ -318,6 +329,41 @@ export function registerTools(server, client, { prefix = '' } = {}) {
   );
 
   // ---------------------------------------------------------------------------
+  // Record config versions (publish snapshots; records-service/configversion)
+  // ---------------------------------------------------------------------------
+
+  tool(
+    'list_record_config_versions',
+    'List a record config\'s published versions, newest first (GET /records/config-versions/{id}): the current version and the numbers the next publish would take (`next_version`, `next_major_version`).',
+    { id: z.string().describe('Record config id') },
+    async ({ id }) => client.get(`/records/config-versions/${encodeURIComponent(id)}`)
+  );
+
+  tool(
+    'get_record_config_version',
+    'Get one published version of a record config with its full snapshot (GET /records/config-version/{id}?version=MAJOR.MINOR).',
+    {
+      id: z.string().describe('Record config id'),
+      version: z.string().describe('Version number, MAJOR.MINOR, from list_record_config_versions'),
+    },
+    async ({ id, version }) => client.get(`/records/config-version/${encodeURIComponent(id)}`, { version })
+  );
+
+  tool(
+    'publish_record_config',
+    'Publish the record config as currently stored as its next version (POST /records/config-publish/{id}). Save changes with update_record_config first. Minor by default; `major: true` bumps the major number. Pass `expected_current_version_id` to refuse if someone else published in between, and `idempotency_key` to make a retry safe.',
+    {
+      id: z.string().describe('Record config id'),
+      title: z.string().describe('Short title for this version'),
+      summary: z.string().optional().describe('What changed'),
+      major: z.boolean().optional().describe('Bump the major version'),
+      expected_current_version_id: z.string().optional().describe('Refuse unless this is still the current version id'),
+      idempotency_key: z.string().optional().describe('Replays with the same key return the first result'),
+    },
+    async ({ id, ...body }) => client.post(`/records/config-publish/${encodeURIComponent(id)}`, body)
+  );
+
+  // ---------------------------------------------------------------------------
   // Records
   // ---------------------------------------------------------------------------
 
@@ -383,7 +429,7 @@ export function registerTools(server, client, { prefix = '' } = {}) {
 
   tool(
     'query_records',
-    'Search records (index-backed, GET /records). Requires folder OR space_id. Narrow by config_id(s), parent_folder, and a payload `filter` over DECLARED index_fields; sort with sort_by (default created_at); keep only some payload paths with `fields`. Page with limit (default 25, max 1000) and offset: `total_hits` is the full match count, `results_total` only this page. A filter on an undeclared field returns an empty page, not an error.',
+    'Search records (index-backed, GET /records). Requires folder, space_id OR scope_folder. Narrow by config_id(s), parent_folder, and a payload `filter` over DECLARED index_fields; sort with sort_by (default created_at); keep only some payload paths with `fields`. Page with limit (default 25, max 1000) and offset: `total_hits` is the full match count, `results_total` only this page. A filter on an undeclared field returns an empty page, not an error. Table-view params (need records-service from evari-olympus #1560; all but scope_folder need exactly ONE config_id): scope_folder (records filed in that folder or directly under it), search + search_fields (words ANDed, each ORed over the fields; text fields match by prefix, keyword exactly; default = the config\'s text index fields), date_field + date_from/date_to (RFC3339 or YYYY-MM-DD; a bare date_to covers its whole day), and latest_by { group_field, order_field } (the newest row per group: ONE page of at most 1000 rows, `truncated: true` when the scope held more, `total_hits` then counts GROUPS, limit capped at 200). See get_records_reference("query-views").',
     {
       folder: z.string().optional().describe('Folder id (folder or space_id required)'),
       space_id: z.string().optional().describe('Space id (folder or space_id required)'),
@@ -395,15 +441,27 @@ export function registerTools(server, client, { prefix = '' } = {}) {
       filter: filterField,
       sort_by: z.string().optional().describe('Record field or declared index field to sort by, "-field" to reverse'),
       fields: fieldsField,
-      limit: z.number().int().positive().max(1000).optional(),
+      limit: z.number().int().positive().max(1000).optional().describe('Default 25, max 1000; with latest_by max 200'),
       offset: z.number().int().nonnegative().optional(),
+      scope_folder: z.string().optional().describe('Only records filed in this folder or directly under it (folder or parent_folder equals it). Counts as the required scope.'),
+      search: z.string().optional().describe('Words ANDed (first 5 used); needs exactly one config_id'),
+      search_fields: z.union([z.array(z.string()), z.string()]).optional().describe('Declared text or keyword index fields search matches (array or comma-separated); default the config\'s text index fields'),
+      date_field: z.string().optional().describe('created_at, updated_at, or a declared date index field of the one config_id; needs date_from or date_to'),
+      date_from: z.string().optional().describe('RFC3339 or YYYY-MM-DD'),
+      date_to: z.string().optional().describe('RFC3339 or YYYY-MM-DD; a bare date covers that whole day'),
+      latest_by: jsonValue.optional().describe('{ group_field, order_field }: keep, per group_field value, the row with the highest order_field. order_field must be a declared SORTABLE index field. One page of at most 1000 rows; see `truncated`.'),
     },
     async (args) => {
-      if (!args.folder && !args.space_id) {
-        throw new Error('folder or space_id is required for query_records');
+      if (!args.folder && !args.space_id && !args.scope_folder) {
+        throw new Error('folder, space_id or scope_folder is required for query_records');
       }
-      const warnings = queryFilterWarnings(args.filter);
+      const view = queryViewProblems(args);
+      if (view.errors.length) return { queried: false, validation: { valid: false, errors: view.errors, warnings: view.warnings } };
+      const warnings = [...queryFilterWarnings(args.filter), ...view.warnings];
       const res = await client.get('/records', recordQuery(args));
+      if (res?.truncated) {
+        warnings.push(`truncated: latest_by read only the first ${LATEST_BY_SCAN_CAP} rows (newest ${args.latest_by?.order_field} first) of a larger scope, so a group whose rows all sit past the cut is MISSING. total_hits counts the groups found, not the groups that exist. Narrow the scope (scope_folder, date window, filter).`);
+      }
       return warnings.length ? { ...res, warnings } : res;
     }
   );

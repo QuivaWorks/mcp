@@ -4,7 +4,7 @@
 //
 // Why: reference examples an agent learns from must be configs that demonstrably
 // work. Hand-written examples are exactly the pattern that shipped a wrong
-// condition syntax in the flows MCP (see docs/lessons.md) — and this MCP has the
+// condition syntax in the flows MCP — and this MCP has the
 // same latent defect in its `sub_templates[].conditions` docs. These harvested
 // files also serve as the golden fixtures for `npm test`: the local validator
 // must accept every template that is already live.
@@ -254,7 +254,7 @@ async function main() {
   console.error(
     `  templates using sub_templates[].conditions: ${conditionUsers}` +
       (conditionUsers === 0
-        ? ' — the documented {all:[...]} form is UNPROVEN on this environment (see docs/quiva-mcp-handoff.md §4)'
+        ? ' — the documented {all:[...]} form is UNPROVEN on this environment'
         : ' — INSPECT THESE: if they use {all:[...]} their sub-templates are being silently dropped')
   );
 }
