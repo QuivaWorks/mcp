@@ -14,10 +14,9 @@ In Quiva, open **Settings → API keys** and create a key. Treat it like a passw
 anyone holding it can act as you in your account. Give it an expiry, and revoke it
 from the same page when you no longer need it.
 
-Send the key on every request as `Authorization: Bearer <API_KEY>`
-(`X-Api-Key: <API_KEY>` also works). A request without one gets `401`. If a request
-carries both `Authorization: Bearer` and `X-Api-Key`, `Authorization` wins and
-`X-Api-Key` is ignored.
+Send the key on every request as `x-api-key: <API_KEY>`. The API gateway accepts
+API keys only in that header. `Authorization: Bearer` is for JWT session tokens, not
+API keys. A request without a credential gets `401`.
 
 ## Tools
 
@@ -45,7 +44,7 @@ Replace `<API_KEY>` with your key in each example.
 
 ```sh
 claude mcp add --transport http quiva https://api.quiva.ai/mcp \
-  --header "Authorization: Bearer <API_KEY>"
+  --header "x-api-key: <API_KEY>"
 ```
 
 Add `--scope user` to make it available in every project. Run `/mcp` inside
@@ -59,7 +58,7 @@ from an environment variable, so it never sits in the file:
 ```toml
 [mcp_servers.quiva]
 url = "https://api.quiva.ai/mcp"
-bearer_token_env_var = "QUIVA_API_KEY"
+env_http_headers = { "x-api-key" = "QUIVA_API_KEY" }
 ```
 
 Export `QUIVA_API_KEY` in the shell that starts Codex.
@@ -73,7 +72,7 @@ Export `QUIVA_API_KEY` in the shell that starts Codex.
   "mcpServers": {
     "quiva": {
       "url": "https://api.quiva.ai/mcp",
-      "headers": { "Authorization": "Bearer <API_KEY>" }
+      "headers": { "x-api-key": "<API_KEY>" }
     }
   }
 }
@@ -93,7 +92,7 @@ never sits in the file:
     "quiva": {
       "type": "http",
       "url": "https://api.quiva.ai/mcp",
-      "headers": { "Authorization": "Bearer ${input:quiva-api-key}" }
+      "headers": { "x-api-key": "${input:quiva-api-key}" }
     }
   }
 }
@@ -109,8 +108,8 @@ Claude Desktop's config file launches local commands, so connect through the
   "mcpServers": {
     "quiva": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "https://api.quiva.ai/mcp", "--header", "Authorization:${QUIVA_AUTH}"],
-      "env": { "QUIVA_AUTH": "Bearer <API_KEY>" }
+      "args": ["-y", "mcp-remote", "https://api.quiva.ai/mcp", "--header", "x-api-key:${QUIVA_API_KEY}"],
+      "env": { "QUIVA_API_KEY": "<API_KEY>" }
     }
   }
 }
@@ -122,7 +121,7 @@ Restart Claude Desktop after saving.
 
 | Response | Meaning |
 |---|---|
-| `401` | No key was sent. Check the header name and the `Bearer ` prefix. |
+| `401` | No key was sent. Check that the key is sent in the `x-api-key` header. |
 | A tool returns `401` or `403` from the API | The key is expired, revoked, or lacks permission for that action. |
 | `403 Origin not allowed` | A browser-based client on an origin that isn't allowed. Use a desktop or CLI client. |
 | `413` | The request body is over the size limit (1 MiB by default). Split large payloads. |
