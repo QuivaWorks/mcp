@@ -5550,7 +5550,7 @@
             },
             "run_id": {
               "type": "string",
-              "description": "Tracking id of a paused run to resume (human-in-the-loop)"
+              "description": "Full tracking id of a paused or errored run to resume (human-in-the-loop), in the form ms.hub.run.<uuid>.<flow subject>, as returned when the run started and by the paused-runs list. A bare uuid is rejected with 400 invalid run_id. Resuming a run that is not paused or errored returns 409."
             },
             "retry": {
               "type": "boolean",
