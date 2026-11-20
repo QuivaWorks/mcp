@@ -315,7 +315,7 @@ export function registerTools(server, client, { prefix = '' } = {}) {
 
   tool(
     'delete_record_config',
-    'Delete a record configuration AND all of its records (the records storage bucket is purged). Irreversible, so it requires confirm: true: one call destroys every record of the type.',
+    'Delete a record configuration AND all of its records (the records storage bucket is purged). Irreversible, so it requires confirm: true: one call destroys every record of the type. A set that keeps history leaves that history behind (readable by root and admin), and creating a config with the same id returns 409 until erase_record_config_history clears it.',
     {
       id: z.string().describe('Record config id'),
       confirm: z.boolean().optional().describe('Must be true. Deletes the config and purges every one of its records.'),
@@ -325,6 +325,21 @@ export function registerTools(server, client, { prefix = '' } = {}) {
         throw new Error('delete_record_config purges every record of the config irreversibly; pass confirm: true to proceed');
       }
       return client.delete(`/records/config/${encodeURIComponent(id)}`);
+    }
+  );
+
+  tool(
+    'erase_record_config_history',
+    'Erase the kept history of a DELETED record config (DELETE /records/config/{config_id}/history): every record\'s history events, amendments and series buckets. Irreversible, root or admin only, idempotent. Returns 409 while the config still exists or its delete is still running; needed before a config with the same id can be created again.',
+    {
+      id: z.string().describe('Id of the deleted record config'),
+      confirm: z.boolean().optional().describe('Must be true. Erases the history of every record of the config.'),
+    },
+    async ({ id, confirm }) => {
+      if (confirm !== true) {
+        throw new Error('erase_record_config_history erases the kept history of every record irreversibly; pass confirm: true to proceed');
+      }
+      return client.delete(`/records/config/${encodeURIComponent(id)}/history`);
     }
   );
 
@@ -655,7 +670,7 @@ export function registerTools(server, client, { prefix = '' } = {}) {
 
   tool(
     'purge_records',
-    'DELETE a config\'s records in bulk, keeping the config (DELETE /records/{config_id}/purge). Unscoped it removes EVERY record of the config; with space_id and/or folder (the record\'s own folder, not its parent) only those. Irreversible, publishes no events. Requires confirm: true. If the reply has truncated: true, records remain — run the same call again.',
+    'DELETE a config\'s records in bulk, keeping the config (DELETE /records/{config_id}/purge). Unscoped it removes EVERY record of the config; with space_id and/or folder (the record\'s own folder, not its parent) only those. Irreversible, publishes no events. Requires confirm: true. If the reply has truncated: true, records remain — run the same call again. Returns 409 for a set that keeps history, since a purge would write no delete events: delete its records one at a time, or delete the set.',
     {
       config_id: z.string().describe('Record config id'),
       space_id: z.string().optional().describe('Only records in this space'),
