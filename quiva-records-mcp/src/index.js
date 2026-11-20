@@ -643,7 +643,7 @@ export function registerTools(server, client, { prefix = '' } = {}) {
 
   tool(
     'export_records',
-    'Email a record set as a CSV or JSON attachment (POST /records/export-records). The whole matching set (up to 50,000 rows) is mailed to `email`, which can be any address, so it requires an explicit `email` and confirm: true once the user has agreed to the recipient. Nothing but { message, records } comes back. Needs space_id or folder; `filter`/`sort_by` are the same as query_records.',
+    'Email a record set as a CSV or JSON attachment (POST /records/export-records). The whole matching set (up to 50,000 rows) is mailed to `email`, which can be any address, so it requires an explicit `email` and confirm: true once the user has agreed to the recipient. The reply is { message, records, size, filename } plus bucket and key when the file is stored. Needs space_id or folder; `filter`/`sort_by` are the same as query_records.',
     {
       config_id: z.string().describe('Record config id'),
       space_id: z.string().optional(),

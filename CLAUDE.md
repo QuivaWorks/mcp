@@ -1,6 +1,6 @@
 # Working in this repo
 
-Seven MCP servers (193 tools) plus a hosted remote that composes them, which let an agent build real Quiva configuration. See
+Seven MCP servers (194 tools) plus a hosted remote that composes them, which let an agent build real Quiva configuration. See
 [README.md](README.md) for what each one does and how to set it up.
 
 ## The defect class this repo exists to prevent
