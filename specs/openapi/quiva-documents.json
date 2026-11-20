@@ -2034,7 +2034,7 @@
       "/file-generator/document-convert": {
         "post": {
           "summary": "Convert a document between formats",
-          "description": "Convert a document between formats via LibreOffice: pdf to docx, doc/rtf/odt to docx, xls/csv to xlsx, docx to pdf. Required fields: bucket, key, source_ext, to. Source up to 16 MB; the converted output is capped at 8 MB and returned inline (base64), plus a report.",
+          "description": "Convert a document between formats via LibreOffice: pdf to docx, doc/rtf/odt to docx, xls/csv to xlsx, docx/pptx to pdf. Required fields: bucket, key, source_ext, to. Source up to 16 MB; the converted output is capped at 8 MB and returned inline (base64), plus a report. A docx/pptx to pdf result is stored beside the source as <key>.preview.pdf and reused while the source is unchanged; it also returns digest (the source digest it was rendered from) and cached (true when the stored copy was reused).",
           "operationId": "convertDocument",
           "tags": [
             "Generation"
@@ -2070,6 +2070,24 @@
                 "application/json": {
                   "schema": {
                     "type": "object",
+                    "properties": {
+                      "content": {
+                        "type": "string",
+                        "description": "The converted file, base64."
+                      },
+                      "report": {
+                        "type": "object",
+                        "additionalProperties": true
+                      },
+                      "digest": {
+                        "type": "string",
+                        "description": "docx/pptx to pdf only: digest of the source version the PDF was rendered from."
+                      },
+                      "cached": {
+                        "type": "boolean",
+                        "description": "docx/pptx to pdf only: true when the stored <key>.preview.pdf was reused."
+                      }
+                    },
                     "additionalProperties": true
                   }
                 }

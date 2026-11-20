@@ -117,7 +117,7 @@
         },
         "post": {
           "summary": "Create a record configuration",
-          "description": "Defines a new category of records by specifying a schema (field names, types, validation constraints) and UI rendering hints. The `id` you choose becomes the `config_id` used in all subsequent record operations for this type. Returns 409 if a configuration with the same ID already exists.",
+          "description": "Defines a new category of records by specifying a schema (field names, types, validation constraints) and UI rendering hints. The `id` you choose becomes the `config_id` used in all subsequent record operations for this type. Returns 409 if a configuration with the same ID already exists. Also 409 while a deleted set with the same ID is still having its records tombstoned, and while history kept from a deleted set with the same ID exists: erase it with `DELETE /records/config/{config_id}/history` first.",
           "operationId": "createRecordConfig",
           "tags": [
             "Record Configs"
@@ -166,7 +166,7 @@
               }
             },
             "409": {
-              "description": "A record configuration with the given ID already exists",
+              "description": "A record configuration with the given ID already exists, a deleted one with that ID is still being removed, or history kept from a deleted one with that ID has not been erased",
               "content": {
                 "application/json": {
                   "schema": {
@@ -306,7 +306,7 @@
         },
         "delete": {
           "summary": "Delete a record configuration",
-          "description": "Deletes the configuration and its associated records storage bucket.",
+          "description": "Deletes the configuration and its records. When the set keeps history, each record first gets a delete event in its history, keeping every earlier version; this runs in the background after the reply and is resumed after a restart. The records are purged only once every event is written. The kept history stays readable by root and admin, and only `DELETE /records/config/{config_id}/history` erases it. A set without history has its records purged at once.",
           "operationId": "deleteRecordConfig",
           "tags": [
             "Record Configs"
@@ -346,6 +346,110 @@
             },
             "404": {
               "description": "Record configuration not found",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "500": {
+              "description": "The pending delete could not be recorded; nothing was deleted",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/config/{config_id}/history": {
+        "delete": {
+          "summary": "Erase a deleted record set's history",
+          "description": "Hard-erases the kept history events, amendments and time-series buckets of every record of a deleted record set. Root and admin only. Idempotent.",
+          "operationId": "deleteRecordConfigHistory",
+          "tags": [
+            "Record History"
+          ],
+          "x-resource-type": "service",
+          "parameters": [
+            {
+              "name": "config_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "History erased",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/Response"
+                      },
+                      {
+                        "properties": {
+                          "body": {
+                            "$ref": "#/components/schemas/RecordHistoryEraseResponse"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Missing or invalid config_id",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "No signed-in user on the request",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "`{\"code\":\"history_forbidden\"}` — only root and admin can erase history",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "409": {
+              "description": "The record set still exists, or its delete is still tombstoning its records",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "500": {
+              "description": "`{\"code\":\"history_erase_failed\"}` — a partial erase; retry the same call. The body still carries `series_docs_deleted`.",
               "content": {
                 "application/json": {
                   "schema": {
@@ -407,9 +511,27 @@
               "name": "offset",
               "in": "query",
               "required": false,
-              "description": "Number of records to skip (pagination).",
+              "description": "Number of records to skip (pagination). At most 10,000; use `cursor` to read further.",
               "schema": {
                 "type": "integer"
+              }
+            },
+            {
+              "name": "cursor",
+              "in": "query",
+              "required": false,
+              "description": "`next_cursor` from the previous page, passed back unchanged with the same filter and sort_by. Replaces offset: sending both is refused 400, as is a cursor with latest_by. Pages of any depth; rows with equal sort values are neither skipped nor repeated. The sort field must be a declared sortable index field. Answers 501 while the indexer predates cursor paging.",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "want_cursor",
+              "in": "query",
+              "required": false,
+              "description": "`true` on the first page of a cursor walk: the reply then carries `next_cursor` and no `next_offset`. Cursor pages order by the index's sort keys; without it the page is ordered and paged exactly as before. Refused 400 with latest_by; answers 501 while the indexer predates cursor paging.",
+              "schema": {
+                "type": "boolean"
               }
             },
             {
@@ -428,6 +550,24 @@
               "description": "Records whose folder OR parent_folder equals this. Satisfies the scope requirement on its own.",
               "schema": {
                 "type": "string"
+              }
+            },
+            {
+              "name": "under_folder",
+              "in": "query",
+              "required": false,
+              "description": "Records in this folder or anywhere below it, at any depth: a folder, or a dotted folder path (read by its last parent.child pair). One indexed term, ANDed with every other parameter. Echoed as under_folder in the reply. Answers 503 until the account's records are indexed with their folder ancestors. Satisfies the scope requirement on its own.",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "ancestors_unverified",
+              "in": "query",
+              "required": false,
+              "description": "Staff only, with under_folder: answer before the account's marker is set, so the backfill can check parity. A client is refused 403.",
+              "schema": {
+                "type": "boolean"
               }
             },
             {
@@ -1232,7 +1372,7 @@
       "/records/{config_id}/purge": {
         "delete": {
           "summary": "Purge records",
-          "description": "Deletes a config's records in bulk, leaving the config itself in place. Without space_id or folder the config's whole record range is dropped in one operation. With either, only matching records are removed: the records are read a page at a time and each page's matches are deleted in concurrent batches. One call empties the scope — there is no cursor for the caller to follow — unless the reply carries `truncated`, which means records remain and the same call resumes the purge.",
+          "description": "Deletes a config's records in bulk, leaving the config itself in place. Without space_id or folder the config's whole record range is dropped in one operation. With either, only matching records are removed: the records are read a page at a time and each page's matches are deleted in concurrent batches. One call empties the scope — there is no cursor for the caller to follow — unless the reply carries `truncated`, which means records remain and the same call resumes the purge. Refused with 409 on a set that keeps history: delete its records singly, or delete the set.",
           "operationId": "purgeRecords",
           "tags": [
             "Records"
@@ -1299,6 +1439,16 @@
                   }
                 }
               }
+            },
+            "409": {
+              "description": "The record set keeps history; a bulk purge would write no delete events",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
             }
           }
         },
@@ -1317,7 +1467,7 @@
       "/records/{config_id}/{id}/history": {
         "get": {
           "summary": "Get a record's change history",
-          "description": "Pages one record's history events, newest first. No record-existence check — a deleted record's history is still readable. `mode` in the reply is the config's CURRENT history mode, which may be `none` if history was later turned off; any retained events are still returned.",
+          "description": "Pages one record's history events, newest first. No record-existence check — a deleted record's history is still readable. `mode` in the reply is the config's CURRENT history mode, which may be `none` if history was later turned off; any retained events are still returned. Once the set is deleted, root and admin can still read its kept history, and `mode` comes from the newest event.",
           "operationId": "getRecordHistory",
           "tags": [
             "Record History"
@@ -1439,7 +1589,7 @@
         ],
         "delete": {
           "summary": "Erase a record's history",
-          "description": "Hard-erases one record's history events and time-series buckets. The record itself is untouched. Idempotent — safe to retry the same call after a partial failure.",
+          "description": "Hard-erases one record's history events and time-series buckets. Root and admin only. The record itself is untouched, and the record and its set may already be deleted. Idempotent — safe to retry the same call after a partial failure.",
           "operationId": "deleteRecordHistory",
           "tags": [
             "Record History"
@@ -1477,8 +1627,18 @@
                 }
               }
             },
-            "404": {
-              "description": "Record configuration not found",
+            "401": {
+              "description": "No signed-in user on the request",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "`{\"code\":\"history_forbidden\"}` — only root and admin can erase history",
               "content": {
                 "application/json": {
                   "schema": {
@@ -2035,7 +2195,7 @@
       "/records/{config_id}/series": {
         "get": {
           "summary": "Read a time-series field across a config's records",
-          "description": "Reads one indexed history.series.fields field from the records-series bucket index, ascending by effective_at then record_id. Backed by a daily bucket index, not the raw event stream.",
+          "description": "Reads one indexed history.series.fields field from the records-series bucket index, ascending by effective_at then record_id. Backed by a daily bucket index, not the raw event stream. Once the set is deleted, root and admin can still read its buckets; the field is then not checked.",
           "operationId": "getRecordSeries",
           "tags": [
             "Record History"
@@ -2455,6 +2615,296 @@
           }
         }
       },
+      "/records/member-rows": {
+        "post": {
+          "summary": "Get or make a member's row",
+          "description": "A journey member's one row of a config. For the member's own anchor config it is the anchor record. Otherwise it is the row at the member's fixed id, else an older row in the member's folder, else a new row made at the fixed id. Staff only.",
+          "operationId": "getOrCreateMemberRow",
+          "tags": [
+            "Records"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "space_id": {
+                      "type": "string"
+                    },
+                    "member": {
+                      "type": "string",
+                      "description": "The member's folder, `household.member` or `member`."
+                    },
+                    "config_id": {
+                      "type": "string"
+                    },
+                    "done_field": {
+                      "type": "string",
+                      "description": "Picks a finished older row over a newer blank one."
+                    }
+                  },
+                  "required": [
+                    "space_id",
+                    "member",
+                    "config_id"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/member-send": {
+        "post": {
+          "summary": "Send a members step to every member",
+          "description": "Sends a journey members step to every member filed under a folder, as a background job over pages of members. For each member it makes or reuses a client login, upserts a task keyed by round, step and member, adds one action per form, gets or makes the member's rows, empties `reset` fields, stamps `sent_field` and invites any login it made. Every step is safe to repeat, and a repeat reopens the task and its actions. Starting the same round, step and folder again resumes a stopped job; a finished one starts a fresh pass. `retry_failed` resumes an unfinished pass, then runs the failed members again. `dry_run` starts a preview job that counts members, new logins and members without an email, with a paged row per member. `remind` starts a reminder job over the members the send reached: it skips members who are done or were reminded in the last 24 hours and notifies the rest with `title` as the message. Every job answers its status, whose `id` reads it back. Staff only.",
+          "operationId": "sendMembersStep",
+          "tags": [
+            "Records"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "space_id": {
+                      "type": "string"
+                    },
+                    "folder": {
+                      "type": "string"
+                    },
+                    "round_config": {
+                      "type": "string"
+                    },
+                    "round_id": {
+                      "type": "string"
+                    },
+                    "step": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "priority": {
+                      "type": "string"
+                    },
+                    "metadata": {
+                      "type": "object"
+                    },
+                    "forms": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "config_id": {
+                            "type": "string"
+                          },
+                          "form_id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "done_field": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "config_id",
+                          "label"
+                        ]
+                      }
+                    },
+                    "folder_forms": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "config_id": {
+                            "type": "string"
+                          },
+                          "form_id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "done_field": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "config_id",
+                          "label"
+                        ]
+                      },
+                      "description": "The folder's own rows, added to every member's task."
+                    },
+                    "create_missing": {
+                      "type": "boolean"
+                    },
+                    "reset": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "sent_field": {
+                      "type": "string",
+                      "description": "Stamped on each member's rows by a send. Required unless remind is set."
+                    },
+                    "unsent_only": {
+                      "type": "boolean",
+                      "description": "Skip members already sent to (a stamped row) or finished on every form; a dry run counts the same set."
+                    },
+                    "dry_run": {
+                      "type": "boolean"
+                    },
+                    "retry_failed": {
+                      "type": "boolean"
+                    },
+                    "remind": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "space_id",
+                    "folder",
+                    "round_id",
+                    "step",
+                    "title"
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/records/member-send/{id}": {
+        "get": {
+          "summary": "Read a members step send",
+          "description": "A job's progress (`state`, `sent`, `failed`, `new_logins`; a preview's `preview` counts (`members`, `new_logins`, `no_email`); a reminder's `reminded` and `skipped`) and one page of its failed members, or of a preview's `preview_rows`. Staff only.",
+          "operationId": "getMembersStepSend",
+          "tags": [
+            "Records"
+          ],
+          "x-resource-type": "service",
+          "x-path-derived": true,
+          "parameters": [
+            {
+              "name": "id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "cursor",
+              "in": "query",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "limit",
+              "in": "query",
+              "schema": {
+                "type": "integer",
+                "default": 25,
+                "maximum": 100
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Success",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Response"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "/records/upsert-record": {
         "post": {
           "summary": "Upsert a record by identity",
@@ -2596,7 +3046,7 @@
       "/records/reindex": {
         "post": {
           "summary": "Reindex a config's records",
-          "description": "Rewrites one page of the config's records into the search index so a newly declared index field becomes filterable. Resume with the cursor from the previous reply. A record the indexer refuses is reported by id and does not stop the page.",
+          "description": "Rewrites one page of the config's records into the search index so a newly declared index field becomes filterable. Resume with the cursor from the previous reply. A record the indexer refuses is reported by id and does not stop the page. With `ancestors` instead, reads (`status`), sets (`mark`) or withdraws (`unmark`) the account's folder-ancestors marker; mark and unmark are root and admin only, and mark answers 409 while an index rebuild runs, which lets under_folder answer; the backfill tool marks only after its parity check passes.",
           "operationId": "reindexRecords",
           "tags": [
             "Records"
@@ -2617,11 +3067,17 @@
                     },
                     "limit": {
                       "type": "integer"
+                    },
+                    "ancestors": {
+                      "type": "string",
+                      "enum": [
+                        "status",
+                        "mark",
+                        "unmark"
+                      ],
+                      "description": "Read the folder-ancestors marker with pending and failed sweeps, or set or withdraw it (root and admin); config_id is then not required."
                     }
-                  },
-                  "required": [
-                    "config_id"
-                  ]
+                  }
                 }
               }
             }
@@ -2652,8 +3108,8 @@
       },
       "/records/export-records": {
         "post": {
-          "summary": "Email an export of a record set",
-          "description": "Builds a CSV or JSON file of the records matching the same filter and sort strings a records query takes, and emails it as an attachment.",
+          "summary": "Export a record set as a file",
+          "description": "Builds a CSV or JSON file of the records matching the same filter and sort strings a records query takes. Download stores it for the caller alone and returns its bucket and key; email attaches it, or stores and links it when it is too large to attach. An export that cannot read every record fails rather than returning a short file. Validation answers at once. By default the export runs inline and answers 200 with the result. With async: true it runs in the background and the reply is 202 with a job_id; a token with no user id still runs inline. Post {job_id} alone to read the caller's job: status running, done (result holds the fields an inline export returns) or error. A running job not updated for 10 minutes reads as error. Jobs are kept for 24 hours.",
           "operationId": "exportRecords",
           "tags": [
             "Records"
@@ -2669,19 +3125,56 @@
                     "config_id": {
                       "type": "string"
                     },
+                    "space_id": {
+                      "type": "string",
+                      "description": "Required unless folder is set."
+                    },
+                    "folder": {
+                      "type": "string",
+                      "description": "Required unless space_id is set."
+                    },
                     "format": {
-                      "type": "string"
+                      "type": "string",
+                      "enum": [
+                        "csv",
+                        "json"
+                      ],
+                      "default": "csv"
+                    },
+                    "delivery": {
+                      "type": "string",
+                      "enum": [
+                        "email",
+                        "download"
+                      ],
+                      "default": "email"
+                    },
+                    "email": {
+                      "type": "string",
+                      "description": "Where an emailed export goes. Defaults to the calling user."
                     },
                     "filter": {
                       "type": "string"
                     },
-                    "sort": {
+                    "sort_by": {
                       "type": "string"
+                    },
+                    "zip": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "Wrap the file in a .zip holding it under its usual name."
+                    },
+                    "async": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "Run the export as a job and answer 202 {job_id}. Without it the export runs inline and answers 200."
+                    },
+                    "job_id": {
+                      "type": "string",
+                      "description": "Sent alone, reads the caller's export job instead of starting one, with or without async. Another user's job is 404."
                     }
                   },
-                  "required": [
-                    "config_id"
-                  ]
+                  "description": "config_id is required unless job_id is set."
                 }
               }
             }
@@ -2692,13 +3185,86 @@
               "content": {
                 "application/json": {
                   "schema": {
-                    "$ref": "#/components/schemas/Response"
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/Response"
+                      },
+                      {
+                        "properties": {
+                          "body": {
+                            "type": "object",
+                            "properties": {
+                              "message": {
+                                "type": "string"
+                              },
+                              "records": {
+                                "type": "integer",
+                                "description": "Records in the file."
+                              },
+                              "size": {
+                                "type": "integer",
+                                "description": "File size in bytes."
+                              },
+                              "filename": {
+                                "type": "string"
+                              },
+                              "bucket": {
+                                "type": "string",
+                                "description": "Set when the file was stored: always for download, and for an email too large to attach."
+                              },
+                              "key": {
+                                "type": "string",
+                                "description": "The stored object's key, readable only by the caller. Set with bucket."
+                              }
+                            },
+                            "description": "The result of an inline export. A job read instead returns the ExportJob fields: job_id, delivery, status, stage (waiting, reading, writing), read, total, error, result, started_at, updated_at."
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "202": {
+              "description": "Export started as a job; only when the request set async",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/Response"
+                      },
+                      {
+                        "properties": {
+                          "body": {
+                            "type": "object",
+                            "properties": {
+                              "job_id": {
+                                "type": "string",
+                                "description": "Post it back as {job_id} to read the job."
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
                   }
                 }
               }
             },
             "400": {
               "description": "Request refused or invalid",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "The record set, or the caller's job, was not found",
               "content": {
                 "application/json": {
                   "schema": {
@@ -4709,6 +5275,13 @@
             "views": {
               "$ref": "#/components/schemas/RecordViews"
             },
+            "index_fields": {
+              "type": "array",
+              "description": "Payload fields lifted into the search index: the only ones a query, filter or metric can use. Replaced wholesale on update; an added or changed field, or a journey edit under a derived field, starts a background reindex.",
+              "items": {
+                "$ref": "#/components/schemas/RecordIndexField"
+              }
+            },
             "created_at": {
               "type": "string",
               "format": "date-time",
@@ -4776,6 +5349,13 @@
             },
             "views": {
               "$ref": "#/components/schemas/RecordViews"
+            },
+            "index_fields": {
+              "type": "array",
+              "description": "Payload fields lifted into the search index: the only ones a query, filter or metric can use. Replaced wholesale on update; an added or changed field, or a journey edit under a derived field, starts a background reindex.",
+              "items": {
+                "$ref": "#/components/schemas/RecordIndexField"
+              }
             }
           },
           "example": {
@@ -4934,6 +5514,100 @@
             },
             "views": {
               "$ref": "#/components/schemas/RecordViews"
+            },
+            "index_fields": {
+              "type": "array",
+              "description": "Payload fields lifted into the search index: the only ones a query, filter or metric can use. Replaced wholesale on update; an added or changed field, or a journey edit under a derived field, starts a background reindex.",
+              "items": {
+                "$ref": "#/components/schemas/RecordIndexField"
+              }
+            }
+          }
+        },
+        "RecordIndexField": {
+          "type": "object",
+          "required": [
+            "field"
+          ],
+          "properties": {
+            "field": {
+              "type": "string",
+              "description": "Dotted path into the record's data; also accepted as `key`. Indexed as `data_<path with dots as underscores>`."
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "keyword",
+                "text",
+                "text_sortable",
+                "number",
+                "numeric",
+                "date",
+                "datetime"
+              ],
+              "description": "Empty means keyword."
+            },
+            "sortable": {
+              "type": "boolean",
+              "description": "Usable as sort_by."
+            },
+            "derive": {
+              "$ref": "#/components/schemas/IndexDerive"
+            }
+          }
+        },
+        "IndexDerive": {
+          "type": "object",
+          "description": "Computes the field's value when the record is indexed instead of reading `data[field]`. The field must be a keyword, a single name, and not a schema property. A metric can filter on it and group by it; a run grouped by it is refused when it cannot be pushed down to the index.",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "journey_round",
+                "member_progress"
+              ],
+              "description": "`journey_round`: `turn` or `handed` for an open round of the journey the record runs (`views.forms[].journey`); absent once the round is ended, closed or at an unknown stage. `member_progress`: how far a member's form row has got, by the rule's other fields: `done`, `done_agreed`, `to_confirm`, `answered_sent`, `answered_unsent`, `sent` or `open`, on the member's one row only (see `anchor`)."
+            },
+            "done_field": {
+              "type": "string",
+              "description": "`member_progress`: filled once the row is finished. Without it, the record's `completed` flag."
+            },
+            "answer_fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "`member_progress`: the dotted fields that count as answers. Wins over `answer_prefix`."
+            },
+            "answer_prefix": {
+              "type": "string",
+              "description": "`member_progress`: top-level keys starting with this are answers. Without either, every key but bookkeeping and `sent_field` is."
+            },
+            "form": {
+              "type": "string",
+              "description": "`member_progress`: a finished row with readiness gaps on this form (`state.readiness[form].missing`) is `to_confirm`."
+            },
+            "sent_field": {
+              "type": "string",
+              "description": "`member_progress`: filled when the row was sent. Without it, no row reads as sent."
+            },
+            "agreed_field": {
+              "type": "string",
+              "description": "`member_progress`: a finished row whose field holds a number is `done_agreed`."
+            },
+            "reset_on_send": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "`member_progress`: fields a send clears to `false`. `false` in one of them is no answer; `false` elsewhere is."
+            },
+            "anchor": {
+              "type": "boolean",
+              "description": "`member_progress`: the members' own anchor config, whose row is each member's anchor record (filed under a parent folder, at a bare member folder). Without it, only the row at the member's fixed id gets a value."
             }
           }
         },
@@ -5054,6 +5728,10 @@
             "total_hits": {
               "type": "integer",
               "description": "Total matching records across all pages (returned by the query endpoint; used with limit/offset)."
+            },
+            "next_cursor": {
+              "type": "string",
+              "description": "Query endpoint, with `want_cursor` or `cursor`: pass as `cursor` for the next page. Absent on the last page. It resumes after the last record returned, so a page trimmed to fit the reply, or with records withheld from a client, loses nothing."
             }
           }
         },
@@ -5154,7 +5832,7 @@
         },
         "RecordHistory": {
           "type": "object",
-          "description": "Per-config history declaration. Absent, or {\"mode\":\"none\"}, means history is off. Turning history on starts recording from that moment; nothing backfills.",
+          "description": "Per-config history declaration. Absent, or {\"mode\":\"none\"}, means history is off. Turning history on starts recording from that moment; nothing backfills. History is kept for the account's history retention, not per config; a `retention` field sent here is ignored.",
           "properties": {
             "mode": {
               "type": "string",
@@ -5165,16 +5843,6 @@
               ],
               "default": "none",
               "description": "\"audit\" keeps the full record snapshot on every changed write. \"timeseries\" keeps only the numeric fields named in series.fields, bucketed by day."
-            },
-            "retention": {
-              "type": "string",
-              "enum": [
-                "90d",
-                "365d",
-                "1095d"
-              ],
-              "default": "365d",
-              "description": "How long events are kept. Enforced by a retention sweeper; the underlying stream's own MaxAge is the 1095d ceiling."
             },
             "series": {
               "$ref": "#/components/schemas/RecordHistorySeries",
@@ -5198,7 +5866,6 @@
           },
           "example": {
             "mode": "timeseries",
-            "retention": "365d",
             "series": {
               "fields": [
                 "rate"
