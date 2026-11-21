@@ -83,7 +83,7 @@ Restart the client after registering: servers connect at session start.
 - `validate_record_config` — id/name/schema/views lint (incl. the `field` vs `ref` gotcha), table-view filters, the `views.flow` wizard, `index_fields`, `source` and the `unset_*` flags
 
 **Record configs**: `list_record_configs` (pages summaries with `GET /records/config?summary=1`; `summary: false` for full configs, `ids` to batch), `get_record_config`,
-`create_record_config`, `update_record_config`, `delete_record_config` (purges every record; requires `confirm: true`)
+`create_record_config`, `update_record_config`, `delete_record_config` (purges every record; requires `confirm: true`), `erase_record_config_history` (erases a deleted config's kept history; requires `confirm: true`)
 
 **Config versions**: `list_record_config_versions`, `get_record_config_version`, `publish_record_config`
 

@@ -275,13 +275,19 @@
               "name": "scheduled",
               "in": "query",
               "schema": {
-                "type": "boolean"
-              }
+                "type": "string",
+                "enum": [
+                  "true",
+                  "false",
+                  "any"
+                ]
+              },
+              "description": "`true` lists only scheduled tasks; absent or `false` only unscheduled ones; `any` both."
             },
             {
               "name": "limit",
               "in": "query",
-              "description": "How many results to return at most. `has_more` tells you whether another page exists.",
+              "description": "How many results to return at most, up to 999. `has_more` tells you whether another page exists.",
               "schema": {
                 "type": "integer",
                 "default": 300
@@ -337,7 +343,7 @@
             {
               "name": "status",
               "in": "query",
-              "description": "Exact match on status; comma-separated values to filter by multiple statuses",
+              "description": "Exact match on status; comma-separated values to filter by multiple statuses. See `with_no_status`.",
               "schema": {
                 "type": "string"
               }
@@ -420,7 +426,7 @@
               "name": "parent",
               "in": "query",
               "required": false,
-              "description": "Parent task id, to list subtasks.",
+              "description": "Parent task id, to list subtasks; comma-separated to list several parents' subtasks.",
               "schema": {
                 "type": "string"
               }
@@ -456,7 +462,104 @@
               "name": "exclude_subtasks",
               "in": "query",
               "required": false,
-              "description": "`true` leaves subtasks out.",
+              "description": "`true` drops subtasks from the page after it is read; each parent still nests subtasks on the same page. Prefer `parents_only`, which pages and counts parents only.",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "parents_only",
+              "in": "query",
+              "required": false,
+              "description": "`true` pages top-level tasks only, so `total_hits` counts parents; each parent carries all its subtasks in `subtasks`.",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "nest_subtasks",
+              "in": "query",
+              "required": false,
+              "description": "`true` gives every listed parent all its subtasks in `subtasks`, while subtasks are still listed as rows of their own.",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "with_no_status",
+              "in": "query",
+              "required": false,
+              "description": "`true` adds tasks with no status to the `status` filter; on its own, lists only tasks with no status.",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "q",
+              "in": "query",
+              "required": false,
+              "description": "Search: any word of the title or description, the last word as a prefix, or a task id prefix (`OPS-12` finds OPS-120 to OPS-129).",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "ids",
+              "in": "query",
+              "required": false,
+              "description": "Comma-separated task ids, read by key.",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "folders",
+              "in": "query",
+              "required": false,
+              "description": "Comma-separated folders, each matched exactly.",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "under_folder",
+              "in": "query",
+              "required": false,
+              "description": "A folder and every folder nested in it, absolute (`spaces.<id>.a`) or space-relative (`a`).",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "dated",
+              "in": "query",
+              "required": false,
+              "description": "`true` lists tasks with a due date or scheduled time, `false` those with neither.",
+              "schema": {
+                "type": "string",
+                "enum": [
+                  "true",
+                  "false"
+                ]
+              }
+            },
+            {
+              "name": "counts",
+              "in": "query",
+              "required": false,
+              "description": "`status` adds `counts.status`: the number of matching tasks per status, `\"\"` for tasks with no status. A failed count leaves `counts` out rather than failing the page.",
+              "schema": {
+                "type": "string",
+                "enum": [
+                  "status"
+                ]
+              }
+            },
+            {
+              "name": "count_due",
+              "in": "query",
+              "required": false,
+              "description": "With `counts=status`, a `start,end` date range; adds `counts.due`, how many matching tasks are due in it.",
               "schema": {
                 "type": "string"
               }
@@ -4007,7 +4110,7 @@
       "/workspaces/tasks/my-tasks": {
         "get": {
           "summary": "List my tasks",
-          "description": "Every non-archived task across all spaces assigned to the caller. dated=true (default) keeps tasks with a due date or scheduled time, dated=false only those with neither, dated=any everything.",
+          "description": "Every non-archived task across all spaces assigned to the caller. dated=true (default) keeps tasks with a due date or scheduled time, dated=false only those with neither, dated=any everything. With `indexed=true`, `dated`, `status` and `with_no_status` are index conditions and the reply carries `total_hits`.",
           "operationId": "listMyTasks",
           "tags": [
             "Tasks"
@@ -4034,6 +4137,63 @@
               "name": "cursor",
               "in": "query",
               "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "offset",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "sort_by",
+              "in": "query",
+              "required": false,
+              "description": "Defaults to `created_at`.",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "sort_order",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ],
+                "default": "asc"
+              }
+            },
+            {
+              "name": "indexed",
+              "in": "query",
+              "required": false,
+              "description": "`true` filters `dated` and `status` in the index.",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "status",
+              "in": "query",
+              "required": false,
+              "description": "With `indexed=true`: comma-separated statuses.",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "with_no_status",
+              "in": "query",
+              "required": false,
+              "description": "With `indexed=true`: adds tasks with no status.",
               "schema": {
                 "type": "string"
               }
@@ -5984,6 +6144,25 @@
             "has_more": {
               "type": "boolean",
               "description": "True when another page exists. Left out when false."
+            },
+            "total_hits": {
+              "type": "integer",
+              "description": "Every match across all pages, as the index counts them."
+            },
+            "counts": {
+              "type": "object",
+              "description": "Present when `counts=status` was asked for and could be read.",
+              "properties": {
+                "status": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer"
+                  }
+                },
+                "due": {
+                  "type": "integer"
+                }
+              }
             }
           }
         },

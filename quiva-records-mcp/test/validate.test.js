@@ -1178,6 +1178,15 @@ await checkAsync('delete_record_config: refuses without confirm: true and sends 
   assert.equal(h.calls[0].path, '/records/config/tasks');
 });
 
+await checkAsync('erase_record_config_history: refuses without confirm: true and sends nothing', async () => {
+  const h = harness(() => ({ config_id: 'tasks', series_docs_deleted: 0 }));
+  assert.equal((await h.raw('erase_record_config_history', { id: 'tasks' })).isError, true);
+  assert.equal(h.calls.length, 0);
+  await h.run('erase_record_config_history', { id: 'tasks', confirm: true });
+  assert.equal(h.calls[0].method, 'DELETE');
+  assert.equal(h.calls[0].path, '/records/config/tasks/history');
+});
+
 await checkAsync('query_records: a min with no max is sent but warned (the query path accepts it)', async () => {
   const h = harness(() => ({ results: [], total_hits: 0 }));
   const out = await h.run('query_records', { space_id: 'OPS', filter: [{ operator: 'OR', conditions: [{ field: 'budget', min: 100 }] }] });
